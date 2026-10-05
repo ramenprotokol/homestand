@@ -250,6 +250,44 @@ describe("analyze: ties, missing data and centring", () => {
   });
 });
 
+describe("analyze: a dropped combination with an extreme lift (Amendment 2 centring, Amendment 3 theme mean)", () => {
+  // The theme with the lowest planted effect, at a club that ran 3+ themes: its lift becomes +50 and its LLM score
+  // is removed, so it is dropped. "Over every club that ran the theme" and "over kept clubs" then differ sharply.
+  const theme = [...THEMES].sort((a, b) => world.themeEffect[a] - world.themeEffect[b])[0];
+  const club = world.clubs.find((c) => world.ran.get(c)!.includes(theme) && world.ran.get(c)!.length >= 3)!;
+  const isDropped = (n: ThemeNight) => n.club === club && n.theme === theme;
+  const nights = world.nights.map((n) => (isDropped(n) ? { ...n, lift: 50, liftR2: 50 } : n));
+  const keptNights = nights.filter((n) => !isDropped(n));
+  const scores = structuredClone(plantedScores);
+  delete scores.llm[club][theme];
+  const r = analyze(nights, scores, OPTS);
+
+  it("centres over every club that ran the theme, not only the kept ones: H1 and R2 match the 'over all' reference", () => {
+    const qz = zPredictor(scores.qloo);
+    const overAll = referenceAccuracy(nights, scores, qz, centredLifts(nights));
+    const overKept = referenceAccuracy(nights, scores, qz, centredLifts(keptNights));
+    expect(r.diagnostics.droppedCombos).toBe(1);
+    expect(Math.abs(overAll - overKept)).toBeGreaterThan(0.01);
+    expect(r.h1.accuracy.estimate).toBeCloseTo(overAll, 12);
+    expect(r.r2.accuracy.estimate).toBeCloseTo(referenceAccuracy(nights, scores, qz, centredLifts(nights, "liftR2")), 12);
+  });
+  it("uses the centring constant (mean over every club that ran the theme) as the theme mean lift in the Spearman", () => {
+    const themeMeanLifts = (ns: ThemeNight[]) => {
+      const ct = clubThemeLifts(ns, "lift");
+      return THEMES.map((t) => {
+        const xs = [...ct].filter(([k]) => k.endsWith(`|${t}`)).map(([, v]) => v);
+        return xs.reduce((s, x) => s + x, 0) / xs.length;
+      });
+    };
+    const pops = THEMES.map((t) => POPULARITY[t]);
+    const overAll = spearman(pops, themeMeanLifts(nights));
+    const overKept = spearman(pops, themeMeanLifts(keptNights));
+    expect(Math.abs(overAll - overKept)).toBeGreaterThan(0.1);
+    expect(r.descriptive.raw.themesInSpearman).toBe(9);
+    expect(r.descriptive.raw.spearmanPopularityVsThemeMeanLift).toBeCloseTo(overAll, 12);
+  });
+});
+
 describe("analyze: pooled OLS (H3)", () => {
   it("recovers a planted night-level slope on Qloo z with theme fixed effects (noiseless)", () => {
     const rng = mulberry32(11);

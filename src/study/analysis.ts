@@ -234,7 +234,7 @@ function standardise(table: ScoreTable, label: string): Standardised {
 }
 
 /** Steps 2–4: the missing-data rule, centring and the predictor values of every kept combination. */
-function keepCombos(combos: readonly Combo[], scores: Scores): { kept: Kept[]; dropped: number; qloo: Standardised; llm: Standardised } {
+function keepCombos(combos: readonly Combo[], scores: Scores): { kept: Kept[]; dropped: number; qloo: Standardised; llm: Standardised; liftMean: Map<StudyThemeId, number> } {
   const qloo = standardise(scores.qloo, "qloo");
   const llm = standardise(scores.llm, "llm");
   const liftMean = themeMeans(combos, (c) => c.lift);
@@ -254,7 +254,7 @@ function keepCombos(combos: readonly Combo[], scores: Scores): { kept: Kept[]; d
       lCall: llm.flat.has(c.theme) ? null : lz,
     });
   }
-  return { kept, dropped: combos.length - kept.length, qloo, llm };
+  return { kept, dropped: combos.length - kept.length, qloo, llm, liftMean };
 }
 
 // ---------- pairs and accuracy ----------
@@ -449,10 +449,13 @@ function popularityCentred(kept: readonly Kept[], pairs: readonly Pair[]): numbe
   return acc;
 }
 
-/** Spearman of national popularity against each theme's mean over its kept club-theme lifts (A3 b). */
-function popularitySpearman(kept: readonly Kept[], scores: Scores): { rho: number | null; themes: number } {
-  const themes = THEME_IDS.filter((t) => kept.some((c) => c.theme === t));
-  const themeMeanLift = themes.map((t) => mean(kept.filter((c) => c.theme === t).map((c) => c.lift)));
+/**
+ * Spearman of national popularity against each theme's mean lift (A3 b). The theme mean is the centring constant,
+ * the mean club-theme lift over every club that ran the theme (Amendment 3), not only the kept combinations.
+ */
+function popularitySpearman(liftMean: ReadonlyMap<StudyThemeId, number>, scores: Scores): { rho: number | null; themes: number } {
+  const themes = THEME_IDS.filter((t) => liftMean.has(t) && readPopularity(scores, t) !== undefined);
+  const themeMeanLift = themes.map((t) => liftMean.get(t)!);
   const rho = themes.length >= 2 ? spearman(themes.map((t) => scores.nationalPopularity[t]), themeMeanLift) : Number.NaN;
   return { rho: Number.isFinite(rho) ? rho : null, themes: themes.length };
 }
@@ -497,12 +500,12 @@ function checkOptions(opts: AnalyzeOptions): void {
 export function analyze(nights: readonly ThemeNight[], scores: Scores, opts: AnalyzeOptions): StudyResults {
   checkOptions(opts);
   const combos = groupCombos(nights);
-  const { kept, dropped, qloo, llm } = keepCombos(combos, scores);
+  const { kept, dropped, qloo, llm, liftMean } = keepCombos(combos, scores);
   const byClub = clubPairs(kept);
   const pairs = [...byClub.values()].flat();
   if (pairs.length === 0) throw new Error("No within-club pairs after the missing-data rule: nothing to analyse");
   const boot = pairBootstrap([...byClub.values()].map(tally), opts.reps, opts.seed);
-  const spear = popularitySpearman(kept, scores);
+  const spear = popularitySpearman(liftMean, scores);
   return {
     h1: hypothesis(boot.h1),
     h2: { llmAccuracy: boot.llm, difference: boot.diff, beats: boot.diff.lo > 0 },
