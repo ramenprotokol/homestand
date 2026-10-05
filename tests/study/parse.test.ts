@@ -19,6 +19,18 @@ describe("parseSchedule", () => {
     expect(n.promoNames).toEqual(["Bluey Night", "Postgame Fireworks", "Bobblehead Giveaway"]);
     expect(nights[1]).toMatchObject({ doubleHeader: true, promoNames: [], fireworks: false, giveaway: false, city: null, lat: null, venueId: null });
   });
+  it("treats only Y and S as double-headers; a missing field is a single game", () => {
+    const withFlag = (flag: string | undefined) => {
+      const raw = structuredClone(sample) as { dates: { games: Record<string, unknown>[] }[] };
+      const game = raw.dates.flatMap((d) => d.games).find((g) => g.gamePk === 1)!;
+      if (flag === undefined) delete game.doubleHeader; else game.doubleHeader = flag;
+      return parseSchedule(raw, 12).find((n) => n.gamePk === 1)?.doubleHeader;
+    };
+    expect(withFlag(undefined)).toBe(false);
+    expect(withFlag("N")).toBe(false);
+    expect(withFlag("Y")).toBe(true);
+    expect(withFlag("S")).toBe(true);
+  });
   it("uses codedGameState F, not the display text: postponed rows with attendance are dropped", () => {
     expect(byPk(3)).toBeUndefined();
   });

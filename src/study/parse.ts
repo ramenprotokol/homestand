@@ -74,7 +74,7 @@ function parseGame(g: unknown, sportId: number): Night | null {
     weekday: day.getUTCDay(),
     month: day.getUTCMonth() + 1,
     attendance,
-    doubleHeader: str(g.doubleHeader) !== "N",
+    doubleHeader: ["Y", "S"].includes(str(g.doubleHeader) ?? ""),
     promoNames,
     promoTypes,
     fireworks:
