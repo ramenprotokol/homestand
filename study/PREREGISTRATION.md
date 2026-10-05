@@ -121,4 +121,67 @@ Only H1 is confirmatory. Everything else is labelled secondary or descriptive.
 
 ## Amendments
 
-_None yet._
+### Amendment 1: 2026-10-05, after an independent design review, before any Qloo request
+
+The original text above is kept unchanged. Where they differ, the rules below replace it.
+
+**A1. National popularity is not z-scored.**
+- Qloo local affinity and the LLM rating are standardised **within theme across clubs** (z-score over the clubs in A2), so each says how far a market leans toward a theme relative to other markets.
+- National popularity is **not** standardised. It is one number per theme, identical for every club: the mean of the bundle entities' Qloo `popularity` values at the time of the pull.
+- By construction it carries no local information. It answers "which themes are big everywhere", not "which themes this market leans to".
+
+**A2. Every theme is scored for every club.**
+- **What is requested:** Qloo and LLM scores for **every theme × every baseline club**, 9 × 120 = 1,080 requests each, not only the combinations that ran a theme. Z-scores are computed over all 120 clubs.
+- **Fallback:** if Qloo's event limits do not allow 1,080 requests, use the 350 theme × club combinations that ran a theme, with z-scores over those clubs per theme. This fallback is recorded as an amendment before the pull.
+- **Location:** each club's location is its most-used venue's latitude and longitude from the pipeline. Two clubs share identical coordinates, so they get identical Qloo and LLM scores. This is noted, not corrected.
+
+**A3. H1 uses theme-centred lift, and national popularity leaves H2.**
+- **H1, correct call:** a predictor calls a pair correctly when the theme it scores higher had the higher **theme-centred lift**. A tie in the predictor, or in the outcome, counts as 0.5.
+- **Theme-centred lift:** the club's mean lift for that theme, minus the mean of that quantity over all clubs that ran the theme.
+- **H2 becomes:** a paired club-bootstrap interval for (Qloo accuracy − LLM accuracy), both on the theme-centred outcome. "Beats" means the interval lies above zero.
+- **National popularity is reported descriptively instead.** It predicts the same order for every club, and on the centred outcome every one of its calls is a tie. The two descriptive reports:
+  - (a) its pairwise accuracy on **raw** (uncentred) lift, next to Qloo's and the LLM's raw-lift accuracies. This is labelled as a theme-level baseline with about 9 effective data points.
+  - (b) the Spearman correlation between national popularity and the nine theme mean lifts.
+- **H3:** for national popularity, the pooled OLS leaves out the theme fixed effects, because it is collinear with them. This is reported for context only.
+
+**A4. The Day-1 request shape is chosen without looking at outcomes.**
+- **No outcome data:** the Day-1 tests run from a club list containing only club name, city, state, latitude and longitude. They never read `data/derived/` or any attendance or lift value. No accuracy or correlation against lift is computed before the full pull.
+- **How the shape is chosen,** by these criteria in order:
+  1. It returns a numeric affinity for every resolved entity at 95% of ballparks or more.
+  2. The score varies across ballparks (more than one distinct value per entity).
+  3. It uses the smallest radius of 40 km or more that meets (1) and (2).
+  4. If `signal.location` as a POINT fails (1), the fallback is the locality entity nearest the ballpark.
+- **Scope:** the tests use at most 10 clubs, chosen alphabetically.
+- **Recorded before the pull, as an amendment:** the chosen shape, the bundle entity IDs, the popularity values and the request count.
+
+**A5. The "flat affinity" diagnostic is fixed in advance.**
+- Under Descriptive: report each theme bundle's across-club SD of the Qloo score and its number of distinct values.
+- If a bundle's score doesn't vary across clubs, its pairs are ties (0.5) and it stays in the sample. Nothing is dropped on this basis.
+
+**A6. The LLM prompt uses the bundle wording.** The prompt becomes:
+
+> "On a scale of 1 to 10, how much does the local market around {city}, {state} over-index on {theme label} (for example {bundle entities, exactly as listed in the Qloo bundle}) compared with the average US Minor League Baseball market? Reply with a single integer."
+
+The theme labels used are "country music" and "pro wrestling" for those two themes.
+
+**Bundle refinements, decided now:**
+- **Dinosaur** adds the children's TV show *Dinosaur Train* to *Jurassic Park* (1993) and *Jurassic World* (2015), if Qloo resolves it. MiLB dinosaur nights are children's events.
+- **Princess** is recorded as a proxy for the children's dress-up audience. Many matched nights are "Pirates & Princesses" style events.
+- **Country** stays the three artists. A genre tag will not be tried.
+
+**Robustness and limitations, labelled as such:**
+- **R1, per-club-weighted accuracy:** each club's pairs are averaged first, then the club averages are averaged. Twelve clubs with 6–8 themes contribute 37% of pairs, so this checks the result isn't driven by a dozen large clubs.
+- **R2, promo stacking:**
+  - Study nights carry 2.5–3.0 promos on average, against 1.75 on other nights. Jersey auctions, appearances and drink specials are not controlled.
+  - This is noise, not bias, unless clubs stack more promos on themes their market loves. That would favour Qloo, and this is stated.
+  - A robustness baseline adds a "number of other promos" regressor.
+- **R3, baseline includes the study nights:** the baseline is fitted with the 385 study nights included, which shrinks their lift slightly. In-sample and held-out lifts correlate at 0.999. This is noted, not changed.
+- **R4, edge nights:** no study night falls on July 3 or 4 or on a club's opening date. Six fall on a club's last home date. This is noted, not changed.
+
+**Power, from a simulation on the real cluster structure (89 clubs, 543 pairs, 200 simulations per effect size, club bootstrap):**
+- **Under no effect:** the accuracy SD is about 2.8 percentage points (about 300 effective pairs), and the false-pass rate is 1–4%.
+- **Where the pass line sits:** the lower-bound rule binds at an observed accuracy of about 55.5%.
+- **What is detectable:** 80% power needs a true pairwise accuracy of about 58%.
+- **How a miss is reported:** "not detected at this sample size", not "disproved".
+
+**The analysis script** (per-club-theme averaging, centring, z-scores, pairs, ties, a seeded club bootstrap, H1–H3, R1 and the descriptives) is written and tested on synthetic data before the pull. It is committed as part of this lock.
