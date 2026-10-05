@@ -1,0 +1,24 @@
+{
+  "dates": [
+    { "games": [
+      { "gamePk": 1, "officialDate": "2025-06-07", "doubleHeader": "N", "status": { "detailedState": "Final" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "venue": { "location": { "city": "Riverbend", "stateAbbrev": "OH", "defaultCoordinates": { "latitude": 40.1, "longitude": -82.9 } } },
+        "gameInfo": { "attendance": 6120 },
+        "promotions": [
+          { "name": "Bluey Night", "offerType": "Theme Days" },
+          { "name": "Postgame Fireworks", "offerType": "Day of Game Highlights" },
+          { "name": "Bobblehead Giveaway", "offerType": "Giveaway" }
+        ] },
+      { "gamePk": 2, "officialDate": "2025-06-08", "doubleHeader": "Y", "status": { "detailedState": "Final" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 3000 } },
+      { "gamePk": 3, "officialDate": "2025-06-09", "doubleHeader": "N", "status": { "detailedState": "Postponed" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "gameInfo": { "attendance": 0 } },
+      { "gamePk": 4, "officialDate": "2025-06-10", "doubleHeader": "N", "status": { "detailedState": "Final" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "gameInfo": {} }
+    ] }
+  ]
+}
