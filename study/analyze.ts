@@ -1,14 +1,16 @@
-// Runs the pre-registered analysis (study/PREREGISTRATION.md with Amendment 1) on the real scores.
-// Reads data/derived/theme-nights-2025.json and data/derived/scores.json; writes aggregates only to
-// study/results/results-2025.json. The seed and the number of bootstrap draws are fixed by the pre-registration.
+// Runs the pre-registered analysis (study/PREREGISTRATION.md with Amendments 1–3) on the real scores.
+// Reads data/derived/theme-nights-2025.json, data/derived/scores.json and data/derived/clubs-2025.json (for the
+// Amendment 3 club-name check); writes aggregates only to study/results/results-2025.json. The seed and the number
+// of bootstrap draws are fixed by the pre-registration.
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { analyze, parseScores, type Interval, type PooledFit, type Scores, type StudyResults } from "../src/study/analysis";
+import { analyze, checkClubNames, parseClubList, parseScores, type Interval, type PooledFit, type Scores, type StudyResults } from "../src/study/analysis";
 import type { ThemeNight } from "../src/study/summary";
 import { STUDY_THEMES } from "../src/study/themes";
 
 const NIGHTS = "data/derived/theme-nights-2025.json";
 const SCORES = "data/derived/scores.json";
+const CLUBS = "data/derived/clubs-2025.json";
 const OUT = "study/results/results-2025.json";
 const SEED = 20261030;
 const REPS = 10_000;
@@ -46,6 +48,26 @@ function readScores(): Scores {
     return parseScores(readJson(SCORES));
   } catch (e) {
     fail(`${SCORES} is not in the expected format: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+function readClubs(): string[] {
+  if (!existsSync(CLUBS)) fail(`${CLUBS} is missing. Run \`npm run study:build\` first.`);
+  try {
+    return parseClubList(readJson(CLUBS));
+  } catch (e) {
+    fail(`${CLUBS} is not in the expected format: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/** Amendment 3: stop before analysing if a score-table club is unknown or a theme-night club has no score at all. */
+function checkClubs(scores: Scores, nights: readonly ThemeNight[]): void {
+  const clubs = readClubs();
+  try {
+    const n = checkClubNames(clubs, scores, nights);
+    console.log(`clubs scored: qloo ${n.qloo}/${n.clubs}, llm ${n.llm}/${n.clubs}`);
+  } catch (e) {
+    fail(`Club-name check failed (Amendment 3); nothing was analysed and nothing was written.\n${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -98,7 +120,9 @@ function print(r: StudyResults): void {
 }
 
 const scores = readScores();
-const results = analyze(readNights(), scores, { seed: SEED, reps: REPS, commit: gitCommit() });
+const nights = readNights();
+checkClubs(scores, nights);
+const results = analyze(nights, scores, { seed: SEED, reps: REPS, commit: gitCommit() });
 mkdirSync("study/results", { recursive: true });
 writeFileSync(OUT, `${JSON.stringify(results, null, 2)}\n`);
 print(results);

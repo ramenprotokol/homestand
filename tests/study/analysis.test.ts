@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyze, pairScore, parseScores, verdictFor, type Scores, type StudyResults } from "../../src/study/analysis";
+import { analyze, checkClubNames, pairScore, parseClubList, parseScores, verdictFor, type Scores, type StudyResults } from "../../src/study/analysis";
 import { mulberry32, spearman, zScores } from "../../src/study/stats";
 import type { ThemeNight } from "../../src/study/summary";
 import { STUDY_THEMES, type StudyThemeId } from "../../src/study/themes";
@@ -389,5 +389,33 @@ describe("parseScores", () => {
     expect(() => parseScores({ ...base, qloo: { "Club 00": { quidditch: 1 } } })).toThrow(/quidditch/);
     expect(() => parseScores({ ...base, llm: { "Club 00": { bluey: "7" } } })).toThrow(/llm/);
     expect(() => parseScores({ ...base, pulledAt: 5 })).toThrow(/pulledAt/);
+  });
+});
+
+describe("club-name check before analysis (Amendment 3)", () => {
+  const list = ["Club A", "Club B", "Club C"];
+  const at = (...clubs: string[]) => clubs.map((club) => ({ club }));
+  it("passes valid tables and returns the clubs scored per table (a club with no score at all is not counted)", () => {
+    const scores = { qloo: { "Club A": { bluey: 1 }, "Club B": { bluey: 2 } }, llm: { "Club A": { bluey: 3 }, "Club C": {} } };
+    expect(checkClubNames(list, scores, at("Club A", "Club B", "Club A"))).toEqual({ qloo: 2, llm: 1, clubs: 3 });
+    expect(checkClubNames(world.clubs, plantedScores, world.nights)).toEqual({ qloo: 80, llm: 80, clubs: 80 });
+  });
+  it("stops on a club that is not in the club list, naming it and its table", () => {
+    const scores = { qloo: { "Club A": { bluey: 1 } }, llm: { "Club A": { bluey: 3 }, "Club Z": { bluey: 4 } } };
+    expect(() => checkClubNames(list, scores, at("Club A"))).toThrow(/scores\.llm.*"Club Z"/);
+  });
+  it("stops on a trailing-space typo, showing the space", () => {
+    const scores = { qloo: { "Club A ": { bluey: 1 } }, llm: { "Club A": { bluey: 3 } } };
+    expect(() => checkClubNames(list, scores, at("Club A"))).toThrow('"Club A "');
+  });
+  it("stops on a club with theme nights that has no score in either table, naming it", () => {
+    const scores = { qloo: { "Club A": { bluey: 1 }, "Club C": {} }, llm: { "Club A": { bluey: 3 } } };
+    expect(() => checkClubNames(list, scores, at("Club A", "Club B", "Club C"))).toThrow(/both score tables.*"Club B", "Club C"/);
+  });
+  it("reads the club names from the club list file and refuses a malformed or duplicated list", () => {
+    expect(parseClubList([{ club: "Club A", city: "X", state: "OH", lat: 40, lon: -80 }, { club: "Club B" }])).toEqual(["Club A", "Club B"]);
+    expect(() => parseClubList({ club: "Club A" })).toThrow(/array/);
+    expect(() => parseClubList([{ name: "Club A" }])).toThrow(/club/);
+    expect(() => parseClubList([{ club: "Club A" }, { club: "Club A" }])).toThrow(/"Club A"/);
   });
 });

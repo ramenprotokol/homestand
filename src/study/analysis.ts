@@ -1,4 +1,4 @@
-// The pre-registered analysis (study/PREREGISTRATION.md, read with Amendment 1, which supersedes the
+// The pre-registered analysis (study/PREREGISTRATION.md, read with Amendments 1–3, which supersede the
 // original text where they differ). Pure functions only: no I/O, no clock, no randomness beyond the seed.
 import { mean, mulberry32, ols, pearson, percentile, populationSd, spearman, zScores } from "./stats";
 import type { ThemeNight } from "./summary";
@@ -578,4 +578,46 @@ export function parseScores(raw: unknown): Scores {
     nationalPopularity[t] = v;
   }
   return { pulledAt: raw.pulledAt, qloo: parseTable(raw.qloo, "qloo"), llm: parseTable(raw.llm, "llm"), nationalPopularity };
+}
+
+// ---------- club-name check (Amendment 3; pure; the CLI runs it before the analysis) ----------
+
+/** The club names from data/derived/clubs-2025.json (one row per baseline club, each with a `club` string). */
+export function parseClubList(raw: unknown): string[] {
+  if (!Array.isArray(raw)) throw new Error("the club list must be an array of club rows");
+  const names = raw.map((row, i) => {
+    if (!isRec(row) || typeof row.club !== "string") throw new Error(`club list row ${i} needs a string club name`);
+    return row.club;
+  });
+  const dupes = names.filter((c, i) => names.indexOf(c) !== i);
+  if (dupes.length) throw new Error(`the club list repeats ${[...new Set(dupes)].map((c) => JSON.stringify(c)).join(", ")}`);
+  return names;
+}
+
+export interface ClubsScored {
+  qloo: number;
+  llm: number;
+  /** Clubs in the club list (120 for 2025). */
+  clubs: number;
+}
+
+/**
+ * Stops the analysis if any club in a score table is not in the club list, or if any club with a theme night has
+ * no score in either table (a club key with no theme scores counts as absent). Returns the clubs scored per table.
+ * Names are quoted so a stray space is visible. A typo can no longer pass as a missing score.
+ */
+export function checkClubNames(clubList: readonly string[], scores: Pick<Scores, "qloo" | "llm">, nights: readonly { club: string }[]): ClubsScored {
+  const known = new Set(clubList);
+  const quote = (cs: readonly string[]) => cs.map((c) => JSON.stringify(c)).join(", ");
+  const unknown = (["qloo", "llm"] as const).flatMap((label) => {
+    const bad = Object.keys(scores[label]).filter((c) => !known.has(c)).sort();
+    return bad.length ? [`scores.${label} has ${bad.length} club(s) not in the ${clubList.length}-club list: ${quote(bad)}`] : [];
+  });
+  if (unknown.length) throw new Error(unknown.join("; "));
+  const scored = (table: ScoreTable) => new Set(Object.keys(table).filter((c) => Object.keys(table[c]).length > 0));
+  const qloo = scored(scores.qloo);
+  const llm = scored(scores.llm);
+  const unscored = [...new Set(nights.map((n) => n.club))].filter((c) => !qloo.has(c) && !llm.has(c)).sort();
+  if (unscored.length) throw new Error(`${unscored.length} club(s) with theme nights are missing from both score tables: ${quote(unscored)}`);
+  return { qloo: qloo.size, llm: llm.size, clubs: clubList.length };
 }
