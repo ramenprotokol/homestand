@@ -185,3 +185,8 @@ The theme labels used are "country music" and "pro wrestling" for those two them
 - **How a miss is reported:** "not detected at this sample size", not "disproved".
 
 **The analysis script** (per-club-theme averaging, centring, z-scores, pairs, ties, a seeded club bootstrap, H1–H3, R1 and the descriptives) is written and tested on synthetic data before the pull. It is committed as part of this lock.
+
+**Verdict words.** These are shown in the app. Each depends only on H1's Qloo accuracy on the centred outcome and its 95% interval:
+- **CONFIRMED:** H1 passes (accuracy 55% or more and lower bound above 50%).
+- **OVERTURNED:** the interval's upper bound is below 50%, meaning evidence that local taste points the wrong way.
+- **CALL STANDS:** anything else (not enough evidence either way).
