@@ -190,3 +190,18 @@ The theme labels used are "country music" and "pro wrestling" for those two them
 - **CONFIRMED:** H1 passes (accuracy 55% or more and lower bound above 50%).
 - **OVERTURNED:** the interval's upper bound is below 50%, meaning evidence that local taste points the wrong way.
 - **CALL STANDS:** anything else (not enough evidence either way).
+
+### Amendment 2: 2026-10-05, after the analysis script was written and tested on synthetic data, before any Qloo request
+
+- **No variation means no call.** If a predictor has no across-club variation for a theme (every club gets the same value), it makes **no call** on any pair that contains that theme, and those pairs score 0.5.
+  - This is how A5's "its pairs are ties" is implemented.
+  - It is also why national popularity scores exactly 0.5 on the centred outcome (A3).
+- **Centring uses every club that ran the theme,** as A3 says, not only the clubs kept after the missing-data rule.
+- **The robustness baseline (R2)** adds the number of **other** promos on the night, not the total.
+- **H3 for national popularity** reports a coefficient and a partial correlation, each with a club-bootstrap interval, as the original H3 says. It is labelled context.
+- **Inference details:**
+  - Z-scores and centring are computed once on the full sample and held fixed. The bootstrap resamples clubs only.
+  - H1, H2, R1 and R2 share the same bootstrap draws.
+  - H3 uses its own seeded draws over every club with a kept night.
+  - Percentiles use linear interpolation (R type 7).
+- **Settings:** seed `20261030`, 10,000 draws.
