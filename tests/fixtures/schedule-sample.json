@@ -1,0 +1,103 @@
+{
+  "dates": [
+    { "games": [
+      { "gamePk": 1, "gameType": "R", "officialDate": "2025-06-07", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "venue": { "id": 7001, "location": { "city": "Riverbend", "stateAbbrev": "OH", "defaultCoordinates": { "latitude": 40.1, "longitude": -82.9 } } },
+        "gameInfo": { "attendance": 6120 },
+        "promotions": [
+          { "name": "Bluey Night", "offerType": "Theme Days" },
+          { "name": "Postgame Fireworks", "offerType": "Day of Game Highlights" },
+          { "name": "Bobblehead Giveaway", "offerType": "Giveaway" }
+        ] },
+      { "gamePk": 2, "gameType": "R", "officialDate": "2025-06-08", "doubleHeader": "Y",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 3000 } },
+      { "gamePk": 3, "gameType": "R", "officialDate": "2025-06-09", "doubleHeader": "N",
+        "status": { "abstractGameState": "Final", "detailedState": "Postponed", "codedGameState": "D" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "gameInfo": { "attendance": 4100 } },
+      { "gamePk": 4, "gameType": "R", "officialDate": "2025-06-10", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "gameInfo": {} },
+      { "gamePk": 5, "gameType": "R", "officialDate": "2025-06-11", "doubleHeader": "N",
+        "status": { "detailedState": "Completed Early: Rain", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "venue": { "id": 7002 },
+        "gameInfo": { "attendance": 2500 } },
+      { "gamePk": 6, "gameType": "R", "officialDate": "2025-06-12", "doubleHeader": "N", "reverseHomeAwayStatus": true,
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "venue": { "id": 7099 },
+        "gameInfo": { "attendance": 9000 } },
+      { "gamePk": 7, "gameType": "E", "officialDate": "2025-03-20", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 1500 } },
+      { "gamePk": 8, "gameType": "R", "officialDate": "2025-06-13", "doubleHeader": "N", "rescheduledFrom": "2025-06-09T23:05:00Z",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "venue": { "id": 7002 },
+        "gameInfo": { "attendance": 3300 } },
+      { "gamePk": 9, "gameType": "R", "officialDate": "2025-06-14", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 5200 },
+        "promotions": [
+          { "name": "Scarf Giveaway", "offerType": "Day of Game Highlights" }
+        ] },
+      { "gamePk": 10, "gameType": "R", "officialDate": "2025-06-15", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 5400 },
+        "promotions": [
+          { "name": "Summer Sendoff", "offerType": "Theme Days", "description": "Stick around for a postgame fireworks show!" }
+        ] },
+      { "gamePk": 11, "gameType": "R", "officialDate": "2025-06-16", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 4800 },
+        "promotions": [
+          { "name": "Family Night", "offerType": "Theme Days", "description": "Fireworks return next homestand" }
+        ] },
+      { "gamePk": 12, "gameType": "R", "officialDate": "2025-07-11", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "gameInfo": { "attendance": 4000 },
+        "promotions": [
+          { "name": "Country Weekend", "offerType": "Theme Days", "description": "Friday night for a drone show, Saturday night for a fireworks show, and Sunday for one last ride!" }
+        ] },
+      { "gamePk": 13, "gameType": "R", "officialDate": "2025-07-12", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "gameInfo": { "attendance": 4500 },
+        "promotions": [
+          { "name": "Country Weekend", "offerType": "Theme Days", "description": "Friday night for a drone show, Saturday night for a fireworks show, and Sunday for one last ride!" }
+        ] },
+      { "gamePk": 14, "gameType": "R", "officialDate": "2025-07-13", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 901, "name": "Lakeside Herons" } } },
+        "gameInfo": { "attendance": 3900 },
+        "promotions": [
+          { "name": "Country Weekend", "offerType": "Theme Days", "description": "Friday night for a drone show, Saturday night for a fireworks show, and Sunday for one last ride!" }
+        ] },
+      { "gamePk": 15, "gameType": "R", "officialDate": "2025-07-19", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 5100 },
+        "promotions": [
+          { "name": "Saturday Showcase", "offerType": "Theme Days", "description": "Join us for a special Saturday post-game fireworks show!" }
+        ] },
+      { "gamePk": 16, "gameType": "R", "officialDate": "2025-07-22", "doubleHeader": "N",
+        "status": { "detailedState": "Final", "codedGameState": "F" },
+        "teams": { "home": { "team": { "id": 900, "name": "Riverbend Otters" } } },
+        "gameInfo": { "attendance": 3600 },
+        "promotions": [
+          { "name": "Tuesday Showcase", "offerType": "Theme Days", "description": "Join us for a special Saturday post-game fireworks show!" }
+        ] }
+    ] }
+  ]
+}

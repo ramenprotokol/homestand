@@ -24,15 +24,20 @@
   - Tests use small hand-written fixtures shaped like the API, with fictional clubs and promos.
   - Only code and, later, aggregate study results are committed.
 - The 9 study themes, ids exactly: `star-wars`, `princess`, `bluey`, `harry-potter`, `margaritaville`, `dinosaur`, `country`, `marvel`, `wrestling`.
-- **Baseline model:**
-  - Outcome: `ln(attendance)` for 2025 regular-season home games that are Final, have attendance > 0, and are not double-headers.
+- **Baseline model** (amended 2026-10-05 after the parser review, before pre-registration):
+  - Outcome: `ln(attendance)` for 2025 regular-season (`gameType` "R") home games that meet all of these:
+    - official finals (`status.codedGameState === "F"`, which includes rain-shortened "Completed Early" games), with attendance > 0;
+    - not double-headers;
+    - not rescheduled;
+    - not played with `reverseHomeAwayStatus`;
+    - played at the club's most-used venue.
   - Regressors:
     - intercept;
     - club fixed effects (the first club alphabetically is the reference);
     - weekday dummies (reference: the lowest weekday present, 0 = Sunday);
     - month dummies (reference: the lowest month present);
-    - `fireworks` (any promo name matches `/firework/i`);
-    - `giveaway` (any promo `offerType` contains `Giveaway`).
+    - `fireworks`: any promo name matches `/firework/i`, OR any promo description matches `/\b(post-?game|postgame) fireworks\b|\bfireworks (show|spectacular|extravaganza|display|night)\b/i`. A description that ties fireworks to a named weekday (`weekday … fireworks` within 40 characters, in one sentence) counts only on that weekday;
+    - `giveaway`: any promo `offerType` contains `Giveaway`, OR any promo name matches `/\bgiveaway\b/i`.
   - A night's **residual lift** is `ln(att) − fitted`.
 - Commit trailer for implementer commits: `Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`.
 
@@ -562,7 +567,7 @@ import { summarize, themeNights } from "../../src/study/summary";
 const night = (gamePk: number, club: string, promo: string[]): Night => ({
   gamePk, sportId: 12, clubId: 1, club, date: `2025-06-${String(gamePk).padStart(2, "0")}`, weekday: 6, month: 6,
   attendance: 5000, doubleHeader: false, promoNames: promo, promoTypes: [], fireworks: false, giveaway: false,
-  city: "X", state: "OH", lat: 40, lon: -80,
+  city: "X", state: "OH", lat: 40, lon: -80, venueId: 1, rescheduled: false,
 });
 
 describe("themeNights and summarize", () => {
@@ -675,14 +680,23 @@ import { summarize, themeNights } from "../src/study/summary";
 
 const SPORTS = [11, 12, 13, 14];
 const nights = mergeNights(SPORTS.map((s) => parseSchedule(JSON.parse(readFileSync(`data/raw/schedule-2025-${s}.json`, "utf8")), s)))
-  .filter((n) => !n.doubleHeader);
-const fit = fitBaseline(nights);
-const residualByPk = new Map(nights.map((n, i) => [n.gamePk, fit.residuals[i]]));
-const rows = themeNights(nights, residualByPk);
+  .filter((n) => !n.doubleHeader && !n.rescheduled);
+// Keep only nights at each club's most-used venue (drops special-venue and borrowed-park games).
+const venueCounts = new Map<string, Map<number | null, number>>();
+for (const n of nights) {
+  const m = venueCounts.get(n.club) ?? new Map<number | null, number>();
+  m.set(n.venueId, (m.get(n.venueId) ?? 0) + 1);
+  venueCounts.set(n.club, m);
+}
+const homeVenue = new Map([...venueCounts].map(([club, m]) => [club, [...m].sort((a, b) => b[1] - a[1])[0][0]]));
+const homeNights = nights.filter((n) => n.venueId === homeVenue.get(n.club));
+const fit = fitBaseline(homeNights);
+const residualByPk = new Map(homeNights.map((n, i) => [n.gamePk, fit.residuals[i]]));
+const rows = themeNights(homeNights, residualByPk);
 mkdirSync("data/derived", { recursive: true });
 writeFileSync("data/derived/theme-nights-2025.json", JSON.stringify(rows));
 const s = summarize(rows);
-console.log(`nights in baseline: ${nights.length} · clubs: ${new Set(nights.map((n) => n.club)).size} · R² ${fit.rSquared.toFixed(3)}`);
+console.log(`nights in baseline: ${homeNights.length} (dropped ${nights.length - homeNights.length} away-venue) · clubs: ${new Set(homeNights.map((n) => n.club)).size} · R² ${fit.rSquared.toFixed(3)}`);
 console.log(`single-theme study nights: ${s.total} · clubs with 2+ themes: ${s.clubsWithTwoPlusThemes} · within-club pairs: ${s.withinClubPairs}`);
 for (const [theme, v] of Object.entries(s.perTheme)) console.log(`  ${theme.padEnd(15)} nights ${String(v.nights).padStart(4)} · clubs ${v.clubs}`);
 ```
