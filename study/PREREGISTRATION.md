@@ -205,3 +205,12 @@ The theme labels used are "country music" and "pro wrestling" for those two them
   - H3 uses its own seeded draws over every club with a kept night.
   - Percentiles use linear interpolation (R type 7).
 - **Settings:** seed `20261030`, 10,000 draws.
+
+### Amendment 3: 2026-10-05, after an independent statistical review of the analysis script, before any Qloo request
+
+The review re-implemented the analysis independently and matched it to 6 decimals. It found no statistical bug. These lines make the text match the code exactly.
+
+- **Binned summary instead of a scatter.** The "scatter of predictor z against lift" is published as five equal-count bins of kept club-theme combinations, sorted by Qloo z. Each bin shows n, z range, mean z and mean centred lift. A per-combination scatter would expose MLB-derived lift values, so it is not published.
+- **Per-theme accuracy:** Qloo's accuracy on the centred outcome over the pairs that contain that theme. Each pair counts toward both of its themes. It is descriptive only, with no interval.
+- **One definition of "theme mean lift".** The Spearman correlation between national popularity and the nine theme mean lifts (A3 b) uses the same theme mean as the centring constant: the mean club-theme lift over every club that ran the theme.
+- **Club names are checked before analysis.** If any club in the score tables isn't in the 120-club list (`clubs-2025.json`), the analysis stops. It also stops if any club in the theme nights is missing from both score tables. It prints the number of clubs scored per table. A typo can no longer pass as a missing score.
