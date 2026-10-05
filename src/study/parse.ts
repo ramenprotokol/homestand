@@ -16,6 +16,8 @@ export interface Night {
   state: string | null;
   lat: number | null;
   lon: number | null;
+  venueId: number | null;
+  rescheduled: boolean;
 }
 
 type Rec = Record<string, unknown>;
@@ -29,7 +31,12 @@ function parseGame(g: unknown, sportId: number): Night | null {
   const gamePk = num(g.gamePk);
   const date = str(g.officialDate);
   if (gamePk === null || date === null || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
-  if (str(rec(g.status).detailedState) !== "Final") return null;
+  // Official finals only (includes rain-shortened "Completed Early"). Do not use abstractGameState:
+  // Postponed/Cancelled rows also report "Final" there.
+  if (str(rec(g.status).codedGameState) !== "F") return null;
+  const gameType = str(g.gameType);
+  if (gameType !== null && gameType !== "R") return null;
+  if (g.reverseHomeAwayStatus === true) return null;
   const attendance = num(rec(g.gameInfo).attendance);
   if (attendance === null || attendance <= 0) return null;
   const team = rec(rec(rec(g.teams).home).team);
@@ -39,6 +46,7 @@ function parseGame(g: unknown, sportId: number): Night | null {
   const promos = Array.isArray(g.promotions) ? g.promotions.filter(isRec) : [];
   const promoNames = promos.map((p) => str(p.name)).filter((s): s is string => s !== null);
   const promoTypes = promos.map((p) => str(p.offerType)).filter((s): s is string => s !== null);
+  const promoDescriptions = promos.map((p) => str(p.description)).filter((s): s is string => s !== null);
   const loc = rec(rec(g.venue).location);
   const coords = rec(loc.defaultCoordinates);
   const day = new Date(`${date}T12:00:00Z`);
@@ -54,15 +62,25 @@ function parseGame(g: unknown, sportId: number): Night | null {
     doubleHeader: str(g.doubleHeader) !== "N",
     promoNames,
     promoTypes,
-    fireworks: promoNames.some((n) => /firework/i.test(n)),
-    giveaway: promoTypes.some((t) => t.includes("Giveaway")),
+    fireworks:
+      promoNames.some((n) => /firework/i.test(n)) ||
+      promoDescriptions.some((d) =>
+        /\b(post-?game|postgame) fireworks\b|\bfireworks (show|spectacular|extravaganza|display|night)\b/i.test(d),
+      ),
+    giveaway: promoTypes.some((t) => t.includes("Giveaway")) || promoNames.some((n) => /\bgiveaway\b/i.test(n)),
     city: str(loc.city),
     state: str(loc.stateAbbrev),
     lat: num(coords.latitude),
     lon: num(coords.longitude),
+    venueId: num(rec(g.venue).id),
+    rescheduled: g.rescheduledFrom !== undefined || g.rescheduledFromDate !== undefined,
   };
 }
 
+/**
+ * Parses one schedule response into nights. The result may contain the same gamePk twice
+ * (suspended/resumed games appear on two dates); call `mergeNights` to dedupe.
+ */
 export function parseSchedule(raw: unknown, sportId: number): Night[] {
   if (!isRec(raw) || !Array.isArray(raw.dates)) return [];
   const out: Night[] = [];
