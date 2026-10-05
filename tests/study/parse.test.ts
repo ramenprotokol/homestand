@@ -9,7 +9,7 @@ describe("parseSchedule", () => {
   const byPk = (pk: number) => nights.find((n) => n.gamePk === pk);
 
   it("keeps official finals with attendance and reads promos, flags and location", () => {
-    expect(nights.map((n) => n.gamePk)).toEqual([1, 2, 5, 8, 9, 10, 11]);
+    expect(nights.map((n) => n.gamePk)).toEqual([1, 2, 5, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
     const n = nights[0];
     expect(n).toMatchObject({
       sportId: 12, clubId: 900, club: "Riverbend Otters", date: "2025-06-07", weekday: 6, month: 6,
@@ -40,6 +40,14 @@ describe("parseSchedule", () => {
     expect(byPk(10)).toMatchObject({ fireworks: true, giveaway: false });
     expect(byPk(10)?.promoNames).toEqual(["Summer Sendoff"]);
     expect(byPk(11)).toMatchObject({ fireworks: false });
+  });
+  it("credits a multi-night description only to the weekday it ties to fireworks", () => {
+    // "Friday night for a drone show, Saturday night for a fireworks show, and Sunday ..." on Fri/Sat/Sun
+    expect([12, 13, 14].map((pk) => [byPk(pk)?.weekday, byPk(pk)?.fireworks])).toEqual([[5, false], [6, true], [0, false]]);
+  });
+  it("counts a weekday-tied description only on that weekday", () => {
+    expect(byPk(15)).toMatchObject({ weekday: 6, fireworks: true }); // Saturday game
+    expect(byPk(16)).toMatchObject({ weekday: 2, fireworks: false }); // same blurb, Tuesday game
   });
   it("returns [] for malformed input and never throws", () => {
     expect(parseSchedule(null, 11)).toEqual([]);

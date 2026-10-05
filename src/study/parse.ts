@@ -26,6 +26,21 @@ const rec = (v: unknown): Rec => (isRec(v) ? v : {});
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 
+const DESC_FIREWORKS = /\b(post-?game|postgame) fireworks\b|\bfireworks (show|spectacular|extravaganza|display|night)\b/i;
+const WEEKDAY_FIREWORKS = /\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b[^.!?]{0,40}\bfireworks?\b/gi;
+const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+/**
+ * A description announces fireworks on this game if it matches the show pattern. When it also ties
+ * fireworks to named weekdays (multi-night blurbs like "Friday ... drone show, Saturday ... fireworks show"),
+ * it counts only on games played on one of those weekdays.
+ */
+function descriptionFireworks(desc: string, weekday: number): boolean {
+  if (!DESC_FIREWORKS.test(desc)) return false;
+  const tied = [...desc.matchAll(WEEKDAY_FIREWORKS)].map((m) => WEEKDAYS.indexOf(m[1].toLowerCase()));
+  return tied.length === 0 || tied.includes(weekday);
+}
+
 function parseGame(g: unknown, sportId: number): Night | null {
   if (!isRec(g)) return null;
   const gamePk = num(g.gamePk);
@@ -64,9 +79,7 @@ function parseGame(g: unknown, sportId: number): Night | null {
     promoTypes,
     fireworks:
       promoNames.some((n) => /firework/i.test(n)) ||
-      promoDescriptions.some((d) =>
-        /\b(post-?game|postgame) fireworks\b|\bfireworks (show|spectacular|extravaganza|display|night)\b/i.test(d),
-      ),
+      promoDescriptions.some((d) => descriptionFireworks(d, day.getUTCDay())),
     giveaway: promoTypes.some((t) => t.includes("Giveaway")) || promoNames.some((n) => /\bgiveaway\b/i.test(n)),
     city: str(loc.city),
     state: str(loc.stateAbbrev),
