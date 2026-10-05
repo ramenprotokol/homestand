@@ -292,7 +292,8 @@ const rawLift: Outcome = (c) => c.lift;
 
 // ---------- step 7: club bootstrap of the pairwise accuracies ----------
 
-interface ClubTally {
+/** One club's pair count and its summed pair scores (Qloo and the LLM on the centred outcome, Qloo on the R2 outcome). */
+export interface ClubTally {
   pairs: number;
   qloo: number;
   llm: number;
@@ -338,12 +339,18 @@ const interval = (estimate: number, draws: readonly number[]): Interval => ({
   estimate, lo: percentile(draws, LOWER_PERCENTILE), hi: percentile(draws, UPPER_PERCENTILE),
 });
 
-function pairBootstrap(tallies: readonly ClubTally[], reps: number, seed: number): Record<keyof PairStats, Interval> {
+/** The club-bootstrap draws of every pair statistic (exported so tests can check them against exact enumeration). */
+export function pairBootstrapDraws(tallies: readonly ClubTally[], reps: number, seed: number): Record<keyof PairStats, number[]> {
   const draws: Record<keyof PairStats, number[]> = { h1: [], llm: [], diff: [], r1: [], r2: [] };
   resample(tallies, reps, seed, (d) => {
     const s = pairStats(d);
     for (const k of Object.keys(draws) as (keyof PairStats)[]) draws[k].push(s[k]);
   });
+  return draws;
+}
+
+function pairBootstrap(tallies: readonly ClubTally[], reps: number, seed: number): Record<keyof PairStats, Interval> {
+  const draws = pairBootstrapDraws(tallies, reps, seed);
   const est = pairStats(tallies);
   return { h1: interval(est.h1, draws.h1), llm: interval(est.llm, draws.llm), diff: interval(est.diff, draws.diff), r1: interval(est.r1, draws.r1), r2: interval(est.r2, draws.r2) };
 }

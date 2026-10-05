@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { analyze, checkClubNames, pairScore, parseClubList, parseScores, verdictFor, type Scores, type StudyResults } from "../../src/study/analysis";
-import { mulberry32, spearman, zScores } from "../../src/study/stats";
+import {
+  analyze, checkClubNames, pairBootstrapDraws, pairScore, parseClubList, parseScores, verdictFor, type ClubTally, type Scores, type StudyResults,
+} from "../../src/study/analysis";
+import { mulberry32, percentile, spearman, zScores } from "../../src/study/stats";
 import type { ThemeNight } from "../../src/study/summary";
 import { STUDY_THEMES, type StudyThemeId } from "../../src/study/themes";
 
@@ -375,6 +377,81 @@ describe("analyze: determinism, bootstrap and output hygiene", () => {
     const scores = structuredClone(plantedScores);
     scores.qloo[world.clubs[0]].bluey = Number.NaN;
     expect(() => analyze(world.nights, scores, OPTS)).toThrow(/finite/);
+  });
+});
+
+describe("analyze: club bootstrap multiplicity and R1 on a three-club world", () => {
+  // Club A runs themes t0, t1 (1 pair); B runs t0..t2 (3 pairs); C runs t0..t3 (6 pairs). One night each, integer lifts.
+  // Theme means over the clubs that ran them: 0, 0, 0, 5, so the centred lifts are
+  //   A: t0 3, t1 -4 · B: t0 0, t1 3, t2 2 · C: t0 -3, t1 1, t2 -2, t3 0.
+  // Qloo: each theme's values over the six scored clubs (A, B, C and three that ran nothing) are a permutation of 1..6,
+  // so every theme has the same mean and SD and the z order within a club is the raw order:
+  //   A: t0 > t1 (1 of 1 correct) · B: t0 > t1 > t2 (only t1 > t2 agrees: 1 of 3) · C: t0 > t1 > t3 > t2 (3 of 6).
+  const [t0, t1, t2, t3] = THEMES;
+  const lifts: Record<string, Partial<Record<StudyThemeId, number>>> = {
+    A: { [t0]: 3, [t1]: -4 },
+    B: { [t0]: 0, [t1]: 3, [t2]: 2 },
+    C: { [t0]: -3, [t1]: 1, [t2]: -2, [t3]: 5 },
+  };
+  const qloo: Scores["qloo"] = {
+    A: { [t0]: 4, [t1]: 3, [t2]: 1, [t3]: 1 },
+    B: { [t0]: 5, [t1]: 4, [t2]: 2, [t3]: 2 },
+    C: { [t0]: 6, [t1]: 5, [t2]: 3, [t3]: 4 },
+    P1: { [t0]: 3, [t1]: 2, [t2]: 4, [t3]: 3 },
+    P2: { [t0]: 2, [t1]: 1, [t2]: 5, [t3]: 5 },
+    P3: { [t0]: 1, [t1]: 6, [t2]: 6, [t3]: 6 },
+  };
+  let gamePk = 1;
+  const nights: ThemeNight[] = Object.entries(lifts).flatMap(([club, row]) =>
+    Object.entries(row).map(([theme, lift]) => ({
+      gamePk: gamePk++, club, date: "2025-06-01", theme: theme as StudyThemeId, lift: lift!, liftR2: lift!, otherPromos: 1, lat: 40, lon: -80, city: "X", state: "OH",
+    })),
+  );
+  const scores: Scores = { pulledAt: "2026-10-30T00:00:00Z", qloo, llm: structuredClone(qloo), nationalPopularity: { ...POPULARITY } };
+  // Per-club tallies as above, alphabetical (the LLM and the liftR2 outcome repeat Qloo's).
+  const tallies: ClubTally[] = [
+    { pairs: 1, qloo: 1, llm: 1, qlooR2: 1 },
+    { pairs: 3, qloo: 1, llm: 1, qlooR2: 1 },
+    { pairs: 6, qloo: 3, llm: 3, qlooR2: 3 },
+  ];
+  const BOOT_REPS = 4000;
+  const r = analyze(nights, scores, { seed: SEED, reps: BOOT_REPS });
+
+  it("R1 averages each club's pairs first: exactly the hand value, which differs from H1", () => {
+    expect(r.diagnostics.pairs).toBe(10);
+    expect(r.diagnostics.clubsWithPairs).toBe(3);
+    expect(r.h1.accuracy.estimate).toBe((1 + 1 + 3) / (1 + 3 + 6));
+    expect(r.r1.accuracy.estimate).toBe((1 / 1 + 1 / 3 + 3 / 6) / 3);
+    expect(r.r1.accuracy.estimate).not.toBe(r.h1.accuracy.estimate);
+  });
+
+  it("counts a club drawn twice twice: the draws match the exact distribution over all 27 ordered draws", () => {
+    const h1 = (d: ClubTally[]) => d.reduce((s, t) => s + t.qloo, 0) / d.reduce((s, t) => s + t.pairs, 0);
+    const r1 = (d: ClubTally[]) => d.reduce((s, t) => s + t.qloo / t.pairs, 0) / d.length;
+    const atom = (x: number) => x.toFixed(12);
+    const exact = { h1: new Map<string, number>(), r1: new Map<string, number>() };
+    for (const i of [0, 1, 2]) for (const j of [0, 1, 2]) for (const k of [0, 1, 2]) {
+      const d = [tallies[i], tallies[j], tallies[k]];
+      exact.h1.set(atom(h1(d)), (exact.h1.get(atom(h1(d))) ?? 0) + 1 / 27);
+      exact.r1.set(atom(r1(d)), (exact.r1.get(atom(r1(d))) ?? 0) + 1 / 27);
+    }
+    // A draw of A, A, B has H1 (2 + 1) / (2 + 3) = 0.6; with clubs de-duplicated it would be 0.5. Same for R1.
+    expect(exact.h1.get(atom(0.6))).toBeCloseTo(3 / 27, 12);
+    const draws = pairBootstrapDraws(tallies, BOOT_REPS, SEED);
+    for (const stat of ["h1", "r1"] as const) {
+      const seen = new Map<string, number>();
+      for (const x of draws[stat]) seen.set(atom(x), (seen.get(atom(x)) ?? 0) + 1 / BOOT_REPS);
+      expect([...seen.keys()].filter((a) => !exact[stat].has(a))).toEqual([]);
+      // Monte Carlo tolerance: the SD of an atom's frequency is at most 0.008 at 4,000 draws.
+      for (const [a, p] of exact[stat]) expect(Math.abs((seen.get(a) ?? 0) - p)).toBeLessThan(0.03);
+    }
+    // The interval: every single-club draw has probability 1/27 > 2.5%, so the exact 2.5% and 97.5% quantiles are the
+    // lowest and highest club accuracies (B's 1/3 and A's 1). analyze() reports the percentiles of these same draws.
+    expect(r.h1.accuracy.lo).toBe(1 / 3);
+    expect(r.h1.accuracy.hi).toBe(1);
+    expect(r.h1.accuracy.lo).toBe(percentile(draws.h1, 2.5));
+    expect(r.h1.accuracy.hi).toBe(percentile(draws.h1, 97.5));
+    expect(r.r1.accuracy).toEqual({ estimate: r.r1.accuracy.estimate, lo: percentile(draws.r1, 2.5), hi: percentile(draws.r1, 97.5) });
   });
 });
 
