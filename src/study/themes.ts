@@ -23,3 +23,12 @@ export const STUDY_THEMES: ReadonlyArray<{ id: StudyThemeId; label: string; patt
 export function classifyThemes(promoNames: string[]): StudyThemeId[] {
   return STUDY_THEMES.filter((t) => promoNames.some((n) => t.pattern.test(n))).map((t) => t.id);
 }
+
+/**
+ * Promos on a game that are not study-theme promos: names matching none of the nine themes.
+ * On a single-theme study night this is promoNames.length minus the names matching its theme.
+ * It is the "number of other promos" regressor of the robustness baseline (pre-registration, R2).
+ */
+export function otherPromoCount(promoNames: string[]): number {
+  return promoNames.filter((n) => !STUDY_THEMES.some((t) => t.pattern.test(n))).length;
+}

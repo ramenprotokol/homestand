@@ -47,6 +47,28 @@ describe("fitBaseline", () => {
     expect(mean(themedRes)).toBeGreaterThan(0.15);
     expect(Math.abs(mean(otherRes))).toBeLessThan(0.01);
   });
+  it("appends extra regressors after giveaway and recovers a planted coefficient", () => {
+    const { rows } = synthetic();
+    const promoRows = rows.map((r, i) => {
+      const promos = (i * 7) % 4;
+      return { ...r, promos, attendance: r.attendance * Math.exp(0.05 * promos) };
+    });
+    const fit = fitBaseline(promoRows, [{ name: "promos", value: (r) => r.promos }]);
+    expect(fit.columns.slice(-3)).toEqual(["fireworks", "giveaway", "promos"]);
+    expect(fit.coefficients[fit.columns.indexOf("promos")]).toBeCloseTo(0.05, 9);
+    expect(fit.coefficients[fit.columns.indexOf("fireworks")]).toBeCloseTo(Math.log(1.2), 9);
+    expect(Math.max(...fit.residuals.map(Math.abs))).toBeLessThan(1e-9);
+  });
+  it("is unchanged when extra is omitted or empty", () => {
+    const { rows } = synthetic(0.25);
+    const plain = fitBaseline(rows);
+    expect(fitBaseline(rows, [])).toEqual(plain);
+    expect(plain.columns).not.toContain("promos");
+    expect(plain.columns.at(-1)).toBe("giveaway");
+  });
+  it("refuses an extra column whose name is already taken", () => {
+    expect(() => fitBaseline(synthetic().rows, [{ name: "giveaway", value: () => 1 }])).toThrow("Duplicate baseline column: giveaway");
+  });
   it("refuses to fit with fewer rows than columns", () => {
     expect(() => fitBaseline(synthetic().rows.slice(0, 2))).toThrow("Not enough rows to fit the baseline");
   });

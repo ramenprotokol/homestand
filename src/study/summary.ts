@@ -1,25 +1,35 @@
 import type { Night } from "./parse";
-import { STUDY_THEMES, classifyThemes, type StudyThemeId } from "./themes";
+import { STUDY_THEMES, classifyThemes, otherPromoCount, type StudyThemeId } from "./themes";
 
 export interface ThemeNight {
   gamePk: number;
   club: string;
   date: string;
   theme: StudyThemeId;
+  /** Residual of the main baseline (the pre-registered outcome). */
   lift: number;
+  /** Residual of the robustness baseline that adds the other-promos regressor (R2). */
+  liftR2: number;
+  /** Promos on the night that are not its study theme's promo. */
+  otherPromos: number;
   lat: number | null;
   lon: number | null;
   city: string | null;
   state: string | null;
 }
 
-export function themeNights(nights: Night[], residualByPk: Map<number, number>): ThemeNight[] {
+export function themeNights(nights: Night[], residualByPk: Map<number, number>, residualR2ByPk: Map<number, number>): ThemeNight[] {
   const out: ThemeNight[] = [];
   for (const n of nights) {
     const themes = classifyThemes(n.promoNames);
     const lift = residualByPk.get(n.gamePk);
     if (themes.length !== 1 || lift === undefined) continue;
-    out.push({ gamePk: n.gamePk, club: n.club, date: n.date, theme: themes[0], lift, lat: n.lat, lon: n.lon, city: n.city, state: n.state });
+    const liftR2 = residualR2ByPk.get(n.gamePk);
+    if (liftR2 === undefined) throw new Error(`Missing robustness residual for game ${n.gamePk}`);
+    out.push({
+      gamePk: n.gamePk, club: n.club, date: n.date, theme: themes[0], lift, liftR2, otherPromos: otherPromoCount(n.promoNames),
+      lat: n.lat, lon: n.lon, city: n.city, state: n.state,
+    });
   }
   return out;
 }

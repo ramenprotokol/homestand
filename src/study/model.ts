@@ -16,9 +16,15 @@ export interface BaselineFit {
   rSquared: number;
 }
 
+/** An additional regressor, appended after `giveaway` (e.g. the robustness baseline's other-promos count). */
+export interface ExtraRegressor<R extends BaselineRow> {
+  name: string;
+  value: (row: R) => number;
+}
+
 const sortedUnique = <T>(xs: T[]): T[] => [...new Set(xs)].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-export function fitBaseline(rows: BaselineRow[]): BaselineFit {
+export function fitBaseline<R extends BaselineRow>(rows: R[], extra: ReadonlyArray<ExtraRegressor<R>> = []): BaselineFit {
   const clubs = sortedUnique(rows.map((r) => r.club)).slice(1);
   const weekdays = sortedUnique(rows.map((r) => r.weekday)).slice(1);
   const months = sortedUnique(rows.map((r) => r.month)).slice(1);
@@ -29,7 +35,10 @@ export function fitBaseline(rows: BaselineRow[]): BaselineFit {
     ...months.map((m) => `m:${m}`),
     "fireworks",
     "giveaway",
+    ...extra.map((e) => e.name),
   ];
+  const duplicate = columns.find((c, i) => columns.indexOf(c) !== i);
+  if (duplicate !== undefined) throw new Error(`Duplicate baseline column: ${duplicate}`);
   if (rows.length < columns.length) throw new Error("Not enough rows to fit the baseline");
 
   const X = rows.map((r) => [
@@ -39,6 +48,7 @@ export function fitBaseline(rows: BaselineRow[]): BaselineFit {
     ...months.map((m) => (r.month === m ? 1 : 0)),
     r.fireworks ? 1 : 0,
     r.giveaway ? 1 : 0,
+    ...extra.map((e) => e.value(r)),
   ]);
   const y = rows.map((r) => Math.log(r.attendance));
   const Xm = new Matrix(X);
