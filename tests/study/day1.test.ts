@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { SearchHit } from "../../src/qloo/client";
 import {
-  bundleScore, chooseRadius, evaluateShape, maxAbsDiff, nationalPopularity, needsLocalityFallback, normalizeName, pickEntity,
+  bundleScore, chooseRadius, emptyThemes, noLocalSignal, withoutKeys, evaluateShape, maxAbsDiff, nationalPopularity, needsLocalityFallback, normalizeName, pickEntity,
   type RadiusResult,
 } from "../../src/study/day1";
 import { BUNDLE_ENTITIES } from "../../src/study/bundles";
@@ -77,5 +77,25 @@ describe("bundles", () => {
   it("cover all nine themes with unique keys", () => {
     expect(new Set(BUNDLE_ENTITIES.map((e) => e.theme))).toEqual(new Set(STUDY_THEMES.map((t) => t.id)));
     expect(new Set(BUNDLE_ENTITIES.map((e) => e.key)).size).toBe(BUNDLE_ENTITIES.length);
+  });
+});
+
+describe("no local signal", () => {
+  const t1 = { a: [0.1, null], b: [null, null], c: [null, null] };
+  const t2 = { a: [null, null], b: [null, null], c: [null, 0.4] };
+  it("flags only entities empty at every club in every table", () => {
+    expect(noLocalSignal([t1, t2])).toEqual(["b"]);
+    expect(noLocalSignal([t1])).toEqual(["b", "c"]);
+  });
+  it("leaves partial-coverage entities in, so they still fail criterion (1)", () => {
+    const table = { a: [0.1, null, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.2], b: Array.from({ length: 10 }, () => null) };
+    const kept = withoutKeys(table, noLocalSignal([table]));
+    expect(Object.keys(kept)).toEqual(["a"]);
+    expect(evaluateShape(kept)).toMatchObject({ pass: false, coverage: false, missing: ["a"] });
+  });
+  it("reports themes with no kept entity", () => {
+    const theme = { x1: "x", x2: "x", y1: "y" } as Record<string, string>;
+    expect(emptyThemes(theme, ["x", "y"], ["x1"])).toEqual(["y"]);
+    expect(emptyThemes(theme, ["x", "y"], ["x1", "y1"])).toEqual([]);
   });
 });

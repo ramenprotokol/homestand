@@ -17,6 +17,16 @@ describe("qloo client", () => {
     expect(url).toContain("filter.results.entities=a%2Cb");
   });
 
+  it("sends filter.release_year.min only when asked", async () => {
+    const f = vi.fn(async () => json({ results: { entities: [] } }));
+    const c = make(f as unknown as typeof fetch);
+    await c.localAffinity({ type: "movie", entityIds: ["a"], lon: 0, lat: 0, releaseYearMin: 1900 });
+    await c.localAffinity({ type: "movie", entityIds: ["a"], lon: 0, lat: 0 });
+    const urls = f.mock.calls.map((x) => (x as unknown as [string])[0]);
+    expect(urls[0]).toContain("filter.release_year.min=1900");
+    expect(urls[1]).not.toContain("release_year");
+  });
+
   it("uses signal.location.query for the locality fallback", async () => {
     const f = vi.fn(async () => json({ results: { entities: [] } }));
     await make(f as unknown as typeof fetch).localAffinity({ type: "movie", entityIds: ["a"], lon: 1, lat: 2, locationQuery: "Aberdeen, MD" });

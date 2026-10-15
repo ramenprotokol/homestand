@@ -21,6 +21,8 @@ export interface AffinityQuery {
   lon: number;
   lat: number;
   radiusM?: number;
+  /** Sent as filter.release_year.min; Qloo hides older films from movie insights unless a floor is given. */
+  releaseYearMin?: number;
   /** Fuzzy locality string (A4 fallback); replaces the POINT when set. */
   locationQuery?: string;
 }
@@ -97,6 +99,7 @@ export function createQlooClient(opts: ClientOptions) {
       "filter.type": `urn:entity:${q.type}`,
       "filter.results.entities": q.entityIds.join(","),
     };
+    if (q.releaseYearMin !== undefined) params["filter.release_year.min"] = String(q.releaseYearMin);
     if (q.locationQuery !== undefined) params["signal.location.query"] = q.locationQuery;
     else {
       params["signal.location"] = `POINT(${q.lon} ${q.lat})`; // WKT: longitude first

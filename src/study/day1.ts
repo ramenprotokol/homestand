@@ -48,6 +48,21 @@ export function evaluateShape(table: AffinityTable): ShapeEvaluation {
   return { pass: coverage && varies, coverage, varies, missing, flat };
 }
 
+/** Entities that returned no numeric affinity at any club in any of the tables (radii) tried: "no local signal". */
+export function noLocalSignal(tables: AffinityTable[]): string[] {
+  const keys = new Set(tables.flatMap((t) => Object.keys(t)));
+  return [...keys].filter((k) => !tables.some((t) => t[k]?.some((v) => v !== null)));
+}
+
+export function withoutKeys(table: AffinityTable, excluded: string[]): AffinityTable {
+  return Object.fromEntries(Object.entries(table).filter(([k]) => !excluded.includes(k)));
+}
+
+/** Themes left with no scored entity: a hard failure for that theme. */
+export function emptyThemes<T extends string>(entityTheme: Record<string, T>, themes: T[], kept: string[]): T[] {
+  return themes.filter((t) => !kept.some((k) => entityTheme[k] === t));
+}
+
 export interface RadiusResult {
   radiusM: number;
   evaluation: ShapeEvaluation;
