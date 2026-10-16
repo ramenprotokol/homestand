@@ -1,0 +1,19 @@
+{
+  "_note": "Qloo entity IDs only (IDs are fine to publish). The first 14 are Amendment 4's kept bundle entities. The rest are filled in by `npm run qloo:resolve` after 'Qloo go'. No affinities or popularity values live here.",
+  "ids": {
+    "star-wars:film": { "id": "1EC3A1AE-9466-4338-BAF6-E20659697569", "name": "Star Wars: Episode IV - A New Hope" },
+    "star-wars:tv": { "id": "24FA08F2-0B47-4A01-B44E-CF18C06E5781", "name": "The Mandalorian" },
+    "princess:frozen": { "id": "3CE60F10-EA7D-4743-B67A-8B53D84351C5", "name": "Frozen" },
+    "princess:moana": { "id": "B4783599-F934-4159-8003-720406FC1C80", "name": "Moana" },
+    "bluey:tv": { "id": "F6013EAC-8F32-4080-B1ED-2BFABB9C706E", "name": "Bluey" },
+    "harry-potter:books": { "id": "0C97E7FE-8A86-4B48-9F54-CB0A73CC2B96", "name": "Harry Potter and the Sorcerer's Stone (Harry Potter, #1)" },
+    "margaritaville:buffett": { "id": "33B34573-DBF2-49C8-BCEB-CBECF31038F0", "name": "Jimmy Buffett" },
+    "dinosaur:jp": { "id": "D3529AD8-9349-481E-8FCB-D107EFB75E68", "name": "Jurassic Park" },
+    "dinosaur:jw": { "id": "8573DA59-4BA6-406A-A022-1BEE0E09B678", "name": "Jurassic World" },
+    "country:combs": { "id": "3CBD78B1-D2F2-4551-A342-4621B6BDB5E2", "name": "Luke Combs" },
+    "country:wallen": { "id": "59DCDFA8-5082-47D9-B3E5-2B49CF2A778F", "name": "Morgan Wallen" },
+    "country:underwood": { "id": "19AC0383-5BB2-4423-8598-709713C22148", "name": "Carrie Underwood" },
+    "marvel:nwh": { "id": "CB376BE9-384A-41C5-9231-3592AF84ADCD", "name": "Spider-Man: No Way Home" },
+    "wrestling:wwe": { "id": "764E1D34-B48B-4757-94F2-063B9F912C03", "name": "WWE" }
+  }
+}
