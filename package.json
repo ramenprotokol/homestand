@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "study:fetch": "tsx study/fetch.ts",
-    "study:build": "tsx study/build.ts"
+    "study:build": "tsx study/build.ts",
+    "study:day1": "tsx study/day1.ts"
   },
   "engines": {
     "node": ">=22.13"

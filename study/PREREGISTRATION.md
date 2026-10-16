@@ -214,3 +214,85 @@ The review re-implemented the analysis independently and matched it to 6 decimal
 - **Per-theme accuracy:** Qloo's accuracy on the centred outcome over the pairs that contain that theme. Each pair counts toward both of its themes. It is descriptive only, with no interval.
 - **One definition of "theme mean lift".** The Spearman correlation between national popularity and the nine theme mean lifts (A3 b) uses the same theme mean as the centring constant: the mean club-theme lift over every club that ran the theme.
 - **Club names are checked before analysis.** If any club in the score tables isn't in the 120-club list (`clubs-2025.json`), the analysis stops. It also stops if any club in the theme nights is missing from both score tables. It prints the number of clubs scored per table. A typo can no longer pass as a missing score.
+
+### Amendment 4: 2026-10-15, after the Day-1 tests, before the full pull
+
+This records what A4 requires: the chosen request shape, the bundle entity IDs, the popularity values and the request count. **No outcome data was read.** The Day-1 tests used only club, city, state, lat and lon from `clubs-2025.json`, for the first 10 clubs in alphabetical order (Aberdeen IronBirds to Biloxi Shuckers). Every decision below rests on Qloo coverage alone.
+
+**The request shape.**
+- **Endpoint:** `GET /v2/insights`, one call per club per Qloo entity type (movie, tv_show, book, artist, brand).
+- **Parameters:**
+  - `filter.type` is the entity type.
+  - `filter.results.entities` is every kept entity ID of that type (below).
+  - `signal.location=POINT(lon lat)` is the club's location (A2).
+  - `signal.location.radius=80000` (80 km).
+- **A release-year floor on movie calls only:** `filter.release_year.min=1900`. Qloo applies an undocumented default recency floor to movie insights. Without it, *Star Wars* (1977), *Frozen*, *Moana*, *Jurassic Park* and *Jurassic World* return no affinity at all.
+- **How 80 km was chosen:** the radius ladder was 40, 60, 80 and 100 km, stopping at the first pass of A4 (1) and (2).
+  - 40 km failed (1): *Moana* had a value at 6 of 10 ballparks, *Jurassic Park* at 9 of 10.
+  - 60 km failed (1): *Moana* at 9 of 10.
+  - 80 km passed: every kept entity had a value at 10 of 10 ballparks, with 10 distinct values each.
+  - The locality fallback (A4 4) was not needed.
+- **Batching is safe:** one batched call per type gave the same affinities as one call per entity (largest difference 0). A repeat of club 1 was identical (difference 0).
+
+**Entities with no local signal are excluded.**
+- An entity that returned no affinity at any of the 10 ballparks, at every radius tried, is treated as unresolved and dropped from its bundle.
+- The rule was set before any outcome was seen, and it rests on Qloo coverage only.
+- Five entities were dropped. Each is the correct, popular Qloo entity (checked against the search candidates); Qloo simply returns no local affinity for it:
+  - *Cinderella* (1950);
+  - *Tangled*;
+  - *Harry Potter and the Sorcerer's Stone* (film);
+  - *Dinosaur Train*;
+  - *The Avengers* (2012).
+- **Every theme keeps at least one entity.** Harry Potter (the book only) and Marvel (*No Way Home* only) are now single-entity bundles, like Bluey, Margaritaville and Wrestling. This is a limitation and is stated.
+
+**The kept bundles, with Qloo IDs and Day-1 popularity.** Popularity was identical at all 10 locations.
+
+| Theme | Entity (Qloo name) | Type | Qloo ID | Popularity |
+|---|---|---|---|---|
+| Star Wars | Star Wars: Episode IV - A New Hope | movie | `1EC3A1AE-9466-4338-BAF6-E20659697569` | 0.9995 |
+| Star Wars | The Mandalorian | tv_show | `24FA08F2-0B47-4A01-B44E-CF18C06E5781` | 0.9983 |
+| Princess | Frozen | movie | `3CE60F10-EA7D-4743-B67A-8B53D84351C5` | 0.9980 |
+| Princess | Moana | movie | `B4783599-F934-4159-8003-720406FC1C80` | 0.9959 |
+| Bluey | Bluey | tv_show | `F6013EAC-8F32-4080-B1ED-2BFABB9C706E` | 0.9196 |
+| Harry Potter | Harry Potter and the Sorcerer's Stone (Harry Potter, #1) | book | `0C97E7FE-8A86-4B48-9F54-CB0A73CC2B96` | 0.9992 |
+| Margaritaville | Jimmy Buffett | artist | `33B34573-DBF2-49C8-BCEB-CBECF31038F0` | 0.9889 |
+| Dinosaur | Jurassic Park | movie | `D3529AD8-9349-481E-8FCB-D107EFB75E68` | 0.9988 |
+| Dinosaur | Jurassic World | movie | `8573DA59-4BA6-406A-A022-1BEE0E09B678` | 0.9966 |
+| Country | Luke Combs | artist | `3CBD78B1-D2F2-4551-A342-4621B6BDB5E2` | 0.9746 |
+| Country | Morgan Wallen | artist | `59DCDFA8-5082-47D9-B3E5-2B49CF2A778F` | 0.9733 |
+| Country | Carrie Underwood | artist | `19AC0383-5BB2-4423-8598-709713C22148` | 0.9968 |
+| Marvel | Spider-Man: No Way Home | movie | `CB376BE9-384A-41C5-9231-3592AF84ADCD` | 0.9991 |
+| Wrestling | WWE | brand | `764E1D34-B48B-4757-94F2-063B9F912C03` | 0.9994 |
+
+- **The Harry Potter books:** Qloo has no series entity. The exact-name book entity has no popularity and returns no local data. The entity above (the series' first book, as listed by Qloo) stands in for the series, as the original text allows.
+- **Day-1 national popularity per theme (A1):**
+
+  | Star Wars | Princess | Bluey | Harry Potter | Margaritaville | Dinosaur | Country | Marvel | Wrestling |
+  |---|---|---|---|---|---|---|---|---|
+  | 0.9989 | 0.9969 | 0.9196 | 0.9992 | 0.9889 | 0.9977 | 0.9816 | 0.9991 | 0.9994 |
+
+  A1's rule stands: the analysis uses the values at the time of the full pull.
+
+**A bundle is fixed across clubs.** In the full pull, if any kept entity of a bundle returns no affinity at a club, that club-theme Qloo score is **missing**. The existing missing-data rule then drops it for all predictors, and the count is reported. A bundle score is never a mean over a different set of entities at different clubs.
+
+**The LLM prompt (A6) lists the kept entities only,** so both predictors see the same bundle. The example text, exactly:
+- Star Wars: "Star Wars (1977), The Mandalorian"
+- Princess: "Frozen, Moana"
+- Bluey: "Bluey"
+- Harry Potter: "the Harry Potter books"
+- Margaritaville: "Jimmy Buffett"
+- Dinosaur: "Jurassic Park, Jurassic World"
+- Country: "Luke Combs, Morgan Wallen, Carrie Underwood"
+- Marvel: "Spider-Man: No Way Home"
+- Wrestling: "WWE"
+
+**Request count.**
+- **Day-1:** about 476 Qloo requests in total. That covers both probe runs (298 and 161) and 17 manual diagnostic requests.
+- **Full pull:** 120 clubs × 5 types = **600 requests**. That covers all 9 themes × 120 clubs (A2 in full), so the A2 fallback is not needed unless Qloo's quota refuses.
+
+**A known limitation, stated before the pull: ceiling compression.**
+- Qloo affinity sits near 1 for very popular entities. Across the 10 Day-1 ballparks:
+  - Carrie Underwood ranged 0.9997–1.0000 (SD 0.0001).
+  - Luke Combs and Morgan Wallen each ranged about 0.995–1.000.
+  - *Moana* ranged 0.785–0.896 and the Harry Potter book 0.825–0.977.
+- Z-scores within theme don't depend on scale, but differences this small may be mostly noise. That would weaken the test for Country in particular. It is reported under A5. The method does not change.
