@@ -68,13 +68,37 @@ describe("qloo client", () => {
 
   it("gives up after 5 rate-limited tries", async () => {
     const f = vi.fn(async () => json({}, 429));
-    await expect(make(f as unknown as typeof fetch).search("x", "movie")).rejects.toThrow(/rate-limited/);
+    await expect(make(f as unknown as typeof fetch).search("x", "movie")).rejects.toThrow(/still failing.*429/);
     expect(f).toHaveBeenCalledTimes(5);
   });
 
   it.each([401, 403])("stops immediately on %i", async (status) => {
     const f = vi.fn(async () => json({}, status));
     await expect(make(f as unknown as typeof fetch).search("x", "movie")).rejects.toThrow(String(status));
+    expect(f).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries 5xx and network errors with backoff, and counts them", async () => {
+    const f = vi.fn()
+      .mockResolvedValueOnce(json({}, 503))
+      .mockRejectedValueOnce(new TypeError("fetch failed"))
+      .mockResolvedValueOnce(json({}, 429))
+      .mockResolvedValueOnce(json({ results: [] }));
+    const c = make(f as unknown as typeof fetch);
+    await c.search("x", "movie");
+    expect(c.requests).toBe(4);
+    expect(c.retries).toEqual({ http429: 1, http5xx: 1, network: 1 });
+  });
+
+  it("gives up after 5 failed 5xx tries and names the failure", async () => {
+    const f = vi.fn(async () => json({}, 502));
+    await expect(make(f as unknown as typeof fetch).search("x", "movie")).rejects.toThrow(/still failing.*502/);
+    expect(f).toHaveBeenCalledTimes(5);
+  });
+
+  it("does not retry other 4xx", async () => {
+    const f = vi.fn(async () => json({ error: "bad" }, 400));
+    await expect(make(f as unknown as typeof fetch).search("x", "movie")).rejects.toThrow(/400/);
     expect(f).toHaveBeenCalledTimes(1);
   });
 });

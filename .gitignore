@@ -37,3 +37,4 @@ playwright-report/
 # MLB data: never commit (see DATA_RIGHTS.md)
 data/raw/
 data/derived/
+study/results/

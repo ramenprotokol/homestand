@@ -48,6 +48,17 @@ function yearOf(props: Record<string, unknown> | undefined): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** One row per requested ID from a raw /v2/insights body; an ID Qloo does not return gets affinity null. */
+export function affinityRowsFromBody(raw: unknown, entityIds: readonly string[]): AffinityRow[] {
+  const body = raw as { results?: { entities?: Record<string, unknown>[] } };
+  const byId = new Map((body.results?.entities ?? []).map((e) => [String(e.entity_id), e]));
+  return entityIds.map((id) => {
+    const e = byId.get(id);
+    const query = e?.query as { affinity?: unknown } | undefined;
+    return { entityId: id, name: e ? String(e.name) : "", affinity: num(query?.affinity), popularity: num(e?.popularity) };
+  });
+}
+
 export function createQlooClient(opts: ClientOptions) {
   const doFetch = opts.fetchImpl ?? fetch;
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
@@ -55,19 +66,37 @@ export function createQlooClient(opts: ClientOptions) {
   const maxTries = opts.maxTries ?? 5;
   let requests = 0;
   let last = 0;
+  const retries = { http429: 0, http5xx: 0, network: 0 };
 
   async function get(path: string, params: Record<string, string>): Promise<unknown> {
     // WKT contains spaces and commas: encode with %20, not "+".
     const qs = Object.entries(params).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
     const url = `${opts.baseUrl}${path}?${qs}`;
+    let lastFailure = "";
     for (let attempt = 0; attempt < maxTries; attempt++) {
       const wait = last + delayMs - Date.now();
       if (wait > 0) await sleep(wait);
       last = Date.now();
       requests++;
-      const res = await doFetch(url, { headers: { "X-Api-Key": opts.apiKey } });
+      let res: Response;
+      try {
+        res = await doFetch(url, { headers: { "X-Api-Key": opts.apiKey } });
+      } catch (e) {
+        retries.network++;
+        lastFailure = `network error: ${e instanceof Error ? e.message : String(e)}`;
+        await sleep(1000 * 2 ** attempt);
+        continue;
+      }
       if (res.status === 401 || res.status === 403) throw new Error(`Qloo ${path}: HTTP ${res.status} (auth)`);
       if (res.status === 429) {
+        retries.http429++;
+        lastFailure = "rate-limited (429)";
+        await sleep(1000 * 2 ** attempt);
+        continue;
+      }
+      if (res.status >= 500) {
+        retries.http5xx++;
+        lastFailure = `HTTP ${res.status}`;
         await sleep(1000 * 2 ** attempt);
         continue;
       }
@@ -76,7 +105,7 @@ export function createQlooClient(opts: ClientOptions) {
       opts.onResponse?.(path, params, body);
       return body;
     }
-    throw new Error(`Qloo ${path}: still rate-limited after ${maxTries} tries`);
+    throw new Error(`Qloo ${path}: still failing after ${maxTries} tries (${lastFailure})`);
   }
 
   async function search(query: string, type: QlooType, take = 5): Promise<SearchHit[]> {
@@ -105,16 +134,10 @@ export function createQlooClient(opts: ClientOptions) {
       params["signal.location"] = `POINT(${q.lon} ${q.lat})`; // WKT: longitude first
       params["signal.location.radius"] = String(q.radiusM ?? 40000);
     }
-    const body = (await get("/v2/insights", params)) as { results?: { entities?: Record<string, unknown>[] } };
-    const byId = new Map((body.results?.entities ?? []).map((e) => [String(e.entity_id), e]));
-    return q.entityIds.map((id) => {
-      const e = byId.get(id);
-      const query = e?.query as { affinity?: unknown } | undefined;
-      return { entityId: id, name: e ? String(e.name) : "", affinity: num(query?.affinity), popularity: num(e?.popularity) };
-    });
+    return affinityRowsFromBody(await get("/v2/insights", params), q.entityIds);
   }
 
-  return { search, localAffinity, get requests() { return requests; } };
+  return { search, localAffinity, get requests() { return requests; }, get retries() { return { ...retries }; } };
 }
 
 export type QlooClient = ReturnType<typeof createQlooClient>;
