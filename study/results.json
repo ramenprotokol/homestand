@@ -1,0 +1,278 @@
+{
+  "verdict": "CALL STANDS",
+  "seed": 20261030,
+  "draws": 10000,
+  "pulledAt": "2026-10-16T00:29:41.652Z",
+  "freezeCommit": "68c12e0351f2086bf59d17e2c8a121c72b136952",
+  "scoresSha256": "6154a76e240ba6e4a8a5815566252874b7aa789bbb2c4d616c998cce7646f535",
+  "passLine": {
+    "accuracyAtLeast": 0.55,
+    "lowerBoundAbove": 0.5
+  },
+  "counts": {
+    "nights": 378,
+    "nightsInput": 385,
+    "combos": 344,
+    "droppedCombos": 6,
+    "pairs": 521,
+    "clubsWithPairs": 89
+  },
+  "h1": {
+    "accuracy": {
+      "estimate": 0.491362763915547,
+      "lo": 0.4321880650994575,
+      "hi": 0.5488622127058609
+    },
+    "pass": false,
+    "verdict": "CALL STANDS"
+  },
+  "h2": {
+    "llmAccuracy": {
+      "estimate": 0.5057581573896354,
+      "lo": 0.4923515549493538,
+      "hi": 0.5203334490343842
+    },
+    "difference": {
+      "estimate": -0.014395393474088358,
+      "lo": -0.07116063526783822,
+      "hi": 0.04106776180698152
+    },
+    "beats": false
+  },
+  "rawLiftAccuracy": {
+    "qloo": 0.5124760076775432,
+    "llm": 0.5230326295585412,
+    "nationalPopularity": 0.491362763915547,
+    "nationalPopularityCentred": 0.5,
+    "spearmanPopularityVsThemeMeanLift": 0.18333333333333332,
+    "themesInSpearman": 9
+  },
+  "h3": {
+    "qloo": {
+      "nights": 378,
+      "coefficient": {
+        "estimate": 0.008623347920102765,
+        "lo": -0.018585227722903455,
+        "hi": 0.03902211972646765
+      },
+      "partialCorrelation": {
+        "estimate": 0.031599506842979984,
+        "lo": -0.06826227142023944,
+        "hi": 0.1362899170391838
+      },
+      "degenerateDraws": 0
+    },
+    "llm": {
+      "nights": 378,
+      "coefficient": {
+        "estimate": 0.004327886642305358,
+        "lo": -0.028167573130346606,
+        "hi": 0.05915520273371663
+      },
+      "partialCorrelation": {
+        "estimate": 0.015295183506902578,
+        "lo": -0.049697083140608986,
+        "hi": 0.0850634587461173
+      },
+      "degenerateDraws": 0
+    },
+    "nationalPopularityContext": {
+      "nights": 378,
+      "coefficient": {
+        "estimate": -2.517988604911593,
+        "lo": -3.376957721317261,
+        "hi": -1.6712089300925175
+      },
+      "partialCorrelation": {
+        "estimate": -0.24858099501435713,
+        "lo": -0.341574932971255,
+        "hi": -0.15758147094456704
+      },
+      "degenerateDraws": 0
+    }
+  },
+  "robustness": {
+    "r1": {
+      "accuracy": {
+        "estimate": 0.4765650080256824,
+        "lo": 0.40861423220973797,
+        "hi": 0.5449478330658107
+      }
+    },
+    "r2": {
+      "accuracy": {
+        "estimate": 0.4932821497120921,
+        "lo": 0.43653724018475754,
+        "hi": 0.5484461580431671
+      },
+      "pass": false,
+      "verdict": "CALL STANDS"
+    }
+  },
+  "perTheme": {
+    "star-wars": {
+      "clubsRan": 76,
+      "clubsKept": 76,
+      "nightsKept": 76,
+      "clubsScored": 120,
+      "qlooSd": 0.004401585968760064,
+      "qlooDistinct": 101,
+      "llmScored": 120,
+      "llmSd": 0,
+      "llmDistinct": 1,
+      "pairs": 199,
+      "qlooAccuracy": 0.5175879396984925
+    },
+    "princess": {
+      "clubsRan": 56,
+      "clubsKept": 54,
+      "nightsKept": 64,
+      "clubsScored": 117,
+      "qlooSd": 0.024411891853741777,
+      "qlooDistinct": 98,
+      "llmScored": 120,
+      "llmSd": 0,
+      "llmDistinct": 1,
+      "pairs": 158,
+      "qlooAccuracy": 0.5379746835443038
+    },
+    "bluey": {
+      "clubsRan": 49,
+      "clubsKept": 45,
+      "nightsKept": 51,
+      "clubsScored": 120,
+      "qlooSd": 0.012809279352272164,
+      "qlooDistinct": 101,
+      "llmScored": 114,
+      "llmSd": 0,
+      "llmDistinct": 1,
+      "pairs": 143,
+      "qlooAccuracy": 0.4825174825174825
+    },
+    "harry-potter": {
+      "clubsRan": 44,
+      "clubsKept": 44,
+      "nightsKept": 47,
+      "clubsScored": 120,
+      "qlooSd": 0.03178210762187684,
+      "qlooDistinct": 101,
+      "llmScored": 120,
+      "llmSd": 0.8272696053887149,
+      "llmDistinct": 4,
+      "pairs": 137,
+      "qlooAccuracy": 0.45255474452554745
+    },
+    "margaritaville": {
+      "clubsRan": 37,
+      "clubsKept": 37,
+      "nightsKept": 38,
+      "clubsScored": 120,
+      "qlooSd": 0.007420486521823847,
+      "qlooDistinct": 100,
+      "llmScored": 120,
+      "llmSd": 0,
+      "llmDistinct": 1,
+      "pairs": 123,
+      "qlooAccuracy": 0.5203252032520326
+    },
+    "dinosaur": {
+      "clubsRan": 28,
+      "clubsKept": 28,
+      "nightsKept": 36,
+      "clubsScored": 120,
+      "qlooSd": 0.016377294710509197,
+      "qlooDistinct": 101,
+      "llmScored": 120,
+      "llmSd": 0.09090593428863097,
+      "llmDistinct": 2,
+      "pairs": 99,
+      "qlooAccuracy": 0.42424242424242425
+    },
+    "country": {
+      "clubsRan": 30,
+      "clubsKept": 30,
+      "nightsKept": 33,
+      "clubsScored": 120,
+      "qlooSd": 0.0012129448972465313,
+      "qlooDistinct": 101,
+      "llmScored": 120,
+      "llmSd": 0.8626509529738353,
+      "llmDistinct": 4,
+      "pairs": 86,
+      "qlooAccuracy": 0.47674418604651164
+    },
+    "marvel": {
+      "clubsRan": 13,
+      "clubsKept": 13,
+      "nightsKept": 13,
+      "clubsScored": 120,
+      "qlooSd": 0.023173137981909685,
+      "qlooDistinct": 101,
+      "llmScored": 120,
+      "llmSd": 0,
+      "llmDistinct": 1,
+      "pairs": 44,
+      "qlooAccuracy": 0.4318181818181818
+    },
+    "wrestling": {
+      "clubsRan": 17,
+      "clubsKept": 17,
+      "nightsKept": 20,
+      "clubsScored": 120,
+      "qlooSd": 0.006240844343482501,
+      "qlooDistinct": 101,
+      "llmScored": 120,
+      "llmSd": 0.310800936649525,
+      "llmDistinct": 2,
+      "pairs": 53,
+      "qlooAccuracy": 0.5094339622641509
+    }
+  },
+  "flatThemes": {
+    "qloo": [],
+    "llm": [
+      "star-wars",
+      "princess",
+      "bluey",
+      "margaritaville",
+      "marvel"
+    ]
+  },
+  "binnedByQlooZ": [
+    {
+      "n": 69,
+      "zMin": -3.6097176330490934,
+      "zMax": -0.8301940967509559,
+      "meanZ": -1.5496167130865517,
+      "meanCentredLift": -0.017348639165000197
+    },
+    {
+      "n": 69,
+      "zMin": -0.7930286404821327,
+      "zMax": -0.21812503339671455,
+      "meanZ": -0.45701445801372925,
+      "meanCentredLift": -0.025923967965254865
+    },
+    {
+      "n": 69,
+      "zMin": -0.2174768686370823,
+      "zMax": 0.21330414991985922,
+      "meanZ": 0.0511383296992333,
+      "meanCentredLift": 0.02499835131387454
+    },
+    {
+      "n": 69,
+      "zMin": 0.21428832982058005,
+      "zMax": 0.6440181856460608,
+      "meanZ": 0.4157759704402439,
+      "meanCentredLift": 0.005407951439785678
+    },
+    {
+      "n": 68,
+      "zMin": 0.6452631187887109,
+      "zMax": 2.1052505060677444,
+      "meanZ": 1.0728485470813893,
+      "meanCentredLift": 0.010452295333532242
+    }
+  ]
+}

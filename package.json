@@ -20,7 +20,9 @@
     "qloo:coverage": "node --env-file=.dev.vars --import tsx scripts/qloo-coverage.ts",
     "qloo:reference": "node --env-file=.dev.vars --import tsx scripts/qloo-reference.ts",
     "qloo:smoke": "node --env-file=.dev.vars --import tsx scripts/qloo-smoke.ts",
-    "reference:synthetic": "tsx scripts/make-synthetic-reference.ts"
+    "reference:synthetic": "tsx scripts/make-synthetic-reference.ts",
+    "study:pull": "tsx study/pull.ts",
+    "study:analyze": "tsx study/analyze.ts"
   },
   "engines": {
     "node": ">=22.13"

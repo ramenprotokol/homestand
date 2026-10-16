@@ -296,3 +296,23 @@ This records what A4 requires: the chosen request shape, the bundle entity IDs, 
   - Luke Combs and Morgan Wallen each ranged about 0.995–1.000.
   - *Moana* ranged 0.785–0.896 and the Harry Potter book 0.825–0.977.
 - Z-scores within theme don't depend on scale, but differences this small may be mostly noise. That would weaken the test for Country in particular. It is reported under A5. The method does not change.
+
+### Amendment 5: 2026-10-15, procedural rules for the full pull, before the analysis; no outcome data read
+
+These rules are procedural. They were needed before the analysis and were not already specified. They change no hypothesis, predictor, sample or test. Steps (a) to (c) below read only club, city, state, lat and lon from `clubs-2025.json`.
+
+**LLM reply parsing.**
+- A reply counts as an integer only if, after trimming whitespace and one optional trailing period, it is exactly a whole number from 1 to 10 (no leading zeros).
+- Anything else is "non-integer": words, ranges, fractions such as "7/10", decimals, out-of-range numbers, or text around a number.
+- A non-integer reply is retried **once** with the identical request. If the second reply is also non-integer, that club-theme LLM score is recorded as missing (an absent key).
+- The reply text is the assistant message content of the Workers AI response. HTTP errors are retried with backoff, up to 5 tries, and are a separate matter from non-integer replies.
+
+**National popularity (A1).** For each kept entity, if Qloo's `popularity` is the same at every club in the pull, that common value is used. If it varies across clubs, the median across clubs is used and the range is reported. The theme value is the mean of its kept entities' values. The pull record states which case occurred.
+
+**Order of work and the freeze.**
+1. The pull code is written and tested on synthetic fixtures only.
+2. The Qloo pull (600 requests) and the LLM pull (1,080 requests) run, with every raw response saved locally and never committed.
+3. `data/derived/scores.json` is written from those saved responses and checked with the existing score and club-name parsers.
+4. `study/PULL_RECORD.md` is committed. It states the pull time, request and retry counts, missing counts per theme and predictor, the national popularity values, the LLM model and date, and the **SHA-256 of `data/derived/scores.json`**. That commit is the freeze.
+5. Only after the freeze commit is the analysis run, once, with the settings in Amendment 2. If the SHA-256 of `scores.json` at analysis time differs from the recorded one, the analysis is not valid.
+6. Whatever the analysis prints is published. Nothing is re-pulled, re-scored or re-parsed after the freeze.
