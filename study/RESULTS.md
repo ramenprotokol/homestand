@@ -2,7 +2,7 @@
 
 **Verdict: CALL STANDS.** In this sample, Qloo's local-taste score did not call which theme night drew better at the same ballpark any more often than a coin flip would. This is "not detected at this sample size", not "disproved".
 
-Everything below follows `study/PREREGISTRATION.md` (Amendments 1 to 5). The scores were frozen first (`study/PULL_RECORD.md`, commit `68c12e0`, `scores.json` SHA-256 `6154a76e…f535`). The analysis was then run once, with seed 20261030 and 10,000 club-bootstrap draws. Aggregates are in `study/results.json`.
+Everything below follows `study/PREREGISTRATION.md` (Amendments 1 to 5). The scores were frozen first (`study/PULL_RECORD.md`, commit `6f82c29`, `scores.json` SHA-256 `6154a76e…f535`). The analysis was then run once, with seed 20261030 and 10,000 club-bootstrap draws. Aggregates are in `study/results.json`.
 
 ## The main test (H1, the only confirmatory one)
 
@@ -50,3 +50,7 @@ The power check in Amendment 1 said a true accuracy near 58% would be caught abo
 ## What it means for the product
 
 H1 did not pass, so per the pre-registration the claim becomes a reasoned, cited audit, and the app says so plainly. These results do not show that local taste does not matter, only that Qloo's score, as used here, did not detect it at this sample size.
+
+## A note on commit ids
+
+On 2026-10-15, before this repository was first published, its git history was rewritten once to turn a local absolute file path in two files into a relative one. Commit dates, order and all other content are unchanged, and so is the SHA-256 of `scores.json`. The freeze commit's id changed from `68c12e0` to `6f82c29` (the "-dirty" line above shows the old id, as printed at the time).

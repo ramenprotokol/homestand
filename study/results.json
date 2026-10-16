@@ -3,7 +3,7 @@
   "seed": 20261030,
   "draws": 10000,
   "pulledAt": "2026-10-16T00:29:41.652Z",
-  "freezeCommit": "68c12e0351f2086bf59d17e2c8a121c72b136952",
+  "freezeCommit": "6f82c2921cc9432797a272ad2b43ca6540083fab",
   "scoresSha256": "6154a76e240ba6e4a8a5815566252874b7aa789bbb2c4d616c998cce7646f535",
   "passLine": {
     "accuracyAtLeast": 0.55,
