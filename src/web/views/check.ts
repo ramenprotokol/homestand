@@ -207,6 +207,7 @@ function whyBody(index: number): HTMLElement[] {
             }
             recheckBusy = false;
             refreshDrawer();
+            document.querySelector('[data-testid="recheck-message"]')?.scrollIntoView({ block: "nearest" });
             window.dispatchEvent(new HashChangeEvent("hashchange"));
           },
         },

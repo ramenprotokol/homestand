@@ -2,6 +2,7 @@ import type { AnalyzeResponse, MarketIn, MemoResponse, NightOut, ProposeResponse
 import type { CalendarRow, RowError } from "../app/calendar/csv";
 import type { FitLabel } from "../app/score";
 import type { TraceStep } from "../app/trace";
+import { templateWhy, type Proposal } from "../app/propose/propose";
 import { themeById } from "../app/themes/library";
 
 export type Decision = "approved" | "rejected";
@@ -22,6 +23,8 @@ export interface State {
   choices: Record<number, string>;
   propose: ProposeResponse | null;
   decisions: Record<string, Decision>;
+  /** A director's switch to one of a proposal's alternates, by proposal id. */
+  altChoice: Record<string, string>;
   allowDuplicates: boolean;
   traceGroups: TraceGroup[];
   memo: MemoResponse | null;
@@ -30,7 +33,7 @@ export interface State {
 export const state: State = blank();
 
 function blank(): State {
-  return { market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: {}, propose: null, decisions: {}, allowDuplicates: false, traceGroups: [], memo: null };
+  return { market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: {}, propose: null, decisions: {}, altChoice: {}, allowDuplicates: false, traceGroups: [], memo: null };
 }
 
 export function reset(): void {
@@ -45,6 +48,7 @@ export function addTrace(title: string, steps: TraceStep[]): void {
 export function invalidateProposals(): void {
   state.propose = null;
   state.decisions = {};
+  state.altChoice = {};
   state.memo = null;
 }
 
@@ -68,7 +72,7 @@ export interface NightView {
 export function viewOf(n: NightOut): NightView {
   const a = state.analysis!;
   const proposal = state.propose?.proposals.find((p) => p.index === n.index);
-  const approved = proposal && state.decisions[proposal.id] === "approved" ? proposal : null;
+  const approved = proposal && state.decisions[proposal.id] === "approved" ? effective(proposal) : null;
   const themeId = approved ? approved.toThemeId : effectiveThemeId(n);
   const score = themeId ? (a.themes[themeId] ?? null) : null;
   const needsChoice = n.resolution.kind === "ambiguous" && state.choices[n.index] === undefined;
@@ -77,8 +81,22 @@ export function viewOf(n: NightOut): NightView {
   return { night: n, themeId, themeLabel: label, fit, z: score?.z ?? null, score, swappedFrom: approved ? (themeById(approved.fromThemeId)?.label ?? approved.fromThemeId) : null, needsChoice };
 }
 
-export function approvedSwaps() {
-  return (state.propose?.proposals ?? []).filter((p) => state.decisions[p.id] === "approved");
+export type ShownProposal = Proposal & { whySource: "model" | "template" };
+
+/** The proposal as the director currently sees it: the top pick, or the alternate they switched to. */
+export function effective(p: ShownProposal): ShownProposal {
+  const alt = state.altChoice[p.id];
+  if (!alt || alt === p.toThemeId) return p;
+  const pick = p.alternates.find((a) => a.toThemeId === alt);
+  if (!pick) return p;
+  const from = themeById(p.fromThemeId)!;
+  const to = themeById(pick.toThemeId)!;
+  // Switching changes the theme but keeps the date and sponsor; the reason falls back to the template for the new theme.
+  return { ...p, toThemeId: pick.toThemeId, to: pick.to, why: templateWhy(from, to, p.sponsor), whySource: "template" };
+}
+
+export function approvedSwaps(): ShownProposal[] {
+  return (state.propose?.proposals ?? []).filter((p) => state.decisions[p.id] === "approved").map(effective);
 }
 
 /** Transient screen status. */

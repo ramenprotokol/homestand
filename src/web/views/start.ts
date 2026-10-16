@@ -5,8 +5,21 @@ import { sampleCsv } from "../../app/samples";
 import { AUDIT_LINE } from "../../app/score";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
+import { loadStudy } from "../study-data";
 import { startCheck } from "../flow";
 import { icon } from "../icons";
+
+function teaser(): HTMLElement {
+  const r = loadStudy().results;
+  const result = r === null ? "Results pending." : r.h1.verdict === "CONFIRMED" ? "Result: local taste beat the line we set." : r.h1.verdict === "OVERTURNED" ? "Result: local taste pointed the wrong way." : "Result: not detected at this sample size.";
+  const nights = r?.counts.nightsInput ?? 385;
+  return h(
+    "div",
+    { class: "teaser", "data-testid": "study-teaser" },
+    h("p", null, `We tested local taste against ${nights} real 2025 theme nights before building this. ${result}`),
+    h("a", { href: "#/study" }, "See The Study", icon("arrowRight")),
+  );
+}
 
 export function startView(): HTMLElement {
   return h(
@@ -25,6 +38,7 @@ export function startView(): HTMLElement {
         h("a", { class: "btn btn--primary", href: "#/sample", "data-testid": "try-sample" }, "Try a sample club", icon("arrowRight")),
         h("a", { class: "btn btn--quiet", href: "#/own", "data-testid": "use-own" }, "Use your own"),
       ),
+      teaser(),
     ),
     h(
       "ol",

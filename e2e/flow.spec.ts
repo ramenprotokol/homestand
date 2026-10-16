@@ -18,6 +18,10 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Your market, not the national chart." })).toBeVisible();
   await expect(page.getByTestId("study-link")).toBeVisible();
+  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 theme nights");
+  await expect(page.getByTestId("study-teaser")).toContainText("not detected at this sample size");
+  // Programmatic focus on the heading shows no ring.
+  expect(await page.locator("h1").evaluate((el) => (el === document.activeElement ? getComputedStyle(el).outlineStyle : "none"))).toBe("none");
   await noSideScroll(page);
   await shot(page, info, "01-start");
 
@@ -56,6 +60,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await why.getByTestId("recheck").click();
   await expect(why.getByTestId("recheck-message")).toContainText(/Checked again/);
   await expect(why.getByTestId("source-line")).toContainText("Re-checked live at");
+  await expect(why.getByTestId("recheck-message")).toBeInViewport();
   await shot(page, info, "04-why");
   await page.keyboard.press("Escape");
   await expect(why).toHaveCount(0);
@@ -71,6 +76,15 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   const cards = page.getByTestId("proposal");
   expect(await cards.count()).toBeGreaterThan(0);
   await noSideScroll(page);
+  await noSideScroll(page);
+  // The cited comparison replaces the repeated sentence; the why is not said twice.
+  await expect(cards.first().getByTestId("cited")).toContainText(/typical \([+-]\d\.\d\)/);
+  await expect(cards.first()).not.toContainText("This market leans toward");
+  if ((await page.getByTestId("angle").count()) > 0) {
+    const angle = await page.getByTestId("angle").first().innerText();
+    expect(angle).toMatch(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Z][a-z]{2} \d{1,2}\b/);
+    expect(angle).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  }
   await shot(page, info, "05-fix");
   await page.getByTestId("open-trace").click();
   const trace = page.getByRole("dialog");
@@ -83,6 +97,15 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
 
   const first = cards.first();
   await expect(first.locator(".stamp")).toHaveCount(0);
+  // Switch to an alternate before approving: the swap line follows it, the date stays.
+  const alt = first.getByTestId("alt").filter({ hasNot: page.locator("[disabled]") }).first();
+  if ((await alt.count()) > 0) {
+    const before = await first.getByTestId("swap-line").innerText();
+    const altName = (await alt.innerText()).trim();
+    await alt.click();
+    await expect(page.getByTestId("proposal").first().getByTestId("swap-line")).toContainText(altName);
+    expect(await page.getByTestId("proposal").first().getByTestId("swap-line").innerText()).not.toBe(before);
+  }
   await first.getByTestId("approve").click();
   const approved = page.getByTestId("proposal").first();
   const stamp = approved.locator(".stamp");

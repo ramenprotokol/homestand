@@ -86,6 +86,13 @@ export const METHOD_WORDS =
   "Higher than most (about half a standard step or more) is \"Leans in\". Lower than most by the same amount is \"Leans away\". In between is \"About average\". " +
   "It describes local taste. It does not say a theme will raise attendance; The Study tests that question.";
 
+/** "higher than typical (+1.1)": the cited comparison with typical ballpark markets, in plain words plus the number. */
+export function vsTypical(z: number | null): string {
+  if (z === null) return "not compared";
+  const words = z >= Z_CUT ? "higher than typical" : z <= -Z_CUT ? "lower than typical" : "about typical";
+  return `${words} (${z >= 0 ? "+" : "-"}${Math.abs(z).toFixed(1)})`;
+}
+
 export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.";
 
 /** The pre-registered consequence of H1 not passing (study/PREREGISTRATION.md). Shown on the landing page, the Why panel and The Study. */

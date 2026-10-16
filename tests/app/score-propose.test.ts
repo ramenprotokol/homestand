@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { bundleScore, comparisonSentence, fitFor, labelForZ, zScore } from "../../src/app/score";
 import { checkCandidate, inWindow, isFamilySlot } from "../../src/app/propose/rules";
-import { propose, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
+import { propose, templateWhy, likeness, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
 import { numbersAreGrounded, numbersIn } from "../../src/app/guard";
 import { THEME_LIBRARY, themeById } from "../../src/app/themes/library";
 
@@ -129,5 +129,69 @@ describe("proposals", () => {
   it("only touches leans-away nights", () => {
     const res = propose({ ...base, nights: [night(0, "2026-07-03", "paw-patrol"), night(1, "2026-07-04", null)] });
     expect(res.proposals).toEqual([]);
+  });
+
+  describe("like-for-like ranking and alternates", () => {
+    const f: Record<string, ThemeFit> = {};
+    for (const t of library) f[t.id] = fit("average", 0);
+    Object.assign(f, {
+      "harry-potter": fit("leans-away", -1.5), ghostbusters: fit("leans-away", -1), bluey: fit("leans-away", -1.2),
+      "taylor-swift": fit("leans-in", 3), "bad-bunny": fit("leans-in", 2.5), "star-wars": fit("leans-in", 0.6), "star-trek": fit("leans-in", 0.9), marvel: fit("leans-in", 0.7),
+      "paw-patrol": fit("leans-in", 0.6), dinosaur: fit("leans-in", 0.8), "grinch": fit("leans-in", 4),
+    });
+    const base2 = { library, fits: f, allowDuplicates: false, now: "2026-10-15T00:00:00.000Z" };
+
+    it("ranks the same category first, even when another theme leans in harder", () => {
+      const res = propose({ ...base2, nights: [night(0, "2026-05-09", "harry-potter")] });
+      const p = res.proposals[0]!;
+      expect(T(p.toThemeId).category).toBe("film");
+      expect(p.toThemeId).toBe("star-trek"); // film, z 0.9 beats film z 0.6; Taylor Swift (z 3) is a different category
+      expect(res.trace.some((s) => s.detail?.includes("same category"))).toBe(true);
+    });
+    it("falls back to the same audience, then to anything", () => {
+      expect(likeness(T("bluey"), T("paw-patrol"))).toBe(0);
+      expect(likeness(T("bluey"), T("minecraft"))).toBe(1);
+      expect(likeness(T("bluey"), T("elvis"))).toBe(2);
+      // Ghostbusters (film, family): film candidates removed, so the same audience (family) wins over adult.
+      const noFilms = { ...f, "star-wars": fit("average", 0), "star-trek": fit("average", 0), marvel: fit("average", 0), wrestling: fit("leans-in", 0.55) };
+      const res = propose({ ...base2, fits: noFilms, nights: [night(0, "2026-05-09", "ghostbusters")] });
+      // Wrestling is family-audience like Ghostbusters: it beats Taylor Swift (adult, z 3) and Bad Bunny.
+      expect(res.proposals[0]!.toThemeId).toBe("wrestling");
+    });
+    it("offers up to two alternates that pass the same constraints", () => {
+      const res = propose({ ...base2, nights: [night(0, "2026-05-09", "harry-potter")] });
+      const p = res.proposals[0]!;
+      expect(p.alternates.map((a) => a.toThemeId)).toEqual(["marvel", "star-wars"]);
+      for (const a of p.alternates) {
+        expect(a.to.label).toBe("leans-in");
+        expect(checkCandidate({ date: p.date, notes: "" }, T("harry-potter"), T(a.toThemeId), new Set(), false).ok).toBe(true);
+      }
+    });
+    it("alternates respect windows, audience, repeats and other proposals' picks", () => {
+      // Kids night on a Friday evening with the original adult: Bluey is kids, so adult-only and window themes must not appear.
+      const res = propose({ ...base2, nights: [night(0, "2026-07-10", "ghostbusters"), night(1, "2026-07-17", "harry-potter"), night(2, "2026-07-18", "bluey")] });
+      const tops = res.proposals.map((p) => p.toThemeId);
+      expect(new Set(tops).size).toBe(tops.length);
+      for (const p of res.proposals) {
+        const orig = T(p.fromThemeId);
+        for (const a of p.alternates) {
+          expect(tops).not.toContain(a.toThemeId); // another proposal's pick
+          expect(a.toThemeId).not.toBe("grinch"); // out of window in July
+          expect(checkCandidate({ date: p.date, notes: "" }, orig, T(a.toThemeId), new Set(), false).ok).toBe(true);
+        }
+      }
+      const bluey = res.proposals.find((p) => p.fromThemeId === "bluey")!;
+      for (const a of [bluey.toThemeId, ...bluey.alternates.map((x) => x.toThemeId)]) expect(T(a).audience).not.toBe("adult");
+    });
+    it("with repeats allowed, alternates may repeat another pick", () => {
+      const res = propose({ ...base2, allowDuplicates: true, nights: [night(0, "2026-05-09", "harry-potter"), night(1, "2026-05-16", "ghostbusters")] });
+      expect(res.proposals[0]!.toThemeId).toBe(res.proposals[1]!.toThemeId);
+    });
+  });
+
+  it("the template reason reads correctly with and without a sponsor", () => {
+    expect(templateWhy(T("elvis"), T("grateful-dead"), "")).toContain("The date stays the same.");
+    expect(templateWhy(T("elvis"), T("grateful-dead"), "")).not.toContain("stay the same");
+    expect(templateWhy(T("elvis"), T("grateful-dead"), "Acme Bank")).toContain("The date and the sponsor stay the same.");
   });
 });

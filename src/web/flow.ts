@@ -37,6 +37,7 @@ export async function ensureProposals(): Promise<void> {
     });
     const res = await api.propose(state.market, nights, state.allowDuplicates);
     state.propose = res;
+    state.altChoice = {};
     state.analysis.caps = res.caps;
     addTrace("Fix: propose swaps", res.trace);
   } catch (err) {

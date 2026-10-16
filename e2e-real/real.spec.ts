@@ -35,6 +35,10 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(why.getByTestId("why-footer")).toContainText("not an attendance predictor");
   await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Result recorded/);
   await shot(page, info, "why");
+  await why.getByTestId("recheck").click();
+  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again/);
+  await expect(why.getByTestId("recheck-message")).toBeInViewport();
+  await page.screenshot({ path: `test-results/screens-real/${info.project.name}-why-viewport.png` });
   await page.keyboard.press("Escape");
   await page.getByTestId("to-fix").click();
   await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
@@ -44,6 +48,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   const n = await page.getByTestId("proposal").count();
   console.log(`albuquerque proposals: ${n}`);
   if (n > 0) {
+    await expect(page.getByTestId("proposal").first().getByTestId("cited")).toContainText("typical");
     await page.getByTestId("proposal").first().getByTestId("approve").click();
     await expect(page.locator(".stamp").first()).toBeVisible();
     await shot(page, info, "approved");
