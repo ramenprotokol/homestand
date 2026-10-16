@@ -20,6 +20,7 @@ AI_DAILY_CAP = "150"
 
 # Local runs and e2e: `npm run worker:dev`. No AI binding (the agent writes template text) and synthetic Qloo
 # answers (QLOO_MODE=synthetic), so it needs no login and makes no network call to Qloo.
+# (No [ai] here on purpose: wrangler warns that "ai" is not inherited. That is the point.)
 [env.check]
 [env.check.vars]
 ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"

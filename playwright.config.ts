@@ -9,7 +9,11 @@ export default defineConfig({
   fullyParallel: false,
   reporter: [["list"]],
   outputDir: "test-results/pw",
-  use: { baseURL: "http://127.0.0.1:5173" },
+  use: { baseURL: "http://127.0.0.1:5173", trace: "retain-on-failure" },
+  projects: [
+    { name: "desktop", use: { viewport: { width: 1280, height: 900 } } },
+    { name: "mobile-375", use: { viewport: { width: 375, height: 812 }, hasTouch: true } },
+  ],
   webServer: [
     {
       command: "rm -rf .wrangler/e2e && npx wrangler dev --local --env check --ip 127.0.0.1 --port 8788 --persist-to .wrangler/e2e",
