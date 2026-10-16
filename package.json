@@ -13,7 +13,9 @@
     "test": "vitest run",
     "study:fetch": "tsx study/fetch.ts",
     "study:build": "tsx study/build.ts",
-    "study:day1": "tsx study/day1.ts"
+    "study:day1": "tsx study/day1.ts",
+    "study:pull": "tsx study/pull.ts",
+    "study:analyze": "tsx study/analyze.ts"
   },
   "engines": {
     "node": ">=22.13"
