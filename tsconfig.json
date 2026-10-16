@@ -4,7 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["node"],
+    "types": ["node", "vite/client"],
+    "resolveJsonModule": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -12,5 +13,6 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["src", "tests", "study", "vite.config.ts"]
+  "include": ["src", "tests", "study", "scripts", "e2e", "vite.config.ts", "playwright.config.ts"],
+  "exclude": ["src/worker/env.ts", "src/worker/index.ts"]
 }

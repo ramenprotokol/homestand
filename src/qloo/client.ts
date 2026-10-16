@@ -23,6 +23,8 @@ export interface AffinityQuery {
   radiusM?: number;
   /** Sent as filter.release_year.min; Qloo hides older films from movie insights unless a floor is given. */
   releaseYearMin?: number;
+  /** Sent as `take` when set. The app sends it (= the number of IDs) for batches over 20, so Qloo's default page size never cuts a batch short. */
+  take?: number;
   /** Fuzzy locality string (A4 fallback); replaces the POINT when set. */
   locationQuery?: string;
 }
@@ -129,6 +131,7 @@ export function createQlooClient(opts: ClientOptions) {
       "filter.results.entities": q.entityIds.join(","),
     };
     if (q.releaseYearMin !== undefined) params["filter.release_year.min"] = String(q.releaseYearMin);
+    if (q.take !== undefined) params["take"] = String(q.take);
     if (q.locationQuery !== undefined) params["signal.location.query"] = q.locationQuery;
     else {
       params["signal.location"] = `POINT(${q.lon} ${q.lat})`; // WKT: longitude first

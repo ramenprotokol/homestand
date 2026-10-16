@@ -1,0 +1,34 @@
+name = "homestand-api"
+main = "src/worker/index.ts"
+compatibility_date = "2026-10-01"
+
+[ai]
+binding = "AI"
+
+# KV cache for Qloo results, daily counters and rate limits. The id is a placeholder: the ship step creates the
+# namespace (through ~/RamenProtocol/_ops/infra/ramen-deploy.sh) and replaces it. Never run a bare `wrangler deploy`.
+[[kv_namespaces]]
+binding = "CACHE"
+id = "00000000000000000000000000000000"
+
+# Production. Secrets (not here): QLOO_API_KEY. Non-secret values only.
+[vars]
+ALLOWED_ORIGINS = "https://homestand.pages.dev"
+QLOO_API_URL = "https://hackathon.api.qloo.com"
+QLOO_DAILY_CAP = "400"
+AI_DAILY_CAP = "150"
+
+# Local runs and e2e: `npm run worker:dev`. No AI binding (the agent writes template text) and synthetic Qloo
+# answers (QLOO_MODE=synthetic), so it needs no login and makes no network call to Qloo.
+# (No [ai] here on purpose: wrangler warns that "ai" is not inherited. That is the point.)
+[env.check]
+[env.check.vars]
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+QLOO_API_URL = "https://hackathon.api.qloo.com"
+QLOO_MODE = "synthetic"
+QLOO_DAILY_CAP = "400"
+AI_DAILY_CAP = "150"
+
+[[env.check.kv_namespaces]]
+binding = "CACHE"
+id = "00000000000000000000000000000000"
