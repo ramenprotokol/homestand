@@ -119,8 +119,8 @@ function results(view: ReturnType<typeof loadStudy>, call: Call): HTMLElement[] 
     { class: "sect" },
     h("h2", null, "Read the paper trail"),
     h("ul", { class: "checks" },
-      h("li", null, h("a", { href: `${REPO}/blob/main/study/PREREGISTRATION.md` }, "Pre-registration and Amendments 1 to 5"), " (written before any Qloo score was pulled)"),
-      h("li", null, h("a", { href: `${REPO}/blob/main/DATA_RIGHTS.md` }, "Data rights"), ": no MLB game data is published"),
+      h("li", null, h("a", { href: `${REPO}/blob/master/study/PREREGISTRATION.md` }, "Pre-registration and Amendments 1 to 5"), " (written before any Qloo score was pulled)"),
+      h("li", null, h("a", { href: `${REPO}/blob/master/DATA_RIGHTS.md` }, "Data rights"), ": no MLB game data is published"),
       h("li", null, h("a", { href: REPO }, "The code")),
     ),
   );
