@@ -13,3 +13,8 @@ export function numbersAreGrounded(text: string, allowed: Iterable<number>): boo
   const facts = [...allowed];
   return numbersIn(text).every((n) => facts.some((f) => Math.abs(f - n) < 1e-9 || Math.abs(Math.round(f * 100) / 100 - n) < 1e-9 || Math.abs(Math.round(f * 10) / 10 - n) < 1e-9));
 }
+
+const OUTCOME_CLAIM = /\b(attendance|revenue|sales|sell(s|ing)? out|sell-?outs?|boost(s|ed|ing)?|raise[sd]?|increase[sd]?|drive[sn]?|more fans|bigger crowds?|fill(s|ed)? the park)\b/i;
+
+/** Wording rule: scores describe local taste. Text that promises an attendance or revenue effect is rejected. */
+export const claimsOutcome = (text: string): boolean => OUTCOME_CLAIM.test(text);

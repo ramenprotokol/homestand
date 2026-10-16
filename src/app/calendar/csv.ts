@@ -31,7 +31,7 @@ export function splitRecords(text: string, delimiter: string): string[][] {
   let record: string[] = [];
   let field = "";
   let inQuotes = false;
-  const src = text.replace(/^﻿/, "");
+  const src = text.replace(/^\u{FEFF}/u, "");
   for (let i = 0; i < src.length; i++) {
     const c = src[i];
     if (inQuotes) {
@@ -102,7 +102,7 @@ export const weekdayName = (iso: string): string => WEEKDAYS[weekdayIndex(iso)]!
 export function parseCalendar(text: string): ParsedCalendar {
   const rows: CalendarRow[] = [];
   const errors: RowError[] = [];
-  const firstLine = text.replace(/^﻿/, "").split(/\r?\n/, 1)[0] ?? "";
+  const firstLine = text.replace(/^\u{FEFF}/u, "").split(/\r?\n/, 1)[0] ?? "";
   if (firstLine.trim() === "") return { rows, errors: [{ line: 1, message: "The file is empty. Add a header row: date,theme,sponsor,locked,notes." }] };
   const records = splitRecords(text, pickDelimiter(firstLine));
   const header = (records[0] ?? []).map((h) => h.trim().toLowerCase());

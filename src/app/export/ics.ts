@@ -4,7 +4,7 @@ const enc = new TextEncoder();
 
 /** RFC 5545 text escaping. */
 export function icsEscape(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
 /** Folds a content line at 75 octets, on character boundaries; continuation lines start with one space. */
