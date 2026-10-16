@@ -1,5 +1,5 @@
 import { activeLibrary, COMMITTED_IDS } from "../app/themes/ids";
-import { REFERENCE } from "../app/score";
+import { REFERENCE, SYNTHETIC_REFERENCE } from "../app/score";
 import type { Deps } from "./agent";
 import type { Env } from "./env";
 import { route, type RouterDeps } from "./router";
@@ -26,7 +26,7 @@ function depsFor(env: Env): RouterDeps {
     qlooBase: env.QLOO_API_URL ?? (synthetic ? "https://synthetic.invalid" : ""),
     qlooKey: env.QLOO_API_KEY ?? "",
     library: activeLibrary(COMMITTED_IDS, synthetic),
-    reference: REFERENCE,
+    reference: synthetic ? SYNTHETIC_REFERENCE : REFERENCE,
     now: () => new Date(),
     qlooDailyCap: num(env.QLOO_DAILY_CAP, 400),
     aiDailyCap: num(env.AI_DAILY_CAP, 150),

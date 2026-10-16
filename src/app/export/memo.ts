@@ -1,4 +1,4 @@
-import { METHOD_WORDS } from "../score";
+import { AUDIT_LINE, METHOD_WORDS } from "../score";
 
 export interface MemoSwap {
   date: string;
@@ -55,6 +55,7 @@ ${d.swaps.length ? `<h2>Approved swaps</h2>
 ${d.angles.length ? `<h2>Locked nights: sponsor-friendly angles</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
 <p>${escapeHtml(METHOD_WORDS)}</p>
+<p>${escapeHtml(AUDIT_LINE)}</p>
 <p>${d.nights} nights were reviewed; ${d.classic} classic nights (fireworks, giveaways, heritage and similar) were left as planned because they are not a pop-culture taste. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
 </article>`;
 }

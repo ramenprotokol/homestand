@@ -289,3 +289,5 @@ table.data td.num, table.data th.num { text-align: right; }
   .memo-sheet, .memo-sheet * { visibility: visible; }
   .memo-sheet { position: absolute; left: 0; top: 0; width: 100%; border: 0; padding: 0; }
 }
+
+.audit-line { font-weight: 650; border-top: 1.5px solid var(--line); padding-top: 8px; }

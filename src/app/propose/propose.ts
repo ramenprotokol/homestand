@@ -62,7 +62,7 @@ export interface ProposeInput {
 }
 
 export function templateWhy(from: Theme, to: Theme, sponsor: string): string {
-  return `${to.label} sits closer to this market's taste than ${from.label}: this market leans toward ${to.label} more than most ballpark markets, and toward ${from.label} less than most. The date${sponsor ? " and the sponsor" : ""} stay the same.`;
+  return `${to.label} sits closer to this market's taste than ${from.label}: this market leans toward ${to.label} more than most ballpark markets, and toward ${from.label} less than most. ${sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`;
 }
 
 export function angleText(night: PlanNight, from: Theme, to: Theme): string {

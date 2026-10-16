@@ -2,6 +2,7 @@ import type { GeoHit } from "../../app/api-types";
 import { CSV_TEMPLATE, parseCalendar } from "../../app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../app/markets";
 import { sampleCsv } from "../../app/samples";
+import { AUDIT_LINE } from "../../app/score";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
 import { startCheck } from "../flow";
@@ -17,6 +18,7 @@ export function startView(): HTMLElement {
       h("span", { class: "note-marker" }, "for promotions directors"),
       h("h1", { tabindex: "-1" }, "Your market, not the national chart."),
       h("p", { class: "lede" }, "Check next season's theme nights against what your own ballpark market leans toward. Get swap suggestions that keep your sponsors and your dates."),
+      h("p", { class: "small" }, `Scores describe what a market leans toward. ${AUDIT_LINE} `, h("a", { href: "#/study" }, "See how we tested it")),
       h(
         "div",
         { class: "actions" },

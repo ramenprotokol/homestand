@@ -26,11 +26,12 @@ describe("theme library", () => {
   it("starts with the nine study themes, and each kept Amendment 4 bundle entity has its committed ID", () => {
     expect(STUDY_THEME_IDS).toEqual(["star-wars", "princess", "bluey", "harry-potter", "margaritaville", "dinosaur", "country", "marvel", "wrestling"]);
     const live = activeLibrary(COMMITTED_IDS, false);
-    expect(live.map((t) => t.id)).toEqual(STUDY_THEME_IDS);
+    // The study themes come first; resolution then added the others that Qloo has local data for.
+    expect(live.slice(0, 9).map((t) => t.id)).toEqual(STUDY_THEME_IDS);
     const studyKeys = new Set(BUNDLE_ENTITIES.map((b) => b.key));
-    for (const t of live) for (const e of t.entities) expect(studyKeys.has(e.key)).toBe(true);
+    for (const t of live.slice(0, 9)) for (const e of t.entities) expect(studyKeys.has(e.key)).toBe(true);
     // Amendment 4's table: 14 kept entities.
-    expect(live.flatMap((t) => t.entities)).toHaveLength(14);
+    expect(live.slice(0, 9).flatMap((t) => t.entities)).toHaveLength(14);
     expect(live.find((t) => t.id === "country")!.entities.map((e) => e.id)).toEqual([
       "3CBD78B1-D2F2-4551-A342-4621B6BDB5E2",
       "59DCDFA8-5082-47D9-B3E5-2B49CF2A778F",

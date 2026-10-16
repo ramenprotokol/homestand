@@ -25,6 +25,7 @@ describe("scoring", () => {
   it("is not scored with no score, no reference, or a flat reference", () => {
     expect(fitFor(null, { n: 40, mean: 0.5, sd: 0.1 }).label).toBe("not-scored");
     expect(fitFor(0.5, undefined).label).toBe("not-scored");
+    expect(fitFor(0.5, { n: 9, mean: 0.5, sd: 0.1 }).label).toBe("not-scored");
     expect(fitFor(0.5, { n: 40, mean: 0.5, sd: 0 })).toMatchObject({ label: "not-scored", z: null });
     expect(fitFor(0.5, { n: 40, mean: 0.5, sd: 0 }).reason).toContain("barely differ");
   });

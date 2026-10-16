@@ -49,7 +49,7 @@ export const THEME_LIBRARY: readonly Theme[] = [
     entities: [e("dinosaur:jp", "movie", "Jurassic Park", 1993), e("dinosaur:jw", "movie", "Jurassic World", 2015)] },
   { id: "country", label: "Country music", category: "music", audience: "adult", aliases: ["country music", "country night", "country western", "country weekend", "country hits"],
     entities: [e("country:combs", "artist", "Luke Combs"), e("country:wallen", "artist", "Morgan Wallen"), e("country:underwood", "artist", "Carrie Underwood")] },
-  { id: "marvel", label: "Marvel", category: "film", audience: "family", aliases: ["marvel", "avengers", "spider-man", "spiderman", "superhero"],
+  { id: "marvel", label: "Marvel", category: "film", audience: "family", aliases: ["marvel", "avengers", "spider-man", "spiderman", "superhero", "superheroes", "super heroes"],
     entities: [e("marvel:nwh", "movie", "Spider-Man: No Way Home", 2021)] },
   { id: "wrestling", label: "Pro wrestling", category: "sports entertainment", audience: "family", aliases: ["wrestling", "wrestler", "wrestlers", "wwe"],
     entities: [e("wrestling:wwe", "brand", "WWE")] },

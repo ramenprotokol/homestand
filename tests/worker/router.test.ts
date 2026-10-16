@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyzeResponse, ApiError, ProposeResponse, RecheckResponse, MemoResponse } from "../../src/app/api-types";
 import { parseCalendar } from "../../src/app/calendar/csv";
-import { REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/app/score";
 import { sampleCsv } from "../../src/app/samples";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { activeLibrary } from "../../src/app/themes/ids";
@@ -116,8 +116,8 @@ describe("analyze", () => {
     const out = await analyzeOk(harness());
     const by = (t: string) => out.nights.find((n) => n.theme === t)!;
     expect(by("Fireworks Friday")).toMatchObject({ label: "classic", themeId: null, z: null });
-    expect(by("Pirates & Princesses")).toMatchObject({ resolution: { kind: "ambiguous" }, label: "not-scored" });
-    expect(by("Pirates & Princesses").candidates.sort()).toEqual(["pirates", "princess"]);
+    expect(by("Dinosaurs & Superheroes")).toMatchObject({ resolution: { kind: "ambiguous" }, label: "not-scored" });
+    expect(by("Dinosaurs & Superheroes").candidates.sort()).toEqual(["dinosaur", "marvel"]);
     expect(by("Hot Sauce Showdown")).toMatchObject({ resolution: { kind: "unknown" }, label: "not-scored" });
     expect(["leans-in", "average", "leans-away"]).toContain(by("Bluey Day").label);
     expect(by("Bluey Day").z).not.toBeNull();

@@ -1,7 +1,8 @@
-import type { Interval, StudyResults, Verdict } from "../../study/analysis";
+import type { Interval, Verdict } from "../../study/analysis";
+import { AUDIT_LINE } from "../../app/score";
 import { STUDY_THEMES } from "../../study/themes";
 import { h } from "../dom";
-import { loadStudy } from "../study-data";
+import { loadStudy, type PublishedResults } from "../study-data";
 
 const REPO = "https://github.com/ramenprotokol/homestand";
 type Call = "Yes" | "No" | "Not sure";
@@ -30,7 +31,7 @@ const interval = (i: Interval): string => `${pct(i.estimate)} (95% interval ${pc
 
 const VERDICT_WORDS: Record<Verdict, string> = {
   CONFIRMED: "Local taste beat the line we set before looking. In pairs of theme nights at the same ballpark, it picked the better-drawing night at least 55% of the time, and the 95% interval stays above a coin flip.",
-  "CALL STANDS": "Not enough evidence either way. The result did not clear the pre-registered line, and the interval does not rule out a coin flip. We do not claim local taste predicts crowds, and we do not claim it fails.",
+  "CALL STANDS": "Not enough evidence either way. The result did not clear the pre-registered line, and the interval includes a coin flip. This is \"not detected at this sample size\", not \"disproved\": a real but small effect could still hide here.",
   OVERTURNED: "The interval sits below a coin flip. At this sample size, local taste pointed the wrong way more often than the right way.",
 };
 
@@ -43,14 +44,14 @@ function s<K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string, s
 }
 
 /** Accuracy strips on one 40% to 70% axis, with the 50% coin-flip and 55% pass lines. */
-function chart(r: StudyResults): SVGSVGElement {
+function chart(r: PublishedResults): SVGSVGElement {
   const W = 640, left = 168, right = 24, top = 30, rowH = 44;
   const lo = 0.4, hi = 0.7;
   const x = (v: number): number => left + ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * (W - left - right);
   const rows: Array<{ name: string; est: number; lo?: number; hi?: number; emph: boolean }> = [
     { name: "Local taste (Qloo)", est: r.h1.accuracy.estimate, lo: r.h1.accuracy.lo, hi: r.h1.accuracy.hi, emph: true },
     { name: "LLM-only guess", est: r.h2.llmAccuracy.estimate, lo: r.h2.llmAccuracy.lo, hi: r.h2.llmAccuracy.hi, emph: false },
-    { name: "National popularity", est: r.descriptive.raw.nationalPopularityCentred, emph: false },
+    { name: "National popularity", est: r.rawLiftAccuracy.nationalPopularityCentred, emph: false },
   ];
   const H = top + rows.length * rowH + 34;
   const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": `Accuracy of three predictors against a 50% coin flip and the 55% pass line. ${rows.map((q) => `${q.name} ${pct(q.est)}`).join(". ")}.` });
@@ -151,13 +152,13 @@ function results(view: ReturnType<typeof loadStudy>, call: Call): HTMLElement[] 
     : null;
   return [
     banner ?? h("span"),
-    h("div", { class: "verdict", "data-testid": "verdict" }, h("span", { class: "small" }, `You said ${call}. The pre-registered verdict:`), h("span", { class: "verdict-word" }, r.h1.verdict), h("p", null, VERDICT_WORDS[r.h1.verdict])),
+    h("div", { class: "verdict", "data-testid": "verdict" }, h("span", { class: "small" }, `You said ${call}. The pre-registered verdict:`), h("span", { class: "verdict-word" }, r.h1.verdict), h("p", null, VERDICT_WORDS[r.h1.verdict]), r.h1.pass ? null : h("p", { class: "audit-line", "data-testid": "audit-line" }, AUDIT_LINE)),
     h(
       "section", { class: "sect" },
       h("h2", null, "How often local taste picked the bigger crowd"),
-      h("p", { "data-testid": "h1-text" }, `Between two theme nights at the same ballpark, local taste picked the better-drawing one ${interval(r.h1.accuracy)} of the time. The line to pass was 55%, with the interval above 50%. A coin flip gets 50%.`),
+      h("p", { "data-testid": "h1-text" }, `Between two theme nights at the same ballpark, local taste picked the better-drawing one ${interval(r.h1.accuracy)} of the time, over ${r.counts.pairs} pairs at ${r.counts.clubsWithPairs} clubs. The line to pass was 55%, with the interval above 50%. A coin flip gets 50%.`),
       chart(r),
-      h("p", { class: "small" }, `Side by side: the LLM-only guess got ${interval(r.h2.llmAccuracy)}. National popularity gets ${pct(r.descriptive.raw.nationalPopularityCentred)} by design, because it is the same for every club and so cannot rank two themes inside one club.`),
+      h("p", { class: "small" }, `Side by side: the LLM-only guess got ${interval(r.h2.llmAccuracy)}, but that is mostly ties: it gave the same rating for nearly every town (${r.flatThemes.llm.length} of 9 themes had no variation at all). National popularity gets ${pct(r.rawLiftAccuracy.nationalPopularityCentred)} by design, because it is the same for every club and so cannot rank two themes inside one club.`),
     ),
     h(
       "section", { class: "sect" },
@@ -166,7 +167,7 @@ function results(view: ReturnType<typeof loadStudy>, call: Call): HTMLElement[] 
       h("div", { class: "table-wrap" },
         h("table", { class: "data" },
           h("thead", null, h("tr", null, ["Group", "Club-themes", "Taste score range (z)", "Crowd vs club's usual"].map((t, i) => h("th", { class: i > 0 ? "num" : "" }, t)))),
-          h("tbody", null, r.binned.map((b, i) => h("tr", null, h("td", null, i === 0 ? "Least" : i === r.binned.length - 1 ? "Most" : `Group ${i + 1}`), h("td", { class: "num" }, String(b.n)), h("td", { class: "num" }, `${b.zMin.toFixed(1)} to ${b.zMax.toFixed(1)}`), h("td", { class: "num" }, `${b.meanCentredLift >= 0 ? "+" : ""}${((Math.exp(b.meanCentredLift) - 1) * 100).toFixed(1)}%`)))),
+          h("tbody", null, r.binnedByQlooZ.map((b, i) => h("tr", null, h("td", null, i === 0 ? "Least" : i === r.binnedByQlooZ.length - 1 ? "Most" : `Group ${i + 1}`), h("td", { class: "num" }, String(b.n)), h("td", { class: "num" }, `${b.zMin.toFixed(1)} to ${b.zMax.toFixed(1)}`), h("td", { class: "num" }, `${b.meanCentredLift >= 0 ? "+" : ""}${((Math.exp(b.meanCentredLift) - 1) * 100).toFixed(1)}%`)))),
         )),
     ),
     h(
@@ -177,7 +178,7 @@ function results(view: ReturnType<typeof loadStudy>, call: Call): HTMLElement[] 
         h("table", { class: "data" },
           h("thead", null, h("tr", null, h("th", null, "Theme"), h("th", { class: "num" }, "Pairs"), h("th", { class: "num" }, "Accuracy"), h("th", null, "vs 50%"))),
           h("tbody", null, STUDY_THEMES.map((t) => {
-            const d = r.diagnostics.perTheme[t.id];
+            const d = r.perTheme[t.id];
             const acc = d?.qlooAccuracy ?? null;
             return h("tr", null, h("td", null, t.label), h("td", { class: "num" }, d ? String(d.pairs) : "n/a"), h("td", { class: "num" }, acc === null ? "n/a" : pct(acc, 0)), h("td", null, acc === null ? "" : h("span", { class: "inline-bar", style: `width:${Math.round(acc * 120)}px`, role: "img", "aria-label": `${pct(acc, 0)}` })));
           })),

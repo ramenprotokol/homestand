@@ -57,14 +57,6 @@
       "id": "764E1D34-B48B-4757-94F2-063B9F912C03",
       "name": "WWE"
     },
-    "paw-patrol:tv": {
-      "id": "2030C185-8B8D-48C9-81EE-F4FDDDB8E921",
-      "name": "PAW Patrol"
-    },
-    "pokemon:tv": {
-      "id": "EE970D24-1E57-4F69-9FB0-BFE072D96918",
-      "name": "Pokémon"
-    },
     "super-mario:film": {
       "id": "771C1BF6-AC3B-4BA0-B9B9-1ED17A418F8E",
       "name": "The Super Mario Bros. Movie"
@@ -85,49 +77,13 @@
       "id": "996272B0-CB79-48D3-8B83-8ED34F2DE9AF",
       "name": "The Beatles"
     },
-    "lord-of-the-rings:film": {
-      "id": "3006EB68-8DD8-426E-B2F2-19BD3B9418F0",
-      "name": "The Lord of the Rings: The Fellowship of the Ring"
-    },
     "stranger-things:tv": {
       "id": "07F1170E-BB69-4982-82C6-255F477EBBAD",
       "name": "Stranger Things"
     },
-    "the-office:tv": {
-      "id": "E5AE1F26-04CB-4CDD-BBA4-87FB6541F848",
-      "name": "The Office"
-    },
-    "batman:film": {
-      "id": "3432C364-C883-4A0D-A76B-99A57E5361E5",
-      "name": "The Dark Knight"
-    },
-    "ninja-turtles:tv": {
-      "id": "C8E9A2A4-E5E0-4C48-885D-8E029C31F6D7",
-      "name": "Teenage Mutant Ninja Turtles"
-    },
-    "scooby-doo:tv": {
-      "id": "5FACCFEF-F4B2-43F1-8E9A-CA1974CB004C",
-      "name": "Scooby Doo, Where Are You!"
-    },
-    "spongebob:tv": {
-      "id": "9668F753-D707-4EB6-A890-DE8A9882DAD4",
-      "name": "SpongeBob SquarePants"
-    },
-    "sesame-street:tv": {
-      "id": "40564DB8-425A-4DE2-B709-77B58FE11D71",
-      "name": "Sesame Street"
-    },
-    "toy-story:film": {
-      "id": "745F8813-3667-4D09-B210-BC085AF583E4",
-      "name": "Toy Story"
-    },
     "barbie:film": {
       "id": "BAF6FB9E-7E2E-4008-944B-97C0CF430D41",
       "name": "Barbie"
-    },
-    "minecraft:film": {
-      "id": "CDE34B03-22DD-48A1-90CB-1F71795E2C0E",
-      "name": "A Minecraft Movie"
     },
     "star-trek:film": {
       "id": "03FD4AA5-5A03-419E-BC23-5B37ADA0AF53",
@@ -157,14 +113,6 @@
       "id": "A29ABC54-6BCE-4068-9655-A4240DB82F99",
       "name": "Kenny Chesney"
     },
-    "peanuts:tv": {
-      "id": "24EDC845-457B-4FCC-B96C-41330BACC1A5",
-      "name": "Peanuts"
-    },
-    "grinch:film": {
-      "id": "FA1D66EC-3608-4FE9-B240-718B8F099503",
-      "name": "The Grinch"
-    },
     "hocus-pocus:film": {
       "id": "FC425CD4-6C84-41AE-9908-AD069B2EC8CC",
       "name": "Hocus Pocus"
@@ -172,14 +120,23 @@
     "bad-bunny:artist": {
       "id": "BDA1B73F-10E7-4D09-AC51-B796CCEC5FF3",
       "name": "Bad Bunny"
-    },
-    "top-gun:film": {
-      "id": "8C9A1D24-872E-4B7A-B9E2-542C46F1AA68",
-      "name": "Top Gun"
-    },
-    "pirates:film": {
-      "id": "8EF9FBDC-8CC5-4D4A-A8D0-FAEA7EE04155",
-      "name": "Pirates of the Caribbean: The Curse of the Black Pearl"
     }
+  },
+  "dropped": {
+    "paw-patrol:tv": "no local affinity at the 4 sample markets",
+    "pokemon:tv": "no local affinity at the 4 sample markets",
+    "lord-of-the-rings:film": "no local affinity at the 4 sample markets",
+    "the-office:tv": "no local affinity at the 4 sample markets",
+    "batman:film": "no local affinity at the 4 sample markets",
+    "ninja-turtles:tv": "no local affinity at the 4 sample markets",
+    "scooby-doo:tv": "no local affinity at the 4 sample markets",
+    "spongebob:tv": "no local affinity at the 4 sample markets",
+    "sesame-street:tv": "no local affinity at the 4 sample markets",
+    "toy-story:film": "no local affinity at the 4 sample markets",
+    "minecraft:film": "no local affinity at the 4 sample markets",
+    "peanuts:tv": "no local affinity at the 4 sample markets",
+    "grinch:film": "no local affinity at the 4 sample markets",
+    "top-gun:film": "no local affinity at the 4 sample markets",
+    "pirates:film": "no local affinity at the 4 sample markets"
   }
 }

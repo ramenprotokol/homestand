@@ -1,5 +1,5 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { CLASSIC_REASON, comparisonSentence, FIT_WORDS, METHOD_WORDS, REFERENCE } from "../../app/score";
+import { AUDIT_LINE, CLASSIC_REASON, comparisonSentence, FIT_WORDS, METHOD_WORDS } from "../../app/score";
 import { themeById } from "../../app/themes/library";
 import { ApiFailure } from "../api";
 import { badge, closeDrawer, openDrawer, refreshDrawer, syntheticBanner, tile } from "../components";
@@ -89,7 +89,7 @@ export function checkView(): HTMLElement {
       h("a", { class: "btn btn--primary", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
       pending > 0 ? h("span", { class: "small" }, "Pick a theme for the open magnets first, or continue and leave them unscored.") : null,
     ),
-    h("p", { class: "footer" }, "Taste data from Qloo. Scores describe what this market leans toward. They do not say a theme will raise attendance; The Study tests that question."),
+    h("p", { class: "footer" }, `Taste data from Qloo. Scores describe what this market leans toward. ${AUDIT_LINE}`),
   );
 }
 
@@ -144,7 +144,7 @@ function whyBody(index: number): HTMLElement[] {
     return out;
   }
   if (!v.themeId || !v.score) {
-    out.push(h("p", { class: "panel-box" }, `We could not place "${n.theme}" in our library of ${Object.keys(a.themes).length} themes, so Qloo has nothing to score. It stays as planned.`));
+    out.push(h("p", { class: "panel-box" }, `"${n.theme}" is not one of the ${Object.keys(a.themes).length} themes Qloo has local data for, so it is not scored. It stays as planned.`));
     return out;
   }
   const s = v.score;
@@ -166,21 +166,22 @@ function whyBody(index: number): HTMLElement[] {
       h(
         "div",
         { class: "panel-box" },
-        h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, e.name), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(3))])),
+        h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, e.name), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(4))])),
         h(
           "dl",
           { class: "kv", style: "border-top:1px solid var(--line);padding-top:8px" },
-          h("dt", null, "This market's bundle score (mean)"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(3)),
-          h("dt", null, `Typical ballpark market (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(3) : "n/a"),
-          h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(3) : "n/a"),
+          h("dt", null, "This market's bundle score (mean)"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
+          h("dt", null, `Typical ballpark market (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
+          h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
           h("dt", null, "Index z = (score - typical) / spread"), h("dd", null, rel(s.z)),
           h("dt", null, "Cut-offs"), h("dd", null, "+0.50 / -0.50"),
         ),
-        REFERENCE.synthetic ? h("p", { class: "small" }, "The typical-market numbers are a synthetic placeholder until the reference set is pulled.") : null,
+        a.reference.synthetic ? h("p", { class: "small" }, "The typical-market numbers are a synthetic placeholder until the reference set is pulled.") : null,
       ),
     );
   }
 
+  out.push(h("p", { class: "small", "data-testid": "why-footer" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See The Study")));
   // Re-check live
   const caps = a.caps;
   const disabled = caps.recheckDisabled || recheckBusy;

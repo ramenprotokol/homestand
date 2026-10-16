@@ -38,11 +38,11 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   expect(await page.locator(".badge:has-text('Leans in'), .badge:has-text('Leans away'), .badge:has-text('About average')").count()).toBeGreaterThan(5);
   await expect(page.locator(".tile-lock").first()).toBeVisible();
   // The ambiguous night asks, and does not guess.
-  const ask = page.getByRole("group", { name: /Pirates & Princesses/ });
+  const ask = page.getByRole("group", { name: /Elvis and the Beatles Night/ });
   await expect(ask).toBeVisible();
   await shot(page, info, "03-check");
-  await ask.getByRole("button", { name: "Princess" }).click();
-  await expect(page.getByRole("group", { name: /Pirates & Princesses/ })).toHaveCount(0);
+  await ask.getByRole("button", { name: "Elvis" }).click();
+  await expect(page.getByRole("group", { name: /Elvis and the Beatles Night/ })).toHaveCount(0);
 
   // ---- Why panel
   await page.locator(".tile", { hasText: "Bluey Day" }).click();
@@ -127,8 +127,9 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("verdict")).toHaveCount(0);
   await shot(page, info, "09-study-call");
   await page.getByTestId("call-yes").click();
-  await expect(page.getByTestId("verdict")).toContainText(/CONFIRMED|CALL STANDS|OVERTURNED/);
-  await expect(page.getByTestId("results-pending")).toContainText("SYNTHETIC");
+  await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
+  await expect(page.getByTestId("audit-line")).toContainText("not an attendance predictor");
+  await expect(page.getByTestId("results-pending")).toHaveCount(0);
   await expect(page.getByTestId("h1-text")).toContainText("95% interval");
   await expect(page.getByText("Pre-registration and Amendments 1 to 4")).toBeVisible();
   await noSideScroll(page);
