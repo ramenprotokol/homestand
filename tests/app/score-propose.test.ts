@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bundleScore, comparisonSentence, fitFor, labelForZ, zScore } from "../../src/app/score";
+import { bundleScore, centre, comparisonSentence, fitFor, labelForZ, marketLevelSentence, vsAverage, zScore } from "../../src/app/score";
 import { checkCandidate, inWindow, isFamilySlot } from "../../src/app/propose/rules";
 import { propose, templateWhy, likeness, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
 import { numbersAreGrounded, numbersIn } from "../../src/app/guard";
@@ -30,8 +30,48 @@ describe("scoring", () => {
     expect(fitFor(0.5, { n: 40, mean: 0.5, sd: 0 }).reason).toContain("barely differ");
   });
   it("explains in plain words without claiming attendance", () => {
-    expect(comparisonSentence("Bluey", "leans-in")).toBe("This market leans toward Bluey more than most ballpark markets.");
-    expect(comparisonSentence("Bluey", "leans-away")).toContain("less than most");
+    expect(comparisonSentence("Bluey", "leans-in")).toBe("Against its own average, Bluey stands out above.");
+    expect(comparisonSentence("Bluey", "leans-away")).toContain("stands out below");
+    expect(marketLevelSentence(-1.1)).toBe("Compared with other ballpark markets, this market scores lower than usual on most themes.");
+    expect(marketLevelSentence(0.9)).toContain("higher than usual");
+    expect(marketLevelSentence(0.1)).toContain("about the same as usual");
+    expect(vsAverage(1.14)).toBe("stands out above this market's average (+1.1)");
+    expect(vsAverage(-0.8)).toBe("sits below this market's average (-0.8)");
+  });
+});
+
+describe("market-centred index", () => {
+  const base = [0.2, -0.4, 0.9, -0.1, 0.3, -0.6, 0.5, 0.0, -0.3, 0.1];
+  const labels = (zs: Array<number | null>) => centre(zs).indices.map((i) => (i === null ? null : labelForZ(i)));
+
+  it("a market shifted uniformly across every theme changes no label and no index", () => {
+    const a = centre(base);
+    for (const shift of [-3, -1.2, 2.5]) {
+      const b = centre(base.map((z) => z + shift));
+      b.indices.forEach((v, i) => expect(v).toBeCloseTo(a.indices[i]!, 10));
+      expect(b.mean).toBeCloseTo(a.mean! + shift, 10);
+    }
+  });
+  it("a market that is low on everything gets all About average, not all Leans away", () => {
+    expect(new Set(labels(base.map((z) => z * 0.1 - 2.2)))).toEqual(new Set(["average"]));
+    // Plain z would have called all of these Leans away.
+    expect(labelForZ(-2.2)).toBe("leans-away");
+  });
+  it("a single-theme spike stands out as Leans in, and the rest stay level", () => {
+    const zs = [0, 0, 0, 0, 0, 0, 0, 0, 0, 3.5].map((z) => z - 2); // low market overall, one spike
+    const l = labels(zs);
+    expect(l[9]).toBe("leans-in");
+    expect(l.slice(0, 9).every((x) => x === "average")).toBe(true);
+  });
+  it("the average excludes not-scored themes, and a thin market has no average", () => {
+    const withGaps = centre([1, null, 3, null, 2, 4, 0]);
+    expect(withGaps.count).toBe(5);
+    expect(withGaps.mean).toBeCloseTo(2, 10);
+    expect(withGaps.indices[1]).toBeNull();
+    expect(withGaps.indices[0]).toBeCloseTo(-1, 10);
+    const thin = centre([1, 2, null, 3]);
+    expect(thin.mean).toBeNull();
+    expect(thin.indices).toEqual([null, null, null, null]);
   });
 });
 

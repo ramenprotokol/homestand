@@ -52,11 +52,11 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await page.locator(".tile", { hasText: "Bluey Day" }).click();
   const why = page.getByRole("dialog");
   await expect(why).toBeVisible();
-  await expect(why).toContainText(/than most ballpark markets|about the same as most ballpark markets/);
+  await expect(why).toContainText(/Against its own average/);
   await expect(why).toContainText("What Qloo looked at");
-  await expect(why.getByText("Index z")).toHaveCount(0);
+  await expect(why.getByText("Index = z")).toHaveCount(0);
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Index z/)).toBeVisible();
+  await expect(why.getByText(/Index = z - market average/)).toBeVisible();
   await why.getByTestId("recheck").click();
   await expect(why.getByTestId("recheck-message")).toContainText(/Checked again/);
   await expect(why.getByTestId("source-line")).toContainText("Re-checked live at");
@@ -78,8 +78,8 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await noSideScroll(page);
   await noSideScroll(page);
   // The cited comparison replaces the repeated sentence; the why is not said twice.
-  await expect(cards.first().getByTestId("cited")).toContainText(/typical \([+-]\d\.\d\)/);
-  await expect(cards.first()).not.toContainText("This market leans toward");
+  await expect(cards.first().getByTestId("cited")).toContainText(/(above|below|in line with) this market's average \([+-]\d\.\d\)/);
+  await expect(cards.first()).not.toContainText("leans toward");
   if ((await page.getByTestId("angle").count()) > 0) {
     const angle = await page.getByTestId("angle").first().innerText();
     expect(angle).toMatch(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Z][a-z]{2} \d{1,2}\b/);

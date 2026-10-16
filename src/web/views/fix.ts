@@ -1,5 +1,5 @@
 import { themeById } from "../../app/themes/library";
-import { vsTypical } from "../../app/score";
+import { vsAverage } from "../../app/score";
 import { syntheticBanner, tile, openDrawer } from "../components";
 import { h } from "../dom";
 import { ensureProposals, navigate } from "../flow";
@@ -89,7 +89,7 @@ function proposalCard(top: ShownProposal): HTMLElement {
       { class: "proposal-body" },
       h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), label(p.toThemeId)),
       h("p", null, p.why),
-      h("p", { class: "small", "data-testid": "cited" }, `${label(p.toThemeId)}: ${vsTypical(p.to.z)} · ${label(p.fromThemeId)}: ${vsTypical(p.from.z)}`, p.whySource === "model" ? ". Reason written by the model from the computed facts." : ""),
+      h("p", { class: "small", "data-testid": "cited" }, `${label(p.toThemeId)}: ${vsAverage(p.to.z)} · ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}`, p.whySource === "model" ? ". Reason written by the model from the computed facts." : ""),
       chips,
       h("details", null, h("summary", { class: "small" }, "Checks passed"), h("ul", { class: "checks" }, p.checks.map((c) => h("li", null, c)))),
       d === "approved"

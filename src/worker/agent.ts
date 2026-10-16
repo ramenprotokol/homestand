@@ -4,7 +4,7 @@ import { resolveTheme, type Resolution } from "../app/calendar/resolve";
 import { numbersAreGrounded, claimsOutcome } from "../app/guard";
 import { marketKey } from "../app/markets";
 import { propose, type PlanNight, type ThemeFit } from "../app/propose/propose";
-import { bundleScore, fitFor, type FitLabel, type ReferenceStats } from "../app/score";
+import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
 import { idsOfType, type LiveTheme } from "../app/themes/ids";
 import { step, type TraceStep } from "../app/trace";
 import { createQlooClient, type QlooType } from "../qloo/client";
@@ -152,19 +152,32 @@ function toOut(d: Deps, id: string, st: StoredTheme, source: ThemeScoreOut["sour
   const ref = d.reference.themes[id];
   const fit = fitFor(score, ref);
   return {
-    themeId: id, label: fit.label, z: fit.z, score, ...(fit.reason ? { reason: fit.reason } : {}),
+    themeId: id, label: fit.label, z: fit.z, index: null, marketMeanZ: null, scoredThemes: 0, score, ...(fit.reason ? { reason: fit.reason } : {}),
     entities: st.entities.map((e) => ({ name: e.name, type: e.type, affinity: e.affinity })),
     fetchedAt: st.fetchedAt, source: d.mode === "synthetic" ? "synthetic" : source, ref: ref ? { n: ref.n, mean: ref.mean, sd: ref.sd } : null,
   };
 }
 
 function allOut(d: Deps, s: Scores): Record<string, ThemeScoreOut> {
-  const out: Record<string, ThemeScoreOut> = {};
+  const list: ThemeScoreOut[] = [];
   for (const t of d.library) {
     const st = s.stored.themes[t.id];
-    if (st) out[t.id] = toOut(d, t.id, st, s.source);
+    if (st) list.push(toOut(d, t.id, st, s.source));
   }
-  return out;
+  // Centre within the market: labels come from z minus the market's own mean z. Not-scored themes never enter the mean.
+  const c = centre(list.map((o) => o.z));
+  list.forEach((o, i) => {
+    o.marketMeanZ = c.mean;
+    o.scoredThemes = c.count;
+    o.index = c.indices[i] ?? null;
+    if (o.z !== null) {
+      if (o.index === null) {
+        o.label = "not-scored";
+        o.reason = "Too few themes were scored at this market to compare one theme with its average.";
+      } else o.label = labelForZ(o.index);
+    }
+  });
+  return Object.fromEntries(list.map((o) => [o.themeId, o]));
 }
 
 // ---------- model ----------
@@ -260,7 +273,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     const label: FitLabel = res.kind === "classic" ? "classic" : themeId ? (sc?.label ?? "not-scored") : "not-scored";
     return {
       index: i, line: r.line, date: r.date, weekday: weekdayName(r.date), theme: r.theme, sponsor: r.sponsor, locked: r.locked, notes: r.notes,
-      resolution: res, candidates: res.kind === "ambiguous" ? res.candidates : [], themeId, label, z: sc?.z ?? null,
+      resolution: res, candidates: res.kind === "ambiguous" ? res.candidates : [], themeId, label, z: sc?.index ?? null,
     };
   });
   const count = (l: FitLabel): number => nights.filter((n) => n.label === l).length;
@@ -275,7 +288,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
 // ---------- propose ----------
 
 function fitsOf(themes: Record<string, ThemeScoreOut>): Record<string, ThemeFit> {
-  return Object.fromEntries(Object.entries(themes).map(([id, t]) => [id, { label: t.label, z: t.z, score: t.score }]));
+  return Object.fromEntries(Object.entries(themes).map(([id, t]) => [id, { label: t.label, z: t.index, score: t.score }]));
 }
 
 const abs1 = (z: number | null): number | null => (z === null ? null : Math.round(Math.abs(z) * 10) / 10);
@@ -331,18 +344,14 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   if (!(await reserveQloo(d, need))) throw new CappedError();
   trace.push(step(iso(d), "note", `Re-checking ${theme.label} live, ignoring the recorded result.`));
   const fresh = (await askQloo(d, input.market, [theme], trace))[theme.id]!;
-  const key = cacheKey(d, input.market);
-  const hit = await d.kv.get(key);
-  if (hit) {
-    try {
-      const stored = JSON.parse(hit) as StoredLibrary;
-      stored.themes[theme.id] = fresh;
-      await d.kv.put(key, JSON.stringify(stored), { expirationTtl: TTL });
-    } catch {
-      /* the next full pull rebuilds it */
-    }
-  }
-  return { theme: toOut(d, theme.id, fresh, "live"), trace, caps: await capsOf(d) };
+  // The market's own average moves when one theme is re-read, so every index is recomputed from the updated record.
+  const scores = await getScores(d, input.market, trace);
+  scores.stored.themes[theme.id] = fresh;
+  await d.kv.put(cacheKey(d, input.market), JSON.stringify(scores.stored), { expirationTtl: TTL });
+  const all = allOut(d, scores);
+  const out = all[theme.id]!;
+  if (d.mode !== "synthetic") out.source = "live";
+  return { theme: out, themes: all, trace, caps: await capsOf(d) };
 }
 
 // ---------- memo ----------
@@ -354,7 +363,7 @@ export async function memoSummary(
   const trace: TraceStep[] = [];
   const scores = await getScores(d, input.market, trace);
   const themes = allOut(d, scores);
-  const facts = input.swaps.map((s) => ({ date: s.date, fromThemeId: s.fromThemeId, toThemeId: s.toThemeId, fromZ: themes[s.fromThemeId]?.z ?? null, toZ: themes[s.toThemeId]?.z ?? null, fromScore: themes[s.fromThemeId]?.score ?? null, toScore: themes[s.toThemeId]?.score ?? null }));
+  const facts = input.swaps.map((s) => ({ date: s.date, fromThemeId: s.fromThemeId, toThemeId: s.toThemeId, fromZ: themes[s.fromThemeId]?.index ?? null, toZ: themes[s.toThemeId]?.index ?? null, fromScore: themes[s.fromThemeId]?.score ?? null, toScore: themes[s.toThemeId]?.score ?? null }));
   const k = input.swaps.length;
   const template = `For ${input.market.label}, we compared ${input.nights} planned theme nights with what this market leans toward. ${k === 0 ? "No swaps were approved, so the calendar is unchanged." : `${k} swap${k === 1 ? " was" : "s were"} approved; each keeps its date and sponsor.`} Classic nights stay as planned. This describes local taste; it is not a forecast of attendance.`;
   let summary = template;

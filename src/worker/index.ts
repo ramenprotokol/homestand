@@ -38,6 +38,7 @@ function depsFor(env: Env): RouterDeps {
     allowedOrigins: (env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     geocodeFetch: fetch,
     clientId,
+    limitScale: num(env.RATE_LIMIT_SCALE, 1),
   };
 }
 

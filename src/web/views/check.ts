@@ -1,5 +1,5 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { AUDIT_LINE, CLASSIC_REASON, comparisonSentence, FIT_WORDS, METHOD_WORDS } from "../../app/score";
+import { AUDIT_LINE, CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS } from "../../app/score";
 import { themeById } from "../../app/themes/library";
 import { ApiFailure } from "../api";
 import { badge, closeDrawer, openDrawer, refreshDrawer, syntheticBanner, tile } from "../components";
@@ -152,7 +152,7 @@ function whyBody(index: number): HTMLElement[] {
   if (s.label === "not-scored") {
     out.push(h("p", { class: "panel-box" }, s.reason ?? "Not scored."));
   } else {
-    out.push(h("p", { class: "panel-box", style: "font-weight:650" }, comparisonSentence(theme.label, s.label)));
+    out.push(h("div", { class: "panel-box" }, h("p", null, marketLevelSentence(s.marketMeanZ)), h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label))));
   }
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${e.name} (${e.type.replace("_", " ")})`)))),
@@ -173,8 +173,10 @@ function whyBody(index: number): HTMLElement[] {
           h("dt", null, "This market's bundle score (mean)"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
           h("dt", null, `Typical ballpark market (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
           h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
-          h("dt", null, "Index z = (score - typical) / spread"), h("dd", null, rel(s.z)),
-          h("dt", null, "Cut-offs"), h("dd", null, "+0.50 / -0.50"),
+          h("dt", null, "z = (score - typical) / spread"), h("dd", null, rel(s.z)),
+          h("dt", null, `This market's average z across ${s.scoredThemes} themes`), h("dd", null, rel(s.marketMeanZ)),
+          h("dt", null, "Index = z - market average"), h("dd", null, rel(s.index)),
+          h("dt", null, "Cut-offs for the index"), h("dd", null, "+0.50 / -0.50"),
         ),
         a.reference.synthetic ? h("p", { class: "small" }, "The typical-market numbers are a synthetic placeholder until the reference set is pulled.") : null,
       ),

@@ -9,4 +9,6 @@ export interface Env {
   ALLOWED_ORIGINS?: string;
   QLOO_DAILY_CAP?: string;
   AI_DAILY_CAP?: string;
+  /** Multiplies the per-minute rate limits. Local test runs only. */
+  RATE_LIMIT_SCALE?: string;
 }

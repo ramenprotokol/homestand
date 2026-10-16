@@ -197,6 +197,58 @@ describe("analyze", () => {
   });
 });
 
+describe("market-centred labels", () => {
+  const library = activeLibrary({}, true);
+  const evenRef = { synthetic: false, markets: 40, pulledAt: null, themes: Object.fromEntries(library.map((t) => [t.id, { n: 40, mean: 0.7, sd: 0.1 }])) };
+  const flat = (value: (id: string) => number): typeof fetch => async (input) => {
+    const ids = (new URL(String(input)).searchParams.get("filter.results.entities") ?? "").split(",");
+    return new Response(JSON.stringify({ results: { entities: ids.map((id) => ({ entity_id: id, name: id, query: { affinity: value(id) } })) } }));
+  };
+
+  it("a market that is far above typical on every theme is About average on all of them", async () => {
+    const out = await analyzeOk(harness({ reference: evenRef }, null, flat(() => 0.95)));
+    const scored = Object.values(out.themes).filter((t) => t.z !== null);
+    expect(scored.length).toBe(library.length);
+    for (const t of scored) {
+      expect(t.z).toBeCloseTo(2.5, 6);
+      expect(t.marketMeanZ).toBeCloseTo(2.5, 6);
+      expect(t.index).toBeCloseTo(0, 6);
+      expect(t.label).toBe("average");
+    }
+  });
+
+  it("one theme that stands out inside a low market is Leans in; the rest are not Leans away", async () => {
+    const out = await analyzeOk(harness({ reference: evenRef }, null, flat((id) => (id === "SYN-bluey:tv" ? 0.75 : 0.5))));
+    expect(out.themes["bluey"]!.label).toBe("leans-in");
+    expect(out.themes["bluey"]!.z).toBeCloseTo(0.5, 6); // still above typical in plain z
+    expect(out.themes["bluey"]!.marketMeanZ!).toBeLessThan(-1.8);
+    for (const [id, t] of Object.entries(out.themes)) if (id !== "bluey") expect(t.label).toBe("average");
+  });
+
+  it("leaves not-scored themes out of the market average", async () => {
+    const out = await analyzeOk(harness({ reference: evenRef }, null, async (input) => {
+      const res = await flat(() => 0.9)(input);
+      const body = (await res.json()) as { results: { entities: Array<{ entity_id: string }> } };
+      body.results.entities = body.results.entities.filter((e) => e.entity_id !== "SYN-bluey:tv");
+      return new Response(JSON.stringify(body));
+    }));
+    expect(out.themes["bluey"]).toMatchObject({ label: "not-scored", index: null });
+    expect(out.themes["star-wars"]!.scoredThemes).toBe(library.length - 1);
+  });
+
+  it("a re-check recomputes every index, since the market's own average moves", async () => {
+    let level = 0.5;
+    const h = harness({ reference: evenRef }, null, async (input) => flat((id) => (id === "SYN-bluey:tv" ? 0.5 : level))(input));
+    const before = await analyzeOk(h);
+    level = 0.9;
+    const res = await route(post("/api/recheck", { market, themeId: "star-wars" }), h.deps);
+    const out = (await res.json()) as RecheckResponse;
+    expect(Object.keys(out.themes).length).toBe(Object.keys(before.themes).length);
+    expect(out.themes["star-wars"]!.index).not.toBeCloseTo(before.themes["star-wars"]!.index!, 3);
+    expect(out.themes["star-wars"]).toMatchObject({ source: "live" });
+  });
+});
+
 describe("propose", () => {
   const planFrom = (out: AnalyzeResponse) => out.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
 

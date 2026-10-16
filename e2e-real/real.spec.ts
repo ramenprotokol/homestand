@@ -8,6 +8,13 @@ async function noSideScroll(page: Page): Promise<void> {
   expect(sw).toBeLessThanOrEqual(iw);
 }
 
+test("real data: start page", async ({ page }, info) => {
+  await page.goto("/");
+  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 theme nights");
+  await noSideScroll(page);
+  await shot(page, info, "start");
+});
+
 for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) {
   test(`real Qloo data: ${id} Check board`, async ({ page }, info) => {
     await page.goto("/#/sample");
@@ -17,7 +24,14 @@ for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) {
     await noSideScroll(page);
     await shot(page, info, `check-${id}`);
     const summary = await page.getByTestId("summary").innerText();
-    console.log(`${id}: ${summary}`);
+    await page.getByTestId("to-fix").click();
+    await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
+    await expect(page.getByTestId("proposal").or(page.getByTestId("angle")).or(page.getByText("Nothing needs swapping.")).or(page.getByText("Could not fix")).first()).toBeVisible({ timeout: 30_000 });
+    console.log(`${id}: ${summary} | proposals ${await page.getByTestId("proposal").count()}, angles ${await page.getByTestId("angle").count()}`);
+    // The demo must show the Fix step working in every sample market.
+    expect(await page.getByTestId("proposal").count(), `${id} proposals`).toBeGreaterThanOrEqual(2);
+    expect(await page.getByTestId("angle").count(), `${id} locked-night angles`).toBeGreaterThanOrEqual(1);
+    await shot(page, info, `fix-${id}`);
   });
 }
 
@@ -31,7 +45,8 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Index z/)).toBeVisible();
+  await expect(why.getByText(/Index = z - market average/)).toBeVisible();
+  await expect(why).toContainText(/Compared with other ballpark markets, this market scores/);
   await expect(why.getByTestId("why-footer")).toContainText("not an attendance predictor");
   await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Result recorded/);
   await shot(page, info, "why");
@@ -48,7 +63,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   const n = await page.getByTestId("proposal").count();
   console.log(`albuquerque proposals: ${n}`);
   if (n > 0) {
-    await expect(page.getByTestId("proposal").first().getByTestId("cited")).toContainText("typical");
+    await expect(page.getByTestId("proposal").first().getByTestId("cited")).toContainText("average");
     await page.getByTestId("proposal").first().getByTestId("approve").click();
     await expect(page.locator(".stamp").first()).toBeVisible();
     await shot(page, info, "approved");
@@ -60,6 +75,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.getByTestId("to-study").click();
   await expect(page.getByText("Make your call first")).toBeVisible();
   await expect(page.getByTestId("verdict")).toHaveCount(0);
+  await shot(page, info, "study-call");
   await page.getByTestId("call-not-sure").click();
   await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
   await expect(page.getByTestId("audit-line")).toContainText("H1 did not pass, so Homestand is a reasoned, cited audit of local taste, not an attendance predictor.");
@@ -68,5 +84,5 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(page.getByTestId("results-pending")).toHaveCount(0);
   await expect(page.getByText("not detected at this sample size").first()).toBeVisible();
   await noSideScroll(page);
-  await shot(page, info, "study");
+  await shot(page, info, "study-result");
 });

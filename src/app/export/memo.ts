@@ -50,7 +50,7 @@ export function buildMemoHtml(d: MemoData): string {
 ${banner}
 <p>${escapeHtml(d.summary)}</p>
 ${d.swaps.length ? `<h2>Approved swaps</h2>
-<table><thead><tr><th>Night</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Local index (z)</th><th>Bundle score</th></tr></thead><tbody>${rows}</tbody></table>
+<table><thead><tr><th>Night</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Index vs market average</th><th>Bundle score</th></tr></thead><tbody>${rows}</tbody></table>
 <h2>Why</h2><ul>${whys}</ul>` : `<p>No swaps were approved. The calendar is unchanged.</p>`}
 ${d.angles.length ? `<h2>Locked nights: sponsor-friendly angles</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>

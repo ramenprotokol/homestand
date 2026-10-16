@@ -67,30 +67,61 @@ export function fitFor(score: number | null, ref: RefStat | undefined): Fit {
   return { label: labelForZ(z), z };
 }
 
-/** The comparison with typical ballpark markets, in plain words. */
+/** Fewer scored themes than this and a market's own average is too thin to compare against. */
+export const MIN_THEMES_FOR_CENTRE = 5;
+
+export interface Centred {
+  /** Mean z over every scored theme at the market; null when too few themes were scored. */
+  mean: number | null;
+  count: number;
+  /** index_t = z_t - mean, in the order given; null where z is null (not scored themes never enter the mean). */
+  indices: Array<number | null>;
+}
+
+/**
+ * Within-market centring. Some markets sit lower or higher on almost every entity, so plain z against other markets
+ * measures the market's overall level. Subtracting the market's own mean z leaves what stands out inside the market,
+ * the same within-club comparison the study's H1 makes.
+ */
+export function centre(zs: ReadonlyArray<number | null>): Centred {
+  const scored = zs.filter((z): z is number => z !== null);
+  if (scored.length < MIN_THEMES_FOR_CENTRE) return { mean: null, count: scored.length, indices: zs.map(() => null) };
+  const mean = scored.reduce((s, z) => s + z, 0) / scored.length;
+  return { mean, count: scored.length, indices: zs.map((z) => (z === null ? null : z - mean)) };
+}
+
+/** How the market compares with other ballpark markets overall, in plain words. */
+export function marketLevelSentence(meanZ: number | null): string {
+  if (meanZ === null) return "";
+  const level = meanZ <= -0.25 ? "lower than usual" : meanZ >= 0.25 ? "higher than usual" : "about the same as usual";
+  return `Compared with other ballpark markets, this market scores ${level} on most themes.`;
+}
+
+/** The theme against this market's own average, in plain words. */
 export function comparisonSentence(themeLabel: string, label: FitLabel): string {
   switch (label) {
     case "leans-in":
-      return `This market leans toward ${themeLabel} more than most ballpark markets.`;
+      return `Against its own average, ${themeLabel} stands out above.`;
     case "leans-away":
-      return `This market leans toward ${themeLabel} less than most ballpark markets.`;
+      return `Against its own average, ${themeLabel} stands out below.`;
     case "average":
-      return `This market's taste for ${themeLabel} is about the same as most ballpark markets.`;
+      return `Against its own average, ${themeLabel} is about in line.`;
     default:
       return "";
   }
 }
 
 export const METHOD_WORDS =
-  "We ask Qloo how strongly people near this ballpark lean toward each thing in the theme, then compare that with 40 other ballpark markets. " +
-  "Higher than most (about half a standard step or more) is \"Leans in\". Lower than most by the same amount is \"Leans away\". In between is \"About average\". " +
-  "It describes local taste. It does not say a theme will raise attendance; The Study tests that question.";
+  "We ask Qloo how strongly people near this ballpark lean toward each thing in a theme, and compare that with 40 other ballpark markets. " +
+  "Then we compare each theme with this market's own average lean, the same within-market comparison The Study uses. " +
+  "Half a standard step or more above its own average is \"Leans in\". The same amount below is \"Leans away\". In between is \"About average\". " +
+  "It describes local taste. It does not say a theme will raise attendance.";
 
-/** "higher than typical (+1.1)": the cited comparison with typical ballpark markets, in plain words plus the number. */
-export function vsTypical(z: number | null): string {
-  if (z === null) return "not compared";
-  const words = z >= Z_CUT ? "higher than typical" : z <= -Z_CUT ? "lower than typical" : "about typical";
-  return `${words} (${z >= 0 ? "+" : "-"}${Math.abs(z).toFixed(1)})`;
+/** "stands out above this market's average (+1.1)": the cited comparison, in plain words plus the number. */
+export function vsAverage(index: number | null): string {
+  if (index === null) return "not compared";
+  const words = index >= Z_CUT ? "stands out above this market's average" : index <= -Z_CUT ? "sits below this market's average" : "is about in line with this market's average";
+  return `${words} (${index >= 0 ? "+" : "-"}${Math.abs(index).toFixed(1)})`;
 }
 
 export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.";

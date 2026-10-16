@@ -51,7 +51,7 @@ export async function recheckTheme(themeId: string): Promise<string> {
   if (!state.analysis || !state.market) return "";
   const before = state.analysis.themes[themeId];
   const res = await api.recheck(state.market, themeId);
-  state.analysis.themes[themeId] = res.theme;
+  state.analysis.themes = { ...res.themes, [themeId]: res.theme };
   state.analysis.caps = res.caps;
   invalidateProposals();
   addTrace(`Re-check live: ${themeId}`, res.trace);

@@ -18,7 +18,13 @@ export interface EntityOut {
 export interface ThemeScoreOut {
   themeId: string;
   label: FitLabel;
+  /** z against the reference ballpark markets. */
   z: number | null;
+  /** z minus this market's own mean z over every scored theme: what stands out inside the market. The label uses this. */
+  index: number | null;
+  /** This market's mean z over the scored themes (its overall level against other markets), and how many themes that is. */
+  marketMeanZ: number | null;
+  scoredThemes: number;
   score: number | null;
   reason?: string;
   entities: EntityOut[];
@@ -58,6 +64,7 @@ export interface NightOut {
   candidates: string[];
   themeId: string | null;
   label: FitLabel;
+  /** The theme's index (see ThemeScoreOut). */
   z: number | null;
 }
 
@@ -92,6 +99,8 @@ export interface ProposeResponse {
 
 export interface RecheckResponse {
   theme: ThemeScoreOut;
+  /** Every theme again: re-reading one moves the market's own average, so every index can shift. */
+  themes: Record<string, ThemeScoreOut>;
   trace: TraceStep[];
   caps: Caps;
 }

@@ -10,6 +10,8 @@ export interface RouterDeps {
   geocodeFetch: typeof fetch;
   /** Caller address for rate limits; "local" when unknown. */
   clientId: (req: Request) => Promise<string>;
+  /** Multiplies every per-minute limit (local test runs only; 1 in production). */
+  limitScale?: number;
 }
 
 const MAX_BODY = 300_000;
@@ -37,7 +39,7 @@ async function underLimit(deps: RouterDeps, req: Request, route: string): Promis
   const id = await deps.clientId(req);
   const key = `rl:${route}:${id}:${Math.floor(deps.agent.now().getTime() / 60_000)}`;
   const n = Number((await deps.kv.get(key)) ?? "0") || 0;
-  if (n >= (LIMITS[route] ?? 10)) return false;
+  if (n >= (LIMITS[route] ?? 10) * (deps.limitScale ?? 1)) return false;
   await deps.kv.put(key, String(n + 1), { expirationTtl: 120 });
   return true;
 }
