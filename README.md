@@ -4,7 +4,7 @@
 
 Homestand checks a Minor League Baseball club's theme-night calendar against what its own ballpark market leans toward, using Qloo's Taste AI. It then proposes swaps that keep every sponsor and every date. Before building it, we ran a sealed, pre-registered test on 385 real 2025 theme nights of whether local taste predicted bigger crowds. The result is published as it came out.
 
-**Live demo:** __LIVE_URL__. Pick a sample club; no sign-up.
+**Live demo:** https://homestand-6az.pages.dev. Pick a sample club; no sign-up.
 
 ## What it does
 

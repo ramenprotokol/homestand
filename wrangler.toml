@@ -9,11 +9,11 @@ binding = "AI"
 # namespace (through ~/RamenProtocol/_ops/infra/ramen-deploy.sh) and replaces it. Never run a bare `wrangler deploy`.
 [[kv_namespaces]]
 binding = "CACHE"
-id = "00000000000000000000000000000000"
+id = "4447d78d27ae4134966ec9bac7984b85"
 
 # Production. Secrets (not here): QLOO_API_KEY. Non-secret values only.
 [vars]
-ALLOWED_ORIGINS = "https://homestand.pages.dev"
+ALLOWED_ORIGINS = "https://homestand-6az.pages.dev"
 QLOO_API_URL = "https://hackathon.api.qloo.com"
 QLOO_DAILY_CAP = "400"
 AI_DAILY_CAP = "150"
