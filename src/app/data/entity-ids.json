@@ -1,19 +1,185 @@
 {
   "_note": "Qloo entity IDs only (IDs are fine to publish). The first 14 are Amendment 4's kept bundle entities. The rest are filled in by `npm run qloo:resolve` after 'Qloo go'. No affinities or popularity values live here.",
   "ids": {
-    "star-wars:film": { "id": "1EC3A1AE-9466-4338-BAF6-E20659697569", "name": "Star Wars: Episode IV - A New Hope" },
-    "star-wars:tv": { "id": "24FA08F2-0B47-4A01-B44E-CF18C06E5781", "name": "The Mandalorian" },
-    "princess:frozen": { "id": "3CE60F10-EA7D-4743-B67A-8B53D84351C5", "name": "Frozen" },
-    "princess:moana": { "id": "B4783599-F934-4159-8003-720406FC1C80", "name": "Moana" },
-    "bluey:tv": { "id": "F6013EAC-8F32-4080-B1ED-2BFABB9C706E", "name": "Bluey" },
-    "harry-potter:books": { "id": "0C97E7FE-8A86-4B48-9F54-CB0A73CC2B96", "name": "Harry Potter and the Sorcerer's Stone (Harry Potter, #1)" },
-    "margaritaville:buffett": { "id": "33B34573-DBF2-49C8-BCEB-CBECF31038F0", "name": "Jimmy Buffett" },
-    "dinosaur:jp": { "id": "D3529AD8-9349-481E-8FCB-D107EFB75E68", "name": "Jurassic Park" },
-    "dinosaur:jw": { "id": "8573DA59-4BA6-406A-A022-1BEE0E09B678", "name": "Jurassic World" },
-    "country:combs": { "id": "3CBD78B1-D2F2-4551-A342-4621B6BDB5E2", "name": "Luke Combs" },
-    "country:wallen": { "id": "59DCDFA8-5082-47D9-B3E5-2B49CF2A778F", "name": "Morgan Wallen" },
-    "country:underwood": { "id": "19AC0383-5BB2-4423-8598-709713C22148", "name": "Carrie Underwood" },
-    "marvel:nwh": { "id": "CB376BE9-384A-41C5-9231-3592AF84ADCD", "name": "Spider-Man: No Way Home" },
-    "wrestling:wwe": { "id": "764E1D34-B48B-4757-94F2-063B9F912C03", "name": "WWE" }
+    "star-wars:film": {
+      "id": "1EC3A1AE-9466-4338-BAF6-E20659697569",
+      "name": "Star Wars: Episode IV - A New Hope"
+    },
+    "star-wars:tv": {
+      "id": "24FA08F2-0B47-4A01-B44E-CF18C06E5781",
+      "name": "The Mandalorian"
+    },
+    "princess:frozen": {
+      "id": "3CE60F10-EA7D-4743-B67A-8B53D84351C5",
+      "name": "Frozen"
+    },
+    "princess:moana": {
+      "id": "B4783599-F934-4159-8003-720406FC1C80",
+      "name": "Moana"
+    },
+    "bluey:tv": {
+      "id": "F6013EAC-8F32-4080-B1ED-2BFABB9C706E",
+      "name": "Bluey"
+    },
+    "harry-potter:books": {
+      "id": "0C97E7FE-8A86-4B48-9F54-CB0A73CC2B96",
+      "name": "Harry Potter and the Sorcerer's Stone (Harry Potter, #1)"
+    },
+    "margaritaville:buffett": {
+      "id": "33B34573-DBF2-49C8-BCEB-CBECF31038F0",
+      "name": "Jimmy Buffett"
+    },
+    "dinosaur:jp": {
+      "id": "D3529AD8-9349-481E-8FCB-D107EFB75E68",
+      "name": "Jurassic Park"
+    },
+    "dinosaur:jw": {
+      "id": "8573DA59-4BA6-406A-A022-1BEE0E09B678",
+      "name": "Jurassic World"
+    },
+    "country:combs": {
+      "id": "3CBD78B1-D2F2-4551-A342-4621B6BDB5E2",
+      "name": "Luke Combs"
+    },
+    "country:wallen": {
+      "id": "59DCDFA8-5082-47D9-B3E5-2B49CF2A778F",
+      "name": "Morgan Wallen"
+    },
+    "country:underwood": {
+      "id": "19AC0383-5BB2-4423-8598-709713C22148",
+      "name": "Carrie Underwood"
+    },
+    "marvel:nwh": {
+      "id": "CB376BE9-384A-41C5-9231-3592AF84ADCD",
+      "name": "Spider-Man: No Way Home"
+    },
+    "wrestling:wwe": {
+      "id": "764E1D34-B48B-4757-94F2-063B9F912C03",
+      "name": "WWE"
+    },
+    "paw-patrol:tv": {
+      "id": "2030C185-8B8D-48C9-81EE-F4FDDDB8E921",
+      "name": "PAW Patrol"
+    },
+    "pokemon:tv": {
+      "id": "EE970D24-1E57-4F69-9FB0-BFE072D96918",
+      "name": "Pokémon"
+    },
+    "super-mario:film": {
+      "id": "771C1BF6-AC3B-4BA0-B9B9-1ED17A418F8E",
+      "name": "The Super Mario Bros. Movie"
+    },
+    "taylor-swift:artist": {
+      "id": "4BBEF799-A0C4-4110-AB01-39216993C312",
+      "name": "Taylor Swift"
+    },
+    "elvis:artist": {
+      "id": "95593E4D-2CBE-44E5-BF82-F1E542B63A96",
+      "name": "Elvis Presley"
+    },
+    "grateful-dead:artist": {
+      "id": "F24E393D-FBBC-44E4-BE26-EA3CE11E04CB",
+      "name": "Grateful Dead"
+    },
+    "beatles:artist": {
+      "id": "996272B0-CB79-48D3-8B83-8ED34F2DE9AF",
+      "name": "The Beatles"
+    },
+    "lord-of-the-rings:film": {
+      "id": "3006EB68-8DD8-426E-B2F2-19BD3B9418F0",
+      "name": "The Lord of the Rings: The Fellowship of the Ring"
+    },
+    "stranger-things:tv": {
+      "id": "07F1170E-BB69-4982-82C6-255F477EBBAD",
+      "name": "Stranger Things"
+    },
+    "the-office:tv": {
+      "id": "E5AE1F26-04CB-4CDD-BBA4-87FB6541F848",
+      "name": "The Office"
+    },
+    "batman:film": {
+      "id": "3432C364-C883-4A0D-A76B-99A57E5361E5",
+      "name": "The Dark Knight"
+    },
+    "ninja-turtles:tv": {
+      "id": "C8E9A2A4-E5E0-4C48-885D-8E029C31F6D7",
+      "name": "Teenage Mutant Ninja Turtles"
+    },
+    "scooby-doo:tv": {
+      "id": "5FACCFEF-F4B2-43F1-8E9A-CA1974CB004C",
+      "name": "Scooby Doo, Where Are You!"
+    },
+    "spongebob:tv": {
+      "id": "9668F753-D707-4EB6-A890-DE8A9882DAD4",
+      "name": "SpongeBob SquarePants"
+    },
+    "sesame-street:tv": {
+      "id": "40564DB8-425A-4DE2-B709-77B58FE11D71",
+      "name": "Sesame Street"
+    },
+    "toy-story:film": {
+      "id": "745F8813-3667-4D09-B210-BC085AF583E4",
+      "name": "Toy Story"
+    },
+    "barbie:film": {
+      "id": "BAF6FB9E-7E2E-4008-944B-97C0CF430D41",
+      "name": "Barbie"
+    },
+    "minecraft:film": {
+      "id": "CDE34B03-22DD-48A1-90CB-1F71795E2C0E",
+      "name": "A Minecraft Movie"
+    },
+    "star-trek:film": {
+      "id": "03FD4AA5-5A03-419E-BC23-5B37ADA0AF53",
+      "name": "Star Trek"
+    },
+    "ghostbusters:film": {
+      "id": "0CC7DA2F-FEB9-4BDF-9C42-7B9C6B574C25",
+      "name": "Ghostbusters"
+    },
+    "back-to-the-future:film": {
+      "id": "093819FF-790D-4CD9-BBCA-71D2A4FEEBD8",
+      "name": "Back to the Future"
+    },
+    "yellowstone:tv": {
+      "id": "98AAE03A-A220-4116-BADE-B3A02D909D3D",
+      "name": "Yellowstone"
+    },
+    "garth-brooks:artist": {
+      "id": "35332365-7A8F-4AC0-8EB4-A842673C3AF9",
+      "name": "Garth Brooks"
+    },
+    "dolly-parton:artist": {
+      "id": "47FA29CA-A1E6-4EA6-8219-D75190AA6BD1",
+      "name": "Dolly Parton"
+    },
+    "kenny-chesney:artist": {
+      "id": "A29ABC54-6BCE-4068-9655-A4240DB82F99",
+      "name": "Kenny Chesney"
+    },
+    "peanuts:tv": {
+      "id": "24EDC845-457B-4FCC-B96C-41330BACC1A5",
+      "name": "Peanuts"
+    },
+    "grinch:film": {
+      "id": "FA1D66EC-3608-4FE9-B240-718B8F099503",
+      "name": "The Grinch"
+    },
+    "hocus-pocus:film": {
+      "id": "FC425CD4-6C84-41AE-9908-AD069B2EC8CC",
+      "name": "Hocus Pocus"
+    },
+    "bad-bunny:artist": {
+      "id": "BDA1B73F-10E7-4D09-AC51-B796CCEC5FF3",
+      "name": "Bad Bunny"
+    },
+    "top-gun:film": {
+      "id": "8C9A1D24-872E-4B7A-B9E2-542C46F1AA68",
+      "name": "Top Gun"
+    },
+    "pirates:film": {
+      "id": "8EF9FBDC-8CC5-4D4A-A8D0-FAEA7EE04155",
+      "name": "Pirates of the Caribbean: The Curse of the Black Pearl"
+    }
   }
 }
