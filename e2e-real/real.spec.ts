@@ -26,10 +26,14 @@ for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) {
     const summary = await page.getByTestId("summary").innerText();
     await page.getByTestId("to-fix").click();
     await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
-    await expect(page.getByTestId("proposal").or(page.getByTestId("angle")).or(page.getByText("Nothing needs swapping.")).or(page.getByText("Could not fix")).first()).toBeVisible({ timeout: 30_000 });
-    console.log(`${id}: ${summary} | proposals ${await page.getByTestId("proposal").count()}, angles ${await page.getByTestId("angle").count()}`);
+    const skip = page.getByTestId("skip-pack");
+    await expect(skip.or(page.getByText("Nothing needs swapping.")).first()).toBeVisible({ timeout: 30_000 });
+    await shot(page, info, `fix-pack-${id}`);
+    if (await skip.isVisible()) await skip.click();
+    const proposals = await page.locator(".slide").count();
+    console.log(`${id}: ${summary} | proposals ${proposals}, angles ${await page.getByTestId("angle").count()}`);
     // The demo must show the Fix step working in every sample market.
-    expect(await page.getByTestId("proposal").count(), `${id} proposals`).toBeGreaterThanOrEqual(2);
+    expect(proposals, `${id} proposals`).toBeGreaterThanOrEqual(2);
     expect(await page.getByTestId("angle").count(), `${id} locked-night angles`).toBeGreaterThanOrEqual(1);
     await shot(page, info, `fix-${id}`);
   });
@@ -40,7 +44,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.getByTestId("market-albuquerque").click();
   await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
   // Why panel on a scored magnet.
-  const scored = page.locator("button.tile .badge:has-text('Leans in'), button.tile .badge:has-text('Leans away'), button.tile .badge:has-text('About average')").first();
+  const scored = page.locator(".card[role=button]").filter({ has: page.locator(".fitword", { hasText: /Leans in|Leans away|About average/ }) }).first();
   await scored.click();
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
@@ -57,15 +61,19 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.keyboard.press("Escape");
   await page.getByTestId("to-fix").click();
   await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
-  await expect(page.getByTestId("proposal").or(page.getByText("Nothing needs swapping."))).not.toHaveCount(0, { timeout: 30_000 });
+  const pack = page.getByRole("button", { name: /Open the pack/ });
+  await expect(pack.or(page.getByText("Nothing needs swapping."))).toBeVisible({ timeout: 30_000 });
   await noSideScroll(page);
   await shot(page, info, "fix");
-  const n = await page.getByTestId("proposal").count();
-  console.log(`albuquerque proposals: ${n}`);
-  if (n > 0) {
-    await expect(page.getByTestId("proposal").first().getByTestId("cited")).toContainText("average");
-    await page.getByTestId("proposal").first().getByTestId("approve").click();
-    await expect(page.locator(".stamp").first()).toBeVisible();
+  if (await pack.isVisible()) {
+    await pack.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.locator("#carousel")).toBeVisible();
+    await expect(page.getByTestId("proposal").getByTestId("cited")).toContainText("average");
+    await shot(page, info, "carousel");
+    await page.getByTestId("approve").click();
+    await expect(page.locator(".decision")).toContainText("Approved");
+    await expect(page.getByTestId("fix-status")).toContainText("1 approved");
     await shot(page, info, "approved");
   }
   await page.getByTestId("to-send").click();
