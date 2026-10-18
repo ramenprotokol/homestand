@@ -11,6 +11,9 @@ async function noSideScroll(page: Page): Promise<void> {
   expect(sw, "no horizontal scroll").toBeLessThanOrEqual(iw);
 }
 
+/** cos of a card's flip: 1 when the front faces us, -1 when the back does. */
+const flipAngle = (page: Page, sel: string): Promise<number> => page.locator(sel).evaluate((el) => new DOMMatrix(getComputedStyle(el).transform).m11);
+
 const overlap = (a: { x: number; y: number; width: number; height: number }, b: { x: number; y: number; width: number; height: number }): boolean =>
   a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
@@ -35,12 +38,12 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByRole("heading", { name: /Check: Akron, OH sample club/ })).toBeVisible();
   await expect(page.getByText("Synthetic demo data").first()).toBeVisible();
   await noSideScroll(page);
-  const tiles = page.locator(".tile");
+  const tiles = page.locator(".card.tile");
   expect(await tiles.count()).toBe(24);
-  // Every scored magnet carries a word, not just a colour.
-  for (const word of ["Classic night", "Not scored"]) await expect(page.locator(`.badge:has-text("${word}")`).first()).toBeVisible();
-  expect(await page.locator(".badge:has-text('Leans in'), .badge:has-text('Leans away'), .badge:has-text('About average')").count()).toBeGreaterThan(5);
-  await expect(page.locator(".tile-lock").first()).toBeVisible();
+  // Every card carries its fit in words, not just a colour.
+  for (const word of ["Classic night", "Not scored"]) await expect(page.locator(`.fitword:has-text("${word}")`).first()).toBeVisible();
+  expect(await page.locator(".fitword:has-text('Leans in'), .fitword:has-text('Leans away'), .fitword:has-text('About average')").count()).toBeGreaterThan(5);
+  await expect(page.locator(".card .lk").first()).toBeVisible();
   // The ambiguous night asks, and does not guess.
   const ask = page.getByRole("group", { name: /Elvis and the Beatles Night/ });
   await expect(ask).toBeVisible();
@@ -49,7 +52,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByRole("group", { name: /Elvis and the Beatles Night/ })).toHaveCount(0);
 
   // ---- Why panel
-  await page.locator(".tile", { hasText: "Bluey Day" }).click();
+  await page.getByRole("button", { name: /Bluey Day/ }).click();
   const why = page.getByRole("dialog");
   await expect(why).toBeVisible();
   await expect(why).toContainText(/Against its own average/);
@@ -66,69 +69,99 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(why).toHaveCount(0);
 
   // A classic night says why it is not scored.
-  await page.locator(".tile", { hasText: "Fireworks" }).click();
+  await page.getByRole("button", { name: /Fireworks/ }).click();
   await expect(page.getByRole("dialog")).toContainText("Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.");
   await page.keyboard.press("Escape");
 
-  // ---- Fix
+  // ---- Fix: a sealed pack, torn open, then the swap carousel
   await page.getByTestId("to-fix").click();
   await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
-  const cards = page.getByTestId("proposal");
-  expect(await cards.count()).toBeGreaterThan(0);
+  await expect(page.locator("#carousel")).toHaveCount(0);
+  const pack = page.getByRole("button", { name: /Open the pack/ });
+  await expect(pack).toBeVisible();
   await noSideScroll(page);
+  await shot(page, info, "05-fix-pack");
+  // The pack floats, so a keyboard press is the steady way to open it.
+  await pack.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.locator("#carousel")).toBeVisible();
+  await expect(pack).toHaveCount(0);
+  const card = page.getByTestId("proposal");
+  await expect(card).toHaveCount(1);
   await noSideScroll(page);
   // The cited comparison replaces the repeated sentence; the why is not said twice.
-  await expect(cards.first().getByTestId("cited")).toContainText(/(above|below|in line with) this market's average \([+-]\d\.\d\)/);
-  await expect(cards.first()).not.toContainText("leans toward");
+  await expect(card.getByTestId("cited")).toContainText(/(above|below|in line with) this market's average \([+-]\d\.\d\)/);
+  await expect(card).not.toContainText("leans toward");
+  await expect(page.locator(".idx")).toContainText(/now [+\u2212]\d\.\d\d \u2192 proposed [+\u2212]\d\.\d\d/);
   if ((await page.getByTestId("angle").count()) > 0) {
     const angle = await page.getByTestId("angle").first().innerText();
     expect(angle).toMatch(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Z][a-z]{2} \d{1,2}\b/);
     expect(angle).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   }
-  await shot(page, info, "05-fix");
+  await shot(page, info, "06-carousel");
   await page.getByTestId("open-trace").click();
   const trace = page.getByRole("dialog");
   await expect(trace).toContainText("Asked Qloo");
   await expect(trace).toContainText("constraint");
   await expect(trace).toContainText("model");
   await expect(trace).toContainText("Re-checking");
-  await shot(page, info, "06-trace");
+  await shot(page, info, "07-trace");
   await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 
-  const first = cards.first();
-  await expect(first.locator(".stamp")).toHaveCount(0);
   // Switch to an alternate before approving: the swap line follows it, the date stays.
-  const alt = first.getByTestId("alt").filter({ hasNot: page.locator("[disabled]") }).first();
+  const alt = page.getByTestId("alt").filter({ hasNot: page.locator("[disabled]") }).first();
   if ((await alt.count()) > 0) {
-    const before = await first.getByTestId("swap-line").innerText();
+    const before = await page.getByTestId("swap-line").innerText();
     const altName = (await alt.innerText()).trim();
     await alt.click();
-    await expect(page.getByTestId("proposal").first().getByTestId("swap-line")).toContainText(altName);
-    expect(await page.getByTestId("proposal").first().getByTestId("swap-line").innerText()).not.toBe(before);
+    await expect(page.getByTestId("swap-line")).toContainText(altName);
+    expect(await page.getByTestId("swap-line").innerText()).not.toBe(before);
   }
-  await first.getByTestId("approve").click();
-  const approved = page.getByTestId("proposal").first();
-  const stamp = approved.locator(".stamp");
-  await expect(stamp).toBeVisible();
-  await expect(stamp).toHaveText("SWAPPED");
-  // The stamp never covers the weekday or date.
-  const sb = (await stamp.boundingBox())!;
-  for (const sel of [".tile-head", ".tile-wd", ".tile-date"]) {
-    const bb = (await approved.locator(sel).boundingBox())!;
-    expect(overlap(sb, bb), `stamp overlaps ${sel}`).toBe(false);
-  }
-  await shot(page, info, "07-approved");
-  await page.getByTestId("proposal").nth(1).getByTestId("reject").click();
-
-  // Locked nights are never swapped.
-  for (const t of await page.locator(".tile--swapped").all()) await expect(t.locator(".tile-lock")).toHaveCount(0);
+  // Approving flips the card into the new theme; the date and sponsor stay pinned; the tally follows.
+  const pinned = await page.locator(".pinbar").innerText();
+  const inBefore = Number(await page.locator('.tally.mini [data-k="leans-in"] b').innerText());
+  const toName = (await page.getByTestId("swap-line").innerText()).split("\n").pop()!.trim();
+  await page.getByTestId("approve").click();
+  await expect(page.locator(".decision")).toContainText("Approved");
+  await expect(page.getByTestId("fix-status")).toContainText("1 approved");
+  await expect(page.locator('.tally.mini [data-k="leans-in"] b')).toHaveText(String(inBefore + 1));
+  await expect(page.locator(".slide.cur .face.alt")).toContainText(toName.split(" ")[0]!);
+  await expect.poll(() => flipAngle(page, ".slide.cur .flipper")).toBeLessThan(-0.99);
+  expect(await page.locator(".pinbar").innerText()).toBe(pinned);
+  await shot(page, info, "08-approved");
+  // Next swap, then reject it.
+  await page.getByTestId("next-swap").click();
+  await expect(page.locator(".slide.cur")).toHaveAttribute("data-j", "1");
+  await page.getByTestId("reject").click();
+  await expect(page.locator(".decision")).toContainText("Rejected");
+  await expect(page.getByTestId("fix-status")).toContainText("1 rejected");
+  // The carousel moves with its buttons and with a swipe.
+  await page.getByRole("button", { name: "Previous swap" }).click();
+  await expect(page.locator(".slide.cur")).toHaveAttribute("data-j", "0");
+  await page.locator("#slides").scrollIntoViewIfNeeded();
+  const box = (await page.locator("#slides").boundingBox())!;
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.5, { steps: 6 });
+  await page.mouse.up();
+  await expect(page.locator(".slide.cur")).toHaveAttribute("data-j", "1");
+  await noSideScroll(page);
 
   // ---- Send
   await page.getByTestId("to-send").click();
   await expect(page.getByRole("heading", { name: /Send:/ })).toBeVisible();
   await expect(page.getByTestId("memo")).toContainText("Theme-night rationale: Akron, OH sample club");
   await expect(page.getByTestId("memo")).toContainText("SYNTHETIC DEMO DATA");
+  await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
   await expect(page.locator(".tile--swapped .stamp")).toHaveCount(1);
+  await expect(page.locator(".tile--swapped .stamp")).toHaveText("SWAPPED");
+  // The stamp never covers the pennant with the date.
+  const sb = (await page.locator(".tile--swapped .stamp").boundingBox())!;
+  const pb = (await page.locator(".tile--swapped .penn").boundingBox())!;
+  expect(overlap(sb, pb), "stamp overlaps the date pennant").toBe(false);
+  // Locked nights are never swapped.
+  await expect(page.locator(".tile--swapped .lk")).toHaveCount(0);
   await noSideScroll(page);
   await shot(page, info, "08-send");
 
@@ -154,7 +187,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("audit-line")).toContainText("not an attendance predictor");
   await expect(page.getByTestId("results-pending")).toHaveCount(0);
   await expect(page.getByTestId("h1-text")).toContainText("95% interval");
-  await expect(page.getByText("Pre-registration and Amendments 1 to 4")).toBeVisible();
+  await expect(page.getByText("Pre-registration and Amendments 1 to 5")).toBeVisible();
   await noSideScroll(page);
   await shot(page, info, "10-study-result");
 });
@@ -180,11 +213,121 @@ test("keyboard: the Why panel opens from a magnet, traps focus, and closes with 
   await page.goto("/#/sample");
   await page.getByTestId("market-portland-me").click();
   await expect(page.getByTestId("summary")).toBeVisible();
-  const tile = page.locator("button.tile").first();
+  const tile = page.locator(".card[role=button]").first();
   await tile.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByRole("button", { name: "Close" })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+});
+
+test("the Why flips the card in 3D to its cardboard back and gives focus back on close", async ({ page }) => {
+  await page.goto("/#/sample");
+  await page.getByTestId("market-portland-me").click();
+  await expect(page.getByTestId("summary")).toBeVisible();
+  const card = page.getByRole("button", { name: /Bluey Day|Star Wars Night|Elvis Night/ }).first();
+  const label = await card.getAttribute("aria-label");
+  await card.focus();
+  await page.keyboard.press("Enter");
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator(".face.back")).toHaveCount(1);
+  await expect(dialog.locator(".bk-top")).toContainText(/Portland nights/);
+  await expect.poll(() => flipAngle(page, ".lb .flipper"), { timeout: 5000 }).toBeLessThan(-0.99);
+  await expect(dialog.locator(".bk-why b")).toContainText(/Why it (fits|misses) Portland|How Portland reads it/);
+  await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: label! })).toBeFocused();
+});
+
+test("reduced motion: flips are instant, the pack opens straight away and nothing is left hidden", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "Your market, not the national chart." })).toBeVisible();
+  await expect(page.locator("#fx")).toHaveCount(1);
+  await expect(page.locator("#hero")).toBeVisible();
+  await page.goto("/#/sample");
+  await page.getByTestId("market-akron").click();
+  await expect(page.getByTestId("summary")).toBeVisible();
+  await page.getByRole("button", { name: /Bluey Day|Star Wars Night|Elvis Night/ }).first().click();
+  // No waiting: the back is showing as soon as the dialog is.
+  await expect(page.getByRole("dialog")).toBeVisible();
+  expect(await flipAngle(page, ".lb .flipper")).toBeLessThan(-0.99);
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await page.getByTestId("to-fix").click();
+  await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
+  // The pack opens by itself and the carousel is there.
+  await expect(page.locator("#carousel")).toBeVisible();
+  await expect(page.getByRole("button", { name: /Open the pack/ })).toHaveCount(0);
+  await page.getByTestId("approve").click();
+  await expect(page.locator(".decision")).toContainText("Approved");
+  expect(await flipAngle(page, ".slide.cur .flipper")).toBeLessThan(-0.99);
+  await expect(page.getByTestId("fix-status")).toContainText("1 approved");
+  await page.getByTestId("to-send").click();
+  await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
+  await page.getByTestId("to-study").click();
+  await page.getByTestId("call-no").click();
+  await expect(page.getByTestId("verdict")).toBeVisible();
+  await expect(page.locator(".needle b")).toContainText("49.1%");
+});
+
+test("no console errors on any route", async ({ page }) => {
+  const problems: string[] = [];
+  page.on("console", (m) => {
+    if (m.type() === "error" || m.type() === "warning") problems.push(`${m.type()}: ${m.text()}`);
+  });
+  page.on("pageerror", (e) => problems.push(`pageerror: ${e.message}`));
+  await page.goto("/");
+  await page.waitForTimeout(600);
+  await page.goto("/#/sample");
+  await page.getByTestId("market-biloxi").click();
+  await expect(page.getByTestId("summary")).toBeVisible();
+  await page.getByTestId("to-fix").click();
+  await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
+  await page.getByTestId("skip-pack").click();
+  await expect(page.locator("#carousel")).toBeVisible();
+  await page.getByTestId("to-send").click();
+  await expect(page.getByTestId("send-summary")).toBeVisible();
+  await page.getByTestId("to-study").click();
+  await page.getByTestId("call-yes").click();
+  await page.goto("/#/own");
+  await page.waitForTimeout(300);
+  expect(problems).toEqual([]);
+});
+
+test("moving between routes leaves no extra animation loops running", async ({ page }) => {
+  // Count requestAnimationFrame callbacks that stay scheduled once the hero is gone.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __live: Set<number> };
+    w.__live = new Set();
+    const raf = window.requestAnimationFrame.bind(window);
+    const caf = window.cancelAnimationFrame.bind(window);
+    window.requestAnimationFrame = (cb) => {
+      const id = raf((t) => {
+        w.__live.delete(id);
+        cb(t);
+      });
+      w.__live.add(id);
+      return id;
+    };
+    window.cancelAnimationFrame = (id) => {
+      w.__live.delete(id);
+      caf(id);
+    };
+  });
+  await page.goto("/");
+  await page.waitForTimeout(800);
+  for (let i = 0; i < 3; i++) {
+    await page.goto("/#/sample");
+    await page.goto("/#/");
+    await page.waitForTimeout(200);
+  }
+  await page.goto("/#/sample");
+  await page.waitForTimeout(1200);
+  const live = await page.evaluate(() => (window as unknown as { __live: Set<number> }).__live.size);
+  // GSAP's ticker keeps one; the hero loops must all have stopped.
+  expect(live).toBeLessThanOrEqual(2);
 });
