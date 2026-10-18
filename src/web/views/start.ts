@@ -5,9 +5,17 @@ import { sampleCsv } from "../../app/samples";
 import { AUDIT_LINE } from "../../app/score";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
-import { loadStudy } from "../study-data";
+import { Fireworks } from "../foil/fx";
+import { heroShell } from "../foil/hero";
+import { makeCard, type CardSpec } from "../foil/cards";
+import { emblemFor } from "../foil/emblems";
+import { onCleanup, onMount, onResize, routeContext, whileVisible } from "../foil/lifecycle";
+import { gsap, reduced } from "../foil/motion";
+import { packEl } from "../foil/pack";
+import { ridge } from "../foil/scenery";
 import { startCheck } from "../flow";
 import { icon } from "../icons";
+import { loadStudy } from "../study-data";
 
 function teaser(): HTMLElement {
   const r = loadStudy().results;
@@ -17,61 +25,124 @@ function teaser(): HTMLElement {
     "div",
     { class: "teaser", "data-testid": "study-teaser" },
     h("p", null, `We tested local taste against ${nights} real 2025 theme nights before building this. ${result}`),
-    h("a", { href: "#/study" }, "See The Study", icon("arrowRight")),
+    h("a", { class: "btn gold", href: "#/study" }, "See The Study", icon("arrowRight")),
   );
 }
 
-export function startView(): HTMLElement {
-  return h(
-    "div",
-    { class: "hero" },
+/** Three decorative cards for the first beat of the teaser. They illustrate the look; they carry no scores. */
+function demoCards(): HTMLElement[] {
+  const base = (title: string, fit: CardSpec["fit"], m: string, d: number, id: string | null, cls: boolean): CardSpec => ({
+    title, fit, emblem: emblemFor(id, null, title, cls), month: m, day: d, weekday: "", sponsor: "", locked: false, index: -1, label: "",
+  });
+  const specs = [base("Fireworks Friday", "classic", "JUL", 3, null, true), base("Elvis Night", "leans-in", "JUN", 12, "elvis", false), base("Bluey Day", "average", "MAY", 9, "bluey", false)];
+  return specs.map((s) => {
+    const c = makeCard(s, { inert: true });
+    c.dataset.notilt = "1";
+    c.removeAttribute("aria-label");
+    return h("div", { class: "demo-card" }, c);
+  });
+}
+
+function teaseSection(): HTMLElement {
+  const cards = demoCards();
+  const burst = h("canvas", { class: "tease-fx", "aria-hidden": "true" });
+  const beats = [
+    { n: "1", name: "Check", text: "See which nights your market leans toward or away from.", art: h("div", { class: "fan3", "aria-hidden": "true" }, cards) },
+    { n: "2", name: "Fix", text: "Approve or reject swaps for the nights that lean away.", art: h("div", { class: "pack-art", "aria-hidden": "true" }, packEl("div", "", "swaps · sealed")) },
+    { n: "3", name: "Send", text: "Export the new calendar and a one-page memo.", art: h("div", { class: "fw-art", "aria-hidden": "true" }, h("div", { class: "fw-box" }, burst)) },
+  ];
+  const section = h(
+    "section",
+    { class: "tease", id: "tease", "aria-label": "How it works" },
     h(
       "div",
-      { class: "hero-copy" },
-      h("span", { class: "note-marker" }, "for promotions directors"),
-      h("h1", { tabindex: "-1" }, "Your market, not the national chart."),
-      h("p", { class: "lede" }, "Check next season's theme nights against what your own ballpark market leans toward. Get swap suggestions that keep your sponsors and your dates."),
-      h("p", { class: "small" }, `Scores describe what a market leans toward. ${AUDIT_LINE} `, h("a", { href: "#/study" }, "See how we tested it")),
-      h(
-        "div",
-        { class: "actions" },
-        h("a", { class: "btn btn--primary", href: "#/sample", "data-testid": "try-sample" }, "Try a sample club", icon("arrowRight")),
-        h("a", { class: "btn btn--quiet", href: "#/own", "data-testid": "use-own" }, "Use your own"),
-      ),
+      { class: "wrap" },
+      h("div", { class: "eyebrow" }, "How it plays"),
+      h("h2", { class: "h2" }, "Three moves, ", h("em", null, "one season")),
+      h("ol", { class: "how", "aria-label": "How it works" }, beats.map((b) => h("li", { class: "beat" }, h("div", { class: "beat-art" }, b.art), h("div", { class: "beat-copy" }, h("span", { class: "n" }, b.n), h("h3", null, b.name), h("p", null, b.text))))),
       teaser(),
     ),
-    h(
-      "ol",
-      { class: "how", "aria-label": "How it works" },
-      h("li", null, h("span", { class: "n" }, "1"), h("span", null, h("b", null, "Check"), "See which nights your market leans toward or away from.")),
-      h("li", null, h("span", { class: "n" }, "2"), h("span", null, h("b", null, "Fix"), "Approve or reject swaps for the nights that lean away.")),
-      h("li", null, h("span", { class: "n" }, "3"), h("span", null, h("b", null, "Send"), "Export the new calendar and a one-page memo.")),
-    ),
   );
+  onMount(() => mountTease(section, cards, burst));
+  return section;
+}
+
+function mountTease(section: HTMLElement, cards: HTMLElement[], canvas: HTMLCanvasElement): void {
+  const ctx = routeContext();
+  const fw = new Fireworks(canvas, { rate: 0.7, top: [0.12, 0.55], big: 0.9, sparks: 90, fireflies: 8 });
+  onResize(() => fw.size());
+  onCleanup(() => fw.stop());
+  if (reduced()) {
+    fw.drawStill();
+    return;
+  }
+  whileVisible(canvas, () => fw.start(), () => fw.stop());
+  ctx.add(() => {
+    const beats = gsap.utils.toArray<HTMLElement>(".beat", section);
+    for (const b of beats) gsap.from(b, { opacity: 0, y: 44, duration: 0.8, ease: "power3.out", scrollTrigger: { trigger: b, start: "top 88%", once: true } });
+    const rot = [-13, 0, 13], dx = [-52, 0, 52];
+    cards.forEach((c, i) => {
+      gsap.fromTo(c, { x: 0, y: 24, rotation: 0, scale: 0.86, opacity: 0.2 }, { x: `${dx[i]}%`, y: Math.abs(rot[i]!) * 0.9, rotation: rot[i], scale: 1, opacity: 1, ease: "none", scrollTrigger: { trigger: ".fan3", start: "top 85%", end: "top 40%", scrub: 0.5 } });
+    });
+    const tear = gsap.timeline({ scrollTrigger: { trigger: ".pack-art", start: "top 80%", end: "top 30%", scrub: 0.5 } });
+    tear
+      .to(".pack-art .pk-strip", { rotation: -24, x: "34%", y: -86, opacity: 0, transformOrigin: "0% 100%", ease: "power2.in" }, 0)
+      .fromTo(".pack-art .pk-burst", { scale: 0.2, opacity: 1 }, { scale: 1.1, opacity: 0, ease: "power2.out" }, 0.25);
+  });
+  const io = new IntersectionObserver((es) => {
+    if (es.some((e) => e.isIntersecting)) fw.salvo(2);
+  }, { threshold: 0.5 });
+  io.observe(canvas);
+  onCleanup(() => io.disconnect());
+}
+
+export function startView(): HTMLElement {
+  const copy = [
+    h("h1", { class: "sub", id: "sub", tabindex: "-1" }, "Your market, not the national chart."),
+    h("p", { class: "hero-lede" }, "Check next season's theme nights against what your own ballpark market leans toward. Get swap suggestions that keep your sponsors and your dates."),
+    h(
+      "div",
+      { class: "hero-actions", id: "cta" },
+      h("a", { class: "btn pri", href: "#/sample", "data-testid": "try-sample" }, "Try a sample club", icon("arrowRight")),
+      h("a", { class: "btn ghost", href: "#/own", "data-testid": "use-own" }, "Use your own"),
+    ),
+    h("p", { class: "tag", id: "tag" }, `Scores describe what a market leans toward. ${AUDIT_LINE} `, h("a", { href: "#/study" }, "See how we tested it")),
+  ];
+  return h("div", { class: "landing" }, heroShell(copy), ridge(), teaseSection());
+}
+
+// ---------- pick a sample club and use your own ----------
+
+function sceneHead(eyebrow: string, title: string, accent: string, lede: string): HTMLElement {
+  return h("div", { class: "scene-head" }, h("div", { class: "eyebrow" }, eyebrow), h("h1", { class: "h2", tabindex: "-1" }, `${title} `, h("em", null, accent)), h("p", { class: "lede" }, lede));
 }
 
 export function pickView(): HTMLElement {
   return h(
-    "div",
-    { class: "form" },
-    h("div", { class: "page-head" }, h("h1", { tabindex: "-1" }, "Pick a sample club"), h("p", { class: "lede" }, "Each is a real ballpark market with a season calendar we wrote. Sponsors are made up.")),
+    "section",
+    { class: "scene scene--pick" },
     h(
       "div",
-      { class: "markets" },
-      SAMPLE_MARKETS.map((m) =>
-        h(
-          "button",
-          {
-            type: "button",
-            class: "market",
-            "data-testid": `market-${m.id}`,
-            onclick: () => {
-              const { rows, errors } = parseCalendar(sampleCsv(m.id));
-              void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, m.id);
+      { class: "wrap" },
+      sceneHead("Step 0 · Pick a club", "Pick a", "sample club", "Each is a real ballpark market with a season calendar we wrote. Sponsors are made up."),
+      h(
+        "div",
+        { class: "tickets" },
+        SAMPLE_MARKETS.map((m) =>
+          h(
+            "button",
+            {
+              type: "button",
+              class: "ticket",
+              "data-testid": `market-${m.id}`,
+              onclick: () => {
+                const { rows, errors } = parseCalendar(sampleCsv(m.id));
+                void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, m.id);
+              },
             },
-          },
-          h("b", null, m.label),
-          h("span", null, `${m.region}. Starts with their next season's calendar.`),
+            h("span", { class: "tk-stub" }, h("span", { class: "tk-k" }, "Sample club"), h("span", { class: "tk-city" }, m.city)),
+            h("span", { class: "tk-main" }, h("b", null, m.label), h("span", null, `${m.region}. Starts with their next season's calendar.`), h("span", { class: "tk-go" }, "Deal the season", icon("arrowRight"))),
+          ),
         ),
       ),
     ),
@@ -86,7 +157,7 @@ export function ownView(): HTMLElement {
   const file = h("input", { id: "csvfile", type: "file", accept: ".csv,text/csv,.txt", "aria-label": "Upload a CSV file" });
   const paste = h("textarea", { id: "csvtext", "aria-describedby": "csvhelp", spellcheck: "false" });
   const errors = h("div", { role: "alert", class: "error" });
-  const go = h("button", { type: "button", class: "btn btn--primary", "data-testid": "check-mine" }, "Check my calendar", icon("arrowRight"));
+  const go = h("button", { type: "button", class: "btn pri", "data-testid": "check-mine" }, "Check my calendar", icon("arrowRight"));
 
   async function search(): Promise<void> {
     const text = q.value.trim();
@@ -151,19 +222,27 @@ export function ownView(): HTMLElement {
   });
 
   return h(
-    "div",
-    { class: "form" },
-    h("div", { class: "page-head" }, h("h1", { tabindex: "-1" }, "Use your own calendar"), h("p", { class: "lede" }, "Two things: where your ballpark is, and your theme nights.")),
-    h("div", { class: "field" }, h("label", { for: "city" }, "1. Your ballpark's city"), h("div", { class: "actions" }, q, h("button", { type: "button", class: "btn", onclick: () => void search() }, icon("search"), "Search")), status, results),
+    "section",
+    { class: "scene scene--pick" },
     h(
       "div",
-      { class: "field" },
-      h("label", { for: "csvtext" }, "2. Your theme nights"),
-      h("p", { id: "csvhelp", class: "help" }, "Columns: date, theme, sponsor, locked, notes. Upload a file or paste the rows here."),
-      h("div", { class: "actions" }, file, h("button", { type: "button", class: "btn btn--small", onclick: () => download("homestand-template.csv", "text/csv", CSV_TEMPLATE) }, icon("download"), "Download the template")),
-      paste,
+      { class: "wrap" },
+      sceneHead("Step 0 · Bring your own", "Use your own", "calendar", "Two things: where your ballpark is, and your theme nights."),
+      h(
+        "div",
+        { class: "paper" },
+        h("div", { class: "field" }, h("label", { for: "city" }, "1. Your ballpark's city"), h("div", { class: "actions" }, q, h("button", { type: "button", class: "btn gold", onclick: () => void search() }, icon("search"), "Search")), status, results),
+        h(
+          "div",
+          { class: "field" },
+          h("label", { for: "csvtext" }, "2. Your theme nights"),
+          h("p", { id: "csvhelp", class: "help" }, "Columns: date, theme, sponsor, locked, notes. Upload a file or paste the rows here."),
+          h("div", { class: "actions" }, file, h("button", { type: "button", class: "btn ghost sm dark", onclick: () => download("homestand-template.csv", "text/csv", CSV_TEMPLATE) }, icon("download"), "Download the template")),
+          paste,
+        ),
+        errors,
+        h("div", { class: "actions" }, go),
+      ),
     ),
-    errors,
-    h("div", { class: "actions" }, go),
   );
 }

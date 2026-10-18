@@ -1,6 +1,10 @@
+import "./foil/foil.css";
 import "./styles.css";
+import { h } from "./dom";
+import { clear } from "./dom";
 import { closeDrawer } from "./components";
-import { clear, h } from "./dom";
+import { closeWhy } from "./foil/why";
+import { route as routeState, runMounts, teardown } from "./foil/lifecycle";
 import { state } from "./store";
 import { checkView } from "./views/check";
 import { fixView } from "./views/fix";
@@ -21,8 +25,8 @@ function topbar(route: string): HTMLElement {
   const ready = state.analysis !== null;
   return h(
     "header",
-    { class: "topbar" },
-    h("a", { class: "brand", href: "#/" }, "Homestand"),
+    { class: "nav", id: "nav" },
+    h("a", { class: "logo brand", href: "#/", "aria-label": "Homestand, start" }, "Homestand"),
     h(
       "nav",
       { "aria-label": "Steps" },
@@ -36,7 +40,12 @@ function topbar(route: string): HTMLElement {
         }),
       ),
     ),
-    h("a", { class: "study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
+    h(
+      "div",
+      { class: "nav-r" },
+      state.market ? h("span", { class: "club" }, h("i"), state.market.label.replace(/ (sample )?club$/, "")) : null,
+      h("a", { class: "out study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
+    ),
   );
 }
 
@@ -52,22 +61,39 @@ function view(route: string): HTMLElement {
   }
 }
 
+const TITLES: Record<string, string> = { "/check": "Check", "/fix": "Fix", "/send": "Send", "/study": "The Study", "/sample": "Pick a sample club", "/own": "Use your own" };
+
 function render(): void {
   const route = location.hash.replace(/^#/, "") || "/";
   const changed = route !== lastRoute;
-  if (changed) closeDrawer(false);
+  if (changed) {
+    closeDrawer(false);
+    closeWhy(false);
+  }
   lastRoute = route;
   const scroll = window.scrollY;
+  // Stop every loop, tween and observer the last screen started before its elements are removed.
+  teardown();
+  routeState.entering = changed;
   clear(app);
   const main = h("main", { id: "main", tabindex: "-1" });
   main.append(view(route));
   app.append(topbar(route), main);
-  document.title = `${{ "/check": "Check", "/fix": "Fix", "/send": "Send", "/study": "The Study", "/sample": "Pick a sample club", "/own": "Use your own" }[route] ?? "Your market, not the national chart"} | Homestand`;
+  document.title = `${TITLES[route] ?? "Your market, not the national chart"} | Homestand`;
+  runMounts();
+  const nav = document.getElementById("nav")!;
+  const solid = (): void => {
+    nav.classList.toggle("solid", window.scrollY > 40 || route !== "/");
+  };
+  solid();
   if (changed) {
     window.scrollTo(0, 0);
     (main.querySelector<HTMLElement>("h1") ?? main).focus({ preventScroll: true });
   } else window.scrollTo(0, scroll);
+  navScroll = solid;
 }
 
+let navScroll: () => void = () => undefined;
+window.addEventListener("scroll", () => navScroll(), { passive: true });
 window.addEventListener("hashchange", render);
 render();

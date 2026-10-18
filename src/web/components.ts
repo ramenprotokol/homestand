@@ -1,7 +1,6 @@
 import { FIT_WORDS, type FitLabel } from "../app/score";
-import { h, formatDate, type Child } from "./dom";
+import { h, type Child } from "./dom";
 import { icon, type IconName } from "./icons";
-import type { NightView } from "./store";
 import { state } from "./store";
 
 const FIT_ICON: Record<FitLabel, IconName> = {
@@ -12,56 +11,9 @@ const FIT_ICON: Record<FitLabel, IconName> = {
   classic: "star",
 };
 
-export function badge(fit: FitLabel): HTMLElement {
-  return h("span", { class: `badge badge--${fit}` }, icon(FIT_ICON[fit]), FIT_WORDS[fit]);
-}
-
-export interface TileOptions {
-  /** Open the Why panel (omit for a read-only tile). */
-  onOpen?: () => void;
-  /** Called when the director picks a theme for an ambiguous night. */
-  onChoose?: (themeId: string) => void;
-  candidates?: Array<{ id: string; label: string }>;
-  /** Show the planned theme again, struck through, under the new one. */
-  showWas?: boolean;
-}
-
-/** One night as a magnet. The stamp sits in the footer row, so it can never cover the weekday or date. */
-export function tile(v: NightView, opts: TileOptions = {}): HTMLElement {
-  const n = v.night;
-  const head = h(
-    "span",
-    { class: "tile-head" },
-    h("span", { class: "tile-wd" }, n.weekday),
-    h("span", { class: "tile-date" }, formatDate(n.date)),
-    n.locked ? h("span", { class: "tile-lock" }, icon("lock"), "Locked") : null,
-  );
-  const themeText = v.swappedFrom ? v.themeLabel : n.theme;
-  const body: Child[] = [
-    head,
-    h("span", { class: "tile-theme" }, themeText),
-    v.swappedFrom ? h("span", { class: "tile-was" }, `was ${n.theme}`) : null,
-    n.sponsor ? h("span", { class: "chip" }, n.sponsor) : null,
-  ];
-  const foot = h("span", { class: "tile-foot" }, v.needsChoice ? null : badge(v.fit), v.swappedFrom ? h("span", { class: "stamp" }, "SWAPPED") : null);
-  const cls = `tile tile--${v.needsChoice ? "not-scored" : v.fit}${v.swappedFrom ? " tile--swapped" : ""}`;
-  const label = `${n.weekday} ${formatDate(n.date)}, ${themeText}${n.sponsor ? `, sponsor ${n.sponsor}` : ""}${n.locked ? ", locked" : ""}, ${v.needsChoice ? "needs your pick" : FIT_WORDS[v.fit]}${v.swappedFrom ? ", swapped" : ""}`;
-
-  if (v.needsChoice && opts.candidates) {
-    return h(
-      "div",
-      { class: cls, "data-index": n.index },
-      ...body,
-      h(
-        "span",
-        { class: "choices", role: "group", "aria-label": `Which theme is "${n.theme}"?` },
-        h("span", { class: "choice-q" }, "Which one did you mean?"),
-        opts.candidates.map((c) => h("button", { type: "button", class: "btn btn--small", onclick: () => opts.onChoose?.(c.id) }, c.label)),
-      ),
-    );
-  }
-  if (!opts.onOpen) return h("div", { class: cls, "data-index": n.index, role: "group", "aria-label": label }, ...body, foot);
-  return h("button", { type: "button", class: cls, "data-index": n.index, "aria-label": label, onclick: opts.onOpen }, ...body, foot);
+/** The fit in words, with an icon: colour is never the only signal. */
+export function fitChip(fit: FitLabel | "pick"): HTMLElement {
+  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), FIT_WORDS[fit]);
 }
 
 export function syntheticBanner(): HTMLElement | null {
@@ -118,7 +70,7 @@ export function openDrawer(title: string, render: () => Child): void {
   closeDrawer(false);
   const titleId = "drawer-title";
   const body = h("div", { class: "drawer-body" });
-  const closeBtn = h("button", { type: "button", class: "btn btn--small", onclick: () => closeDrawer() }, icon("x"), "Close");
+  const closeBtn = h("button", { type: "button", class: "btn ghost sm", onclick: () => closeDrawer() }, icon("x"), "Close");
   const root = h("aside", { class: "drawer", role: "dialog", "aria-modal": "true", "aria-labelledby": titleId }, h("div", { class: "drawer-head" }, h("h2", { id: titleId }, title), closeBtn), body);
   const scrim = h("div", { class: "scrim", onclick: () => closeDrawer() });
   current = { root, scrim, opener: document.activeElement, render, body, titleId };

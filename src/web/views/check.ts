@@ -2,18 +2,34 @@ import type { ThemeScoreOut } from "../../app/api-types";
 import { AUDIT_LINE, CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS } from "../../app/score";
 import { themeById } from "../../app/themes/library";
 import { ApiFailure } from "../api";
-import { badge, closeDrawer, openDrawer, refreshDrawer, syntheticBanner, tile } from "../components";
-import { formatDate, formatDateTime, h } from "../dom";
+import { fitChip, syntheticBanner } from "../components";
+import { formatDate, formatDateTime, h, type Child } from "../dom";
 import { recheckTheme, navigate } from "../flow";
+import { bindTilt, FIT_NAME, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
+import { tally } from "../foil/tally";
+import { onCleanup, onMount, route, routeContext } from "../foil/lifecycle";
+import { fmt, gsap, reduced } from "../foil/motion";
+import { rand } from "../foil/rng";
+import { bokeh, garland, lamp, ridge } from "../foil/scenery";
+import { openWhy, refreshWhy } from "../foil/why";
 import { icon } from "../icons";
 import { state, ui, viewOf, type NightView } from "../store";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const LEGEND: ReadonlyArray<readonly [CardFit, string, string]> = [
+  ["leans-in", "Leans in", "This market likes it more than its own average. Gold foil, green gem."],
+  ["average", "About average", "Right around this market's own average. Silver."],
+  ["leans-away", "Leans away", "This market likes it less than its own average. Red gem with a red glow."],
+  ["classic", "Classic night", "A proven promo, left alone. Blue."],
+  ["not-scored", "Not scored", "No theme in the library matches. An unpainted sketch."],
+];
+
+const city = (): string => (state.analysis?.market.label ?? "").split(",")[0]!.replace(/ (sample )?club$/, "");
 
 export function checkView(): HTMLElement {
   if (ui.loading) return loadingView();
   if (ui.error) {
-    return h("div", { class: "form" }, h("h1", { tabindex: "-1" }, "That did not work"), h("p", { class: "error", role: "alert" }, ui.error), h("div", { class: "actions" }, h("a", { class: "btn btn--primary", href: "#/" }, "Start again")));
+    return h("section", { class: "scene" }, h("div", { class: "wrap narrow" }, h("h1", { class: "h2", tabindex: "-1" }, "That did not work"), h("p", { class: "error", role: "alert" }, ui.error), h("div", { class: "actions" }, h("a", { class: "btn pri", href: "#/" }, "Start again"))));
   }
   const a = state.analysis;
   if (!a) {
@@ -23,7 +39,7 @@ export function checkView(): HTMLElement {
   const views = a.nights.map(viewOf);
   const count = (f: NightView["fit"]): number => views.filter((v) => v.fit === f).length;
   const away = count("leans-away");
-  const pending = views.filter((v) => v.needsChoice).length;
+  const pendingViews = views.filter((v) => v.needsChoice);
 
   const notices: HTMLElement[] = [];
   const synth = syntheticBanner();
@@ -38,7 +54,6 @@ export function checkView(): HTMLElement {
       ),
     );
   }
-  if (pending > 0) notices.push(h("div", { class: "notice", role: "note" }, icon("info"), h("span", null, h("strong", null, `${pending} night${pending === 1 ? " needs" : "s need"} your pick. `), "That name fits more than one theme, so choose one on the magnet. We never guess.")));
   if (a.recordedOn) notices.push(h("div", { class: "notice", role: "note" }, icon("clock"), h("span", null, `Scores recorded on ${formatDate(a.recordedOn)}. They are saved results from Qloo, not a new request.`)));
 
   const months = new Map<string, NightView[]>();
@@ -48,65 +63,139 @@ export function checkView(): HTMLElement {
   }
 
   const summary = `${count("leans-in")} lean in, ${count("average")} about average, ${away} lean away, ${count("not-scored")} not scored, ${count("classic")} classic.`;
-  return h(
-    "div",
-    null,
-    h("div", { class: "page-head" }, h("h1", { tabindex: "-1" }, `Check: ${a.market.label}`), h("p", { class: "lede", "data-testid": "summary" }, summary)),
-    notices,
+  const locked = views.filter((v) => v.night.locked);
+
+  const asks = pendingViews.map((v) =>
     h(
       "div",
-      { class: "board" },
+      { class: "ask", role: "group", "aria-label": `Which theme is "${v.night.theme}"?`, "data-ask": v.night.index },
+      h("div", { class: "q" }, `${v.night.theme} (${formatDate(v.night.date)})`),
+      h("p", null, "That name fits more than one theme. Which one did you mean? We never guess."),
       h(
         "div",
-        { class: "board-face" },
-        h("div", { class: "board-note" }, h("span", { class: "note-marker" }, "Tap a magnet to see why"), h("span", { class: "small" }, `${views.length} nights`)),
-        [...months.entries()].map(([key, vs]) =>
-          h(
-            "section",
-            { class: "month", "aria-label": MONTHS[Number(key.slice(5)) - 1] },
-            h("h2", { class: "month-tag" }, MONTHS[Number(key.slice(5)) - 1]),
-            h(
-              "div",
-              { class: "grid" },
-              vs.map((v) =>
-                tile(v, {
-                  onOpen: () => openWhy(v.night.index),
-                  candidates: v.night.candidates.map((id) => ({ id, label: themeById(id)?.label ?? id })),
-                  onChoose: (id) => {
-                    state.choices[v.night.index] = id;
-                    window.dispatchEvent(new HashChangeEvent("hashchange"));
-                  },
-                }),
-              ),
-            ),
-          ),
+        { class: "ask-b" },
+        v.night.candidates.map((id) =>
+          h("button", { type: "button", class: "btn ghost sm", onclick: () => { state.choices[v.night.index] = id; window.dispatchEvent(new HashChangeEvent("hashchange")); } }, themeById(id)?.label ?? id),
         ),
       ),
     ),
-    h(
-      "div",
-      { class: "actions", style: "margin-top:20px" },
-      h("a", { class: "btn btn--primary", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
-      pending > 0 ? h("span", { class: "small" }, "Pick a theme for the open magnets first, or continue and leave them unscored.") : null,
-    ),
-    h("p", { class: "footer" }, `Taste data from Qloo. Scores describe what this market leans toward. ${AUDIT_LINE}`),
   );
+
+  const grid = h("div", { class: "grids" });
+  for (const [key, vs] of months) {
+    const name = MONTHS[Number(key.slice(5)) - 1]!;
+    grid.append(
+      h(
+        "section",
+        { class: "month", "aria-label": name },
+        h("h2", { class: "month-tag" }, name),
+        h("div", { class: "grid" }, vs.map((v) => {
+          const c = makeCard(specOf(v));
+          return h("div", { class: "slot" }, c);
+        })),
+      ),
+    );
+  }
+  grid.addEventListener("click", (e) => {
+    const c = (e.target as Element).closest<HTMLElement>(".card");
+    if (c) tap(c);
+  });
+  grid.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const c = (e.target as Element).closest<HTMLElement>(".card");
+    if (!c || e.target !== c) return;
+    e.preventDefault();
+    tap(c);
+  });
+
+  const deckL = h(
+    "div",
+    { class: "deck-l", id: "deckL" },
+    h("div", { class: "eyebrow" }, "Scene 1 · Check"),
+    h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
+    h("p", { class: "lede", "data-testid": "summary" }, summary),
+    notices,
+    tally(views),
+    h("div", { class: "legend", role: "list", "aria-label": "What the cards mean" }, LEGEND.map(([fit, word, text]) => h("div", { class: `lg${fit === "leans-away" ? " away" : ""}`, role: "listitem" }, gemChip(fit), h("span", null, h("b", null, `${word}: `), text)))),
+    locked.length > 0
+      ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, `${locked.length} locked night${locked.length === 1 ? "" : "s"}`), ` stay exactly as planned: ${locked.map((v) => v.night.theme).join(", ")}.`))
+      : null,
+    asks,
+    h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
+    pendingViews.length > 0 ? h("p", { class: "small" }, `${pendingViews.length} night${pendingViews.length === 1 ? " needs" : "s need"} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} unscored.`) : null,
+    h("p", { class: "small" }, `Taste data from Qloo. Scores describe what this market leans toward. ${AUDIT_LINE}`),
+  );
+
+  const section = h(
+    "section",
+    { class: "deck", id: "deck" },
+    bokeh(),
+    garland(),
+    lamp(),
+    h("div", { class: "wrap deck-in" }, deckL, h("div", { class: "deck-r" }, h("div", { class: "binder", id: "binder" }, h("div", { class: "rings", "aria-hidden": "true" }), grid))),
+  );
+
+  function tap(c: HTMLElement): void {
+    const index = Number(c.dataset.index);
+    if (c.dataset.fit === "pick") {
+      const ask = deckL.querySelector<HTMLElement>(`[data-ask="${index}"]`);
+      ask?.scrollIntoView({ block: "center", behavior: reduced() ? "auto" : "smooth" });
+      ask?.querySelector<HTMLElement>("button")?.focus({ preventScroll: true });
+      return;
+    }
+    openCard(index, c);
+  }
+
+  onMount(() => {
+    const ctx = routeContext();
+    onCleanup(bindTilt(grid));
+    const fitSticky = (): void => {
+      if (window.innerWidth <= 1100) {
+        deckL.style.top = "";
+        return;
+      }
+      deckL.style.top = `${Math.max(Math.min(78, window.innerHeight - deckL.offsetHeight - 24), -(deckL.offsetHeight - window.innerHeight + 24))}px`;
+    };
+    fitSticky();
+    window.addEventListener("resize", fitSticky);
+    onCleanup(() => window.removeEventListener("resize", fitSticky));
+    if (route.entering && !reduced()) {
+      const g = grid.getBoundingClientRect();
+      if (g.top < window.innerHeight * 0.85) ctx.add(() => dealIn(grid));
+    }
+  });
+  return h("div", { class: "page" }, section, ridge());
+}
+
+/** Cards fly in from one pile and settle into their pockets. Skipped for reduced motion, and when the deck starts off screen. */
+function dealIn(grid: HTMLElement): void {
+  const slots = [...grid.querySelectorAll<HTMLElement>(".slot")];
+  const g = grid.getBoundingClientRect();
+  const px = g.left + g.width * 0.5, py = g.top + Math.min(g.height * 0.2, 260);
+  const pos = slots.map((s) => {
+    const r = s.getBoundingClientRect();
+    return [px - (r.left + r.width / 2), py - (r.top + r.height / 2)] as const;
+  });
+  gsap.fromTo(slots, { x: (i: number) => pos[i]![0], y: (i: number) => pos[i]![1], rotation: () => rand(-38, 38), scale: 0.4, opacity: 0 }, { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1, duration: 0.85, stagger: 0.04, ease: "back.out(1.15)", clearProps: "transform,opacity" });
 }
 
 function loadingView(): HTMLElement {
   return h(
-    "div",
-    { "aria-busy": "true" },
-    h("div", { class: "page-head" }, h("h1", { tabindex: "-1" }, "Checking your calendar"), h("p", { class: "lede", role: "status" }, "Matching theme names and asking Qloo what this market leans toward. A few seconds.")),
-    h("div", { class: "board" }, h("div", { class: "board-face" }, h("div", { class: "grid" }, Array.from({ length: 8 }, () => h("div", { class: "skeleton" }))))),
+    "section",
+    { class: "deck", "aria-busy": "true" },
+    bokeh(),
+    h(
+      "div",
+      { class: "wrap deck-in" },
+      h("div", { class: "deck-l" }, h("div", { class: "eyebrow" }, "Scene 1 · Check"), h("h1", { class: "h2", tabindex: "-1" }, "Checking ", h("em", null, "your calendar")), h("p", { class: "lede", role: "status" }, "Matching theme names and asking Qloo what this market leans toward. A few seconds.")),
+      h("div", { class: "deck-r" }, h("div", { class: "binder" }, h("div", { class: "rings", "aria-hidden": "true" }), h("div", { class: "grid" }, Array.from({ length: 10 }, () => h("div", { class: "skeleton" }))))),
+    ),
   );
 }
 
-// ---------- Why panel ----------
+// ---------- the Why: the card flips to its cardboard back ----------
 
-function rel(z: number | null): string {
-  return z === null ? "n/a" : `${z >= 0 ? "+" : ""}${z.toFixed(2)}`;
-}
+const rel = (z: number | null): string => (z === null ? "n/a" : `${z >= 0 ? "+" : ""}${z.toFixed(2)}`);
 
 function sourceLine(s: ThemeScoreOut, recheckedAt: string | null): string {
   if (recheckedAt) return `Re-checked live at ${formatDateTime(recheckedAt)}.`;
@@ -120,19 +209,55 @@ let showNumbers = false;
 let recheckMessage = "";
 let recheckBusy = false;
 
-function openWhy(index: number): void {
-  showNumbers = false;
-  recheckMessage = "";
-  const night = state.analysis!.nights[index]!;
-  openDrawer(`${night.weekday} ${formatDate(night.date)}`, () => whyBody(index));
+function backOf(v: NightView): BackSpec {
+  const n = v.night;
+  const s = v.score;
+  const scored = !!s && s.label !== "not-scored";
+  const fit: CardFit = v.needsChoice ? "pick" : v.fit;
+  const reason = v.fit === "classic" ? CLASSIC_REASON : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
+  return {
+    no: n.index + 1,
+    total: state.analysis!.nights.length,
+    city: city(),
+    title: v.swappedFrom ? v.themeLabel : n.theme,
+    dateLine: `${formatDate(n.date)} · ${n.weekday}`,
+    rows: scored ? s.entities.map((e) => ({ name: e.name, type: e.type, affinity: e.affinity })) : [],
+    index: scored ? s.index : null,
+    fit,
+    reason,
+  };
 }
 
-function whyBody(index: number): HTMLElement[] {
+function openCard(index: number, source: HTMLElement): void {
+  showNumbers = false;
+  recheckMessage = "";
+  const build = (): HTMLElement => {
+    const v = viewOf(state.analysis!.nights[index]!);
+    return makeCard(specOf(v), { back: backOf(v), inert: true });
+  };
+  openWhy({
+    index,
+    source,
+    card: build,
+    repaint: (card) => {
+      const v = viewOf(state.analysis!.nights[index]!);
+      repaintCard(card, specOf(v), { back: backOf(v) });
+    },
+    info: () => whyInfo(index),
+  });
+}
+
+function whyInfo(index: number): Child {
   const a = state.analysis!;
   const v = viewOf(a.nights[index]!);
   const n = v.night;
-  const out: HTMLElement[] = [h("div", null, h("p", { class: "tile-theme", style: "margin-bottom:8px" }, n.theme), badge(v.fit), n.locked ? h("p", { class: "small", style: "margin-top:8px" }, "This night is locked. It will not be swapped.") : null)];
-
+  const title = v.swappedFrom ? v.themeLabel : n.theme;
+  const fit: CardFit = v.needsChoice ? "pick" : v.fit;
+  const out: Child[] = [
+    h("div", { class: "eyebrow" }, `No. ${String(n.index + 1).padStart(2, "0")} / ${String(a.nights.length).padStart(2, "0")} · ${n.weekday} ${formatDate(n.date)}${n.locked ? " · Locked" : ""}`),
+    h("h2", { id: "why-title" }, title),
+    h("div", null, fitChip(fit), n.locked ? h("p", { class: "small", style: "margin-top:8px" }, "This night is locked. It will not be swapped.") : null),
+  ];
   if (v.swappedFrom) out.push(h("p", { class: "panel-box" }, `Swapped from ${v.swappedFrom}.`));
 
   if (v.fit === "classic") {
@@ -140,7 +265,7 @@ function whyBody(index: number): HTMLElement[] {
     return out;
   }
   if (v.needsChoice) {
-    out.push(h("p", { class: "panel-box" }, `"${n.theme}" fits more than one theme (${n.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}). Close this panel and pick one on the magnet.`));
+    out.push(h("p", { class: "panel-box" }, `"${n.theme}" fits more than one theme (${n.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}). Close this panel and pick one on the deck.`));
     return out;
   }
   if (!v.themeId || !v.score) {
@@ -152,14 +277,17 @@ function whyBody(index: number): HTMLElement[] {
   if (s.label === "not-scored") {
     out.push(h("p", { class: "panel-box" }, s.reason ?? "Not scored."));
   } else {
-    out.push(h("div", { class: "panel-box" }, h("p", null, marketLevelSentence(s.marketMeanZ)), h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label))));
+    out.push(
+      h("p", { class: "why-index" }, h("b", null, `Index ${fmt(s.index ?? 0)}.`), ` ${FIT_NAME[fit]}.`),
+      h("div", { class: "panel-box" }, h("p", null, marketLevelSentence(s.marketMeanZ)), h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label))),
+    );
   }
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${e.name} (${e.type.replace("_", " ")})`)))),
     h("p", { class: "small" }, METHOD_WORDS),
   );
 
-  const toggle = h("button", { type: "button", class: "toggle", "aria-expanded": String(showNumbers), "data-keep": "numbers", onclick: () => { showNumbers = !showNumbers; refreshDrawer(); } }, icon("caretDown"), showNumbers ? "Hide the numbers" : "Show the numbers");
+  const toggle = h("button", { type: "button", class: "toggle", "aria-expanded": String(showNumbers), "data-keep": "numbers", onclick: () => { showNumbers = !showNumbers; refreshWhy(); } }, icon("caretDown"), showNumbers ? "Hide the numbers" : "Show the numbers");
   out.push(toggle);
   if (showNumbers) {
     out.push(
@@ -169,7 +297,7 @@ function whyBody(index: number): HTMLElement[] {
         h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, e.name), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(4))])),
         h(
           "dl",
-          { class: "kv", style: "border-top:1px solid var(--line);padding-top:8px" },
+          { class: "kv kv--sum" },
           h("dt", null, "This market's bundle score (mean)"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
           h("dt", null, `Typical ballpark market (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
           h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
@@ -184,7 +312,6 @@ function whyBody(index: number): HTMLElement[] {
   }
 
   out.push(h("p", { class: "small", "data-testid": "why-footer" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See The Study")));
-  // Re-check live
   const caps = a.caps;
   const disabled = caps.recheckDisabled || recheckBusy;
   out.push(
@@ -195,11 +322,11 @@ function whyBody(index: number): HTMLElement[] {
       h(
         "button",
         {
-          type: "button", class: "btn btn--small", "data-testid": "recheck", "data-keep": "recheck", disabled: disabled ? "" : null,
+          type: "button", class: "btn gold sm", "data-testid": "recheck", "data-keep": "recheck", disabled: disabled ? "" : null,
           onclick: async () => {
             recheckBusy = true;
             recheckMessage = "Asking Qloo now...";
-            refreshDrawer();
+            refreshWhy();
             try {
               const r = await recheckTheme(v.themeId!);
               rechecked[v.themeId!] = new Date().toISOString();
@@ -208,7 +335,7 @@ function whyBody(index: number): HTMLElement[] {
               recheckMessage = err instanceof ApiFailure ? err.message : "Re-check failed. Try again.";
             }
             recheckBusy = false;
-            refreshDrawer();
+            refreshWhy();
             document.querySelector('[data-testid="recheck-message"]')?.scrollIntoView({ block: "nearest" });
             window.dispatchEvent(new HashChangeEvent("hashchange"));
           },
@@ -223,4 +350,3 @@ function whyBody(index: number): HTMLElement[] {
   return out;
 }
 
-export { closeDrawer };

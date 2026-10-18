@@ -1,14 +1,24 @@
-import { themeById } from "../../app/themes/library";
-import { vsAverage } from "../../app/score";
-import { syntheticBanner, tile, openDrawer } from "../components";
-import { h } from "../dom";
-import { ensureProposals, navigate } from "../flow";
-import { icon } from "../icons";
-import { state, ui, viewOf, approvedSwaps, effective, type ShownProposal } from "../store";
 import { shortDate } from "../../app/dates";
+import { vsAverage } from "../../app/score";
+import { themeById } from "../../app/themes/library";
+import { openDrawer, syntheticBanner } from "../components";
+import { h, type Child } from "../dom";
+import { ensureProposals, navigate } from "../flow";
+import { makeCard, setFlip, specForSwap, specOf, flipper, type CardSpec } from "../foil/cards";
+import { onCleanup, onMount, onResize, routeContext } from "../foil/lifecycle";
+import { fmt, gsap, reduced, sleep, tween } from "../foil/motion";
+import { packEl } from "../foil/pack";
+import { setTally, tally } from "../foil/tally";
+import { icon } from "../icons";
+import { approvedSwaps, effective, state, ui, viewOf, type ShownProposal } from "../store";
 
 const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hashchange"));
 const label = (id: string): string => themeById(id)?.label ?? id;
+const ix = (z: number | null): string => (z === null ? "n/a" : fmt(z));
+const TYPE_WORDS: Record<string, string> = { tv_show: "TV show", movie: "movie", artist: "artist", book: "book", brand: "brand" };
+
+/** Where the carousel is, kept across redraws so a re-render never tears the pack again. */
+const stage = { forPropose: null as object | null, opened: false, cur: 0 };
 
 export function fixView(): HTMLElement {
   const a = state.analysis;
@@ -19,86 +29,514 @@ export function fixView(): HTMLElement {
   if (!state.propose && !ui.proposeError) {
     void ensureProposals();
     return h(
-      "div",
-      { "aria-busy": "true" },
-      h("div", { class: "page-head" }, h("h1", { tabindex: "-1" }, "Working out the fixes"), h("p", { class: "lede", role: "status" }, "Checking each swap against your locks, dates and audience.")),
-      h("div", { class: "proposals" }, Array.from({ length: 3 }, () => h("div", { class: "skeleton", style: "min-height:180px" }))),
+      "section",
+      { class: "fix", "aria-busy": "true" },
+      h(
+        "div",
+        { class: "wrap" },
+        h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Scene 2 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Working out ", h("em", null, "the fixes")), h("p", { class: "lede", role: "status" }, "Checking each swap against your locks, dates and audience."))),
+        h("div", { class: "fix-grid" }, h("div", { class: "stage2" }, h("div", { class: "pack-wrap" }, packEl("div", "", "swaps · sealing"))), h("aside", { class: "agent" }, h("div", { class: "ag-h" }, h("i"), "The agent"), h("div", { class: "skeleton", style: "min-height:160px;margin-top:12px" }))),
+      ),
     );
   }
   if (ui.proposeError || !state.propose) {
-    return h("div", { class: "form" }, h("h1", { tabindex: "-1" }, "That did not work"), h("p", { class: "error", role: "alert" }, ui.proposeError ?? "Try again."), h("div", { class: "actions" }, h("button", { type: "button", class: "btn", onclick: () => { ui.proposeError = null; rerender(); } }, "Try again"), h("a", { class: "btn btn--quiet", href: "#/check" }, "Back to Check")));
+    return h("section", { class: "scene" }, h("div", { class: "wrap narrow" }, h("h1", { class: "h2", tabindex: "-1" }, "That did not work"), h("p", { class: "error", role: "alert" }, ui.proposeError ?? "Try again."), h("div", { class: "actions" }, h("button", { type: "button", class: "btn pri", onclick: () => { ui.proposeError = null; rerender(); } }, "Try again"), h("a", { class: "btn ghost", href: "#/check" }, "Back to Check"))));
   }
   const p = state.propose;
-  const decided = p.proposals.filter((x) => state.decisions[x.id]).length;
+  if (stage.forPropose !== p) Object.assign(stage, { forPropose: p, opened: false, cur: 0 });
+  const swaps = p.proposals;
   const synth = syntheticBanner();
+  const headTally = tally(a.nights.map(viewOf), true);
 
-  return h(
+  const doneMsg = h("p", { role: "status", "data-testid": "fix-status" });
+  const doneBar = h("div", { class: "fix-done" }, doneMsg, h("a", { class: "btn pri", href: "#/send", "data-testid": "to-send" }, "Send the revised calendar", icon("arrowRight")));
+  const paintDone = (): void => {
+    const decided = swaps.filter((x) => state.decisions[x.id]).length;
+    const ok = approvedSwaps().length;
+    doneMsg.textContent = `${ok} approved, ${decided - ok} rejected, ${swaps.length - decided} not decided (they stay as planned).`;
+  };
+  paintDone();
+
+  const stageEl = h("div", { class: "stage2", id: "stage2" });
+  const agent = h("aside", { class: "agent", id: "agent", "aria-live": "polite" }, h("div", { class: "ag-h" }, h("i"), "The agent"), h("div", { class: "ag-b", id: "steps" }));
+
+  const tools = h(
     "div",
-    null,
-    h("div", { class: "page-head" }, h("h1", { tabindex: "-1" }, "Fix: nights that lean away"), h("p", { class: "lede" }, p.proposals.length > 0 ? `${p.proposals.length} swap${p.proposals.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked nights are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.")),
-    synth,
+    { class: "fix-tools" },
+    h("button", { type: "button", class: "btn ghost sm", "data-testid": "open-trace", onclick: openTrace }, icon("list"), "Agent trace"),
+    h("label", { class: "check-l" }, h("input", { type: "checkbox", checked: state.allowDuplicates ? "" : null, "data-testid": "allow-dupes", onchange: (e: Event) => { state.allowDuplicates = (e.target as HTMLInputElement).checked; state.propose = null; state.decisions = {}; state.altChoice = {}; state.memo = null; rerender(); } }), "Allow a theme to repeat in the season"),
+  );
+
+  const lead = swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked nights are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
+  const section = h(
+    "section",
+    { class: "fix", id: "fix" },
     h(
       "div",
-      { class: "actions", style: "margin-bottom:16px" },
-      h("button", { type: "button", class: "btn btn--small", "data-testid": "open-trace", onclick: openTrace }, icon("list"), "Agent trace"),
-      h("label", { class: "small", style: "display:inline-flex;gap:8px;align-items:center;min-height:44px" }, h("input", { type: "checkbox", checked: state.allowDuplicates ? "" : null, "data-testid": "allow-dupes", onchange: (e: Event) => { state.allowDuplicates = (e.target as HTMLInputElement).checked; state.propose = null; state.decisions = {}; state.altChoice = {}; state.memo = null; rerender(); } }), "Allow a theme to repeat in the season"),
-    ),
-    p.proposals.length > 0 ? h("div", { class: "proposals" }, p.proposals.map(proposalCard)) : null,
-    p.angles.length > 0
-      ? h("section", { class: "sect", style: "margin-top:24px" }, h("h2", null, "Locked nights: keep them, add an angle"), h("div", { class: "proposals" }, p.angles.map((x) => h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text)))))
-      : null,
-    p.unfixed.length > 0
-      ? h("section", { class: "sect", style: "margin-top:24px" }, h("h2", null, "Could not fix"), h("ul", { class: "checks" }, p.unfixed.map((u) => h("li", null, `${shortDate(u.date)}: ${u.reason}`))))
-      : null,
-    h(
-      "div",
-      { class: "actions", style: "margin-top:24px" },
-      h("a", { class: "btn btn--primary", href: "#/send", "data-testid": "to-send" }, "Send the revised calendar", icon("arrowRight")),
-      h("span", { class: "small" }, `${approvedSwaps().length} approved, ${decided - approvedSwaps().length} rejected, ${p.proposals.length - decided} not decided (they stay as planned).`),
+      { class: "wrap" },
+      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Scene 2 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, "nights that lean away")), h("p", { class: "lede" }, lead)), headTally),
+      synth,
+      tools,
+      swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
+      doneBar,
+      p.angles.length > 0
+        ? h("section", { class: "sect side" }, h("h2", null, "Locked nights: keep them, add an angle"), h("div", { class: "side-list" }, p.angles.map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))))
+        : null,
+      p.unfixed.length > 0
+        ? h("section", { class: "sect side" }, h("h2", null, "Could not fix"), h("div", { class: "side-list" }, p.unfixed.map((u) => sideRow(u.index, "nofix", h("p", null, `${shortDate(u.date)}: ${u.reason}`)))))
+        : null,
     ),
   );
+
+  if (swaps.length > 0) onMount(() => new FixStage(stageEl, agent, swaps, headTally, paintDone).mount());
+  return h("div", { class: "page" }, section);
 }
 
-function proposalCard(top: ShownProposal): HTMLElement {
-  const p = effective(top);
-  const night = state.analysis!.nights[p.index]!;
-  const v = viewOf(night);
-  const d = state.decisions[p.id];
-  const set = (x: "approved" | "rejected" | undefined) => () => {
-    if (x) state.decisions[p.id] = x;
-    else delete state.decisions[p.id];
+/** A card for a night the agent could not change, beside the plain reason. */
+function sideRow(index: number, kind: "lock" | "nofix", body: HTMLElement): HTMLElement {
+  const v = viewOf(state.analysis!.nights[index]!);
+  const extra = kind === "lock" ? [sealed()] : [h("div", { class: "stamp" }, "COULD NOT", h("br"), "FIX")];
+  const c = makeCard(specOf(v), { inert: true, extra });
+  c.dataset.notilt = "1";
+  return h("div", { class: "side-row" }, h("div", { class: "side-card" }, c), body);
+}
+
+function sealed(): HTMLElement {
+  const lock = document.createElement("template");
+  lock.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="#3a2504" stroke-width="1.8"/><rect x="3" y="7" width="10" height="8" rx="1.8" fill="#3a2504"/></svg>';
+  return h("div", { class: "seal" }, h("span", null, lock.content.firstElementChild, "Sealed"));
+}
+
+interface Slide {
+  top: ShownProposal;
+  el: HTMLElement;
+  lift: HTMLElement;
+  card: HTMLElement;
+}
+
+/** The sealed foil pack, the swap carousel, the pinned date and sponsor, and the agent stream beside it. */
+class FixStage {
+  private slides: Slide[] = [];
+  private busy = false;
+  private alive = true;
+  private tok = 0;
+  private slidesEl!: HTMLElement;
+  private console!: HTMLElement;
+  private dashes!: HTMLElement;
+  private prev!: HTMLButtonElement;
+  private next!: HTMLButtonElement;
+  private carousel!: HTMLElement;
+  private readonly ctx = routeContext();
+
+  constructor(
+    private readonly root: HTMLElement,
+    private readonly agent: HTMLElement,
+    private readonly swaps: ShownProposal[],
+    private readonly headTally: HTMLElement,
+    private readonly paintDone: () => void,
+  ) {}
+
+  mount(): void {
+    onCleanup(() => {
+      this.alive = false;
+      this.tok++;
+    });
+    onResize(() => {
+      if (stage.opened) this.layout();
+    });
+    this.buildPack();
+    if (stage.opened || reduced()) {
+      stage.opened = true;
+      this.reveal(false);
+    } else this.idleAgent();
+  }
+
+  private get steps(): HTMLElement {
+    return this.agent.querySelector<HTMLElement>("#steps")!;
+  }
+
+  // ----- the pack -----
+
+  private buildPack(): void {
+    const n = this.swaps.length;
+    const wrap = h("div", { class: "pack-wrap", id: "packWrap" });
+    const pack = packEl("button", `Open the pack: ${n} swap${n === 1 ? "" : "s"}`, `${n} new card${n === 1 ? "" : "s"} · sealed`);
+    const hint = h("p", { class: "pack-hint" }, `The agent has ${n} swap${n === 1 ? "" : "s"} ready. Tap the pack to tear it open.`);
+    const skip = h("button", { type: "button", class: "btn ghost sm", "data-testid": "skip-pack", onclick: () => this.open(false) }, "Skip the tearing");
+    wrap.append(pack, hint, skip);
+    pack.addEventListener("click", () => this.open(true));
+    this.root.replaceChildren(wrap);
+  }
+
+  private open(animate: boolean): void {
+    if (stage.opened) return;
+    stage.opened = true;
+    const wrap = this.root.querySelector<HTMLElement>("#packWrap")!;
+    const pk = wrap.querySelector<HTMLElement>(".pack")!;
+    wrap.querySelectorAll("button").forEach((b) => b.setAttribute("disabled", ""));
+    if (!animate || reduced()) {
+      this.reveal(true);
+      return;
+    }
+    const strip = pk.querySelector<HTMLElement>(".pk-strip")!, burst = pk.querySelector<HTMLElement>(".pk-burst")!;
+    this.ctx.add(() => {
+      gsap
+        .timeline()
+        .to(pk, { rotation: 2, x: 3, duration: 0.07, repeat: 7, yoyo: true, ease: "none" }, 0)
+        .set(pk, { animation: "none" }, 0)
+        .to(strip, { rotation: -26, x: "38%", y: -120, opacity: 0, transformOrigin: "0% 100%", duration: 0.8, ease: "power2.in" }, 0.5)
+        .add(() => pk.classList.add("torn"), 0.52)
+        .fromTo(burst, { scale: 0.2, opacity: 1 }, { scale: 1.1, opacity: 0, duration: 1, ease: "power2.out" }, 0.55)
+        .to(pk, { y: 70, scale: 0.88, opacity: 0, duration: 0.7, ease: "power2.in" }, 1.0)
+        .add(() => this.reveal(true), 1.25);
+    });
+  }
+
+  // ----- the carousel -----
+
+  private reveal(focus: boolean): void {
+    const car = h("div", { class: "carousel", id: "carousel", role: "region", "aria-label": "Swaps proposed by the agent", "aria-roledescription": "carousel" });
+    this.carousel = car;
+    this.slidesEl = h("div", { class: "slides", id: "slides" });
+    this.console = h("div", { class: "console" });
+    this.dashes = h("div", { class: "dashes" });
+    this.prev = h("button", { type: "button", class: "sq", id: "prev", "aria-label": "Previous swap", onclick: () => this.show(stage.cur - 1) }, icon("arrowLeft")) as HTMLButtonElement;
+    this.next = h("button", { type: "button", class: "sq", id: "next", "aria-label": "Next swap", onclick: () => this.show(stage.cur + 1) }, icon("arrowRight")) as HTMLButtonElement;
+    car.append(this.slidesEl, this.console, h("div", { class: "cnav" }, this.prev, h("span", { class: "cl" }, "Previous"), this.dashes, h("span", { class: "cl" }, "Next"), this.next));
+    this.root.replaceChildren(car);
+    this.buildSlides();
+    this.bindInput();
+    this.layout();
+    this.show(stage.cur, true);
+    if (focus) this.console.querySelector<HTMLElement>("[data-focus]")?.focus({ preventScroll: true });
+    if (!reduced() && focus) {
+      const cw = this.slides[0]?.el.offsetWidth ?? 230;
+      this.ctx.add(() => {
+        this.slides.forEach((s, j) => {
+          const o = j - stage.cur;
+          if (Math.abs(o) > 1) return;
+          gsap.from(s.lift, { x: -(o * (cw * 0.86 + 22)), y: 60, scale: 0.3, rotation: (o || 1) * -16, opacity: 0, duration: 0.95, delay: 0.08 + Math.abs(o) * 0.14, ease: "back.out(1.3)", clearProps: "transform,opacity" });
+        });
+      });
+    }
+  }
+
+  private specs(top: ShownProposal): { front: CardSpec; alt: CardSpec } {
+    const p = effective(top);
+    const base = specOf(viewOf(state.analysis!.nights[p.index]!));
+    return { front: specForSwap(base, p.fromThemeId, label(p.fromThemeId), p.from.label), alt: specForSwap(base, p.toThemeId, label(p.toThemeId), p.to.label) };
+  }
+
+  private buildSlides(): void {
+    this.slides = this.swaps.map((top, j) => {
+      const { front, alt } = this.specs(top);
+      const card = makeCard(front, { alt, inert: true });
+      card.dataset.notilt = "1";
+      const lift = h("div", { class: "lift" }, card);
+      const el = h("div", { class: "slide", "data-j": j }, lift);
+      this.slidesEl.append(el);
+      if (state.decisions[top.id] === "approved") setFlip(card, 180);
+      return { top, el, lift, card };
+    });
+    this.dashes.replaceChildren(...this.slides.map((s, j) => h("button", { type: "button", class: "dash", "aria-label": `Show swap ${j + 1} of ${this.slides.length}: ${shortDate(s.top.date)}`, "data-j": j, onclick: () => this.show(j) })));
+  }
+
+  private bindInput(): void {
+    let sx: number | null = null;
+    this.slidesEl.addEventListener("pointerdown", (e) => {
+      sx = e.clientX;
+    });
+    this.slidesEl.addEventListener("pointerup", (e) => {
+      if (sx === null) return;
+      const dx = e.clientX - sx;
+      sx = null;
+      if (Math.abs(dx) > 50) this.show(stage.cur + (dx < 0 ? 1 : -1));
+    });
+    this.slidesEl.addEventListener("pointercancel", () => {
+      sx = null;
+    });
+    this.slidesEl.addEventListener("click", (e) => {
+      const s = (e.target as Element).closest<HTMLElement>(".slide");
+      if (s && !s.classList.contains("cur") && Math.abs(Number(s.dataset.j) - stage.cur) === 1) this.show(Number(s.dataset.j));
+    });
+    this.carousel.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowLeft") this.show(stage.cur - 1);
+      else if (e.key === "ArrowRight") this.show(stage.cur + 1);
+    });
+  }
+
+  private layout(): void {
+    const cw = this.slides[0]?.el.offsetWidth || 230;
+    this.slides.forEach((s, j) => {
+      const o = j - stage.cur, a = Math.abs(o);
+      let x = 0, sc = 1, ry = 0, z = 40, op = 1;
+      if (a === 1) {
+        x = Math.sign(o) * (cw * 0.86 + 22);
+        sc = 0.72;
+        ry = -Math.sign(o) * 24;
+        z = -40;
+      } else if (a > 1) {
+        x = Math.sign(o) * (cw * 1.3 + 22);
+        sc = 0.5;
+        ry = -Math.sign(o) * 30;
+        z = -120;
+        op = 0;
+      }
+      s.el.style.transform = `translateX(${x}px) translateZ(${z}px) rotateY(${ry}deg) scale(${sc})`;
+      s.el.style.opacity = String(op);
+      s.el.style.zIndex = String(10 - a);
+      s.el.classList.toggle("cur", a === 0);
+      s.el.classList.toggle("dim", a === 1);
+      s.el.style.pointerEvents = a > 1 ? "none" : "auto";
+      s.el.setAttribute("aria-hidden", a === 0 ? "false" : "true");
+    });
+    this.dashes.querySelectorAll<HTMLElement>(".dash").forEach((d, j) => {
+      d.classList.toggle("on", j === stage.cur);
+      d.classList.toggle("done", !!state.decisions[this.slides[j]!.top.id]);
+      d.setAttribute("aria-current", j === stage.cur ? "true" : "false");
+    });
+    this.prev.disabled = stage.cur === 0;
+    this.next.disabled = stage.cur === this.slides.length - 1;
+  }
+
+  private show(j: number, instant = false): void {
+    stage.cur = Math.max(0, Math.min(this.slides.length - 1, j));
+    this.layout();
+    this.paintConsole();
+    void this.paintAgent(instant);
+  }
+
+  // ----- what is shown for the current swap -----
+
+  private paintConsole(): void {
+    const s = this.slides[stage.cur]!;
+    const top = s.top;
+    const p = effective(top);
+    const night = state.analysis!.nights[p.index]!;
+    const d = state.decisions[p.id];
+    const cited = `${label(p.toThemeId)}: ${vsAverage(p.to.z)} · ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}`;
+    const shown = d === "approved" ? p.to.z : p.from.z;
+    const sub = d === "approved" ? `Approved. Was ${ix(p.from.z)}.` : d === "rejected" ? "Rejected. Kept as planned." : `now ${ix(p.from.z)} → proposed ${ix(p.to.z)}`;
+
+    const takenElsewhere = new Set(this.swaps.filter((o) => o.id !== p.id).map((o) => effective(o).toThemeId));
+    const pool = [top.toThemeId, ...top.alternates.map((a) => a.toThemeId)].filter((id) => id !== p.toThemeId);
+    const chips =
+      d === undefined && top.alternates.length > 0
+        ? h("div", { class: "alts", role: "group", "aria-label": "Other themes that pass the same checks" }, h("span", { class: "small" }, "Or:"), pool.map((id) => {
+            const blocked = !state.allowDuplicates && takenElsewhere.has(id);
+            return h("button", { type: "button", class: "chip-btn", "data-testid": "alt", disabled: blocked ? "" : null, title: blocked ? "Already chosen for another night" : null, onclick: () => this.switchAlt(top, id) }, label(id));
+          }))
+        : null;
+
+    const nextOpen = this.nextUndecided();
+    const acts: Child =
+      d === undefined
+        ? [
+            h("button", { type: "button", class: "btn gold", "data-testid": "approve", "data-focus": "", onclick: () => this.approve(s) }, "Approve swap"),
+            h("button", { type: "button", class: "btn ghost", "data-testid": "reject", onclick: () => this.reject(s) }, "Reject"),
+          ]
+        : [
+            h("span", { class: "decision" }, icon(d === "approved" ? "check" : "x"), d === "approved" ? `Approved: ${label(p.toThemeId)} now holds ${shortDate(p.date)}${night.sponsor ? `. ${night.sponsor} stays` : ""}.` : "Rejected, stays as planned"),
+            h("button", { type: "button", class: "lnk", "data-focus": "", onclick: () => this.undo(s) }, "Undo"),
+            nextOpen >= 0 ? h("button", { type: "button", class: "btn pri sm", "data-testid": "next-swap", onclick: () => this.show(nextOpen) }, "Next swap", icon("arrowRight")) : null,
+          ];
+
+    this.console.replaceChildren(
+      h(
+        "div",
+        { class: "meta" },
+        h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDate(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Pinned: never moves")),
+        h("div", { class: "idx" }, h("span", { class: "k" }, "Index"), h("span", { class: `v ${(shown ?? 0) < 0 ? "neg" : "pos"}`, id: "idxV" }, ix(shown)), h("div", { class: "pp" }, sub)),
+      ),
+      h(
+        "div",
+        { class: "swap-card", "data-proposal": p.id, "data-decision": d ?? "open", "data-testid": "proposal" },
+        h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), label(p.toThemeId)),
+        h("p", { class: "swap-why" }, p.why),
+        h("p", { class: "small", "data-testid": "cited" }, cited, p.whySource === "model" ? ". Reason written by the model from the computed facts." : ""),
+        chips,
+      ),
+      h("div", { class: "acts", role: "group", "aria-label": `Decide the swap for ${shortDate(p.date)}` }, acts),
+    );
+  }
+
+  private nextUndecided(): number {
+    const after = this.slides.findIndex((s, k) => k > stage.cur && !state.decisions[s.top.id]);
+    return after >= 0 ? after : this.slides.findIndex((s) => !state.decisions[s.top.id] && s !== this.slides[stage.cur]);
+  }
+
+  private switchAlt(top: ShownProposal, id: string): void {
+    state.altChoice[top.id] = id;
+    const s = this.slides.find((x) => x.top.id === top.id)!;
+    const { alt } = this.specs(top);
+    const back = makeCard(alt, { inert: true });
+    s.card.querySelector(".face.alt")?.replaceWith(relabel(back.querySelector<HTMLElement>(".face.front")!));
+    this.paintConsole();
+    void this.paintAgent(true);
+    this.console.querySelector<HTMLElement>('[data-testid="alt"]')?.focus({ preventScroll: true });
+  }
+
+  private repaintTally(): void {
+    setTally(this.headTally, state.analysis!.nights.map(viewOf));
+    this.paintDone();
+  }
+
+  private approve(s: Slide): void {
+    if (this.busy) return;
+    const id = s.top.id;
+    state.decisions[id] = "approved";
     state.memo = null;
-    rerender();
-    document.querySelector<HTMLElement>(`[data-proposal="${p.id}"] [data-focus]`)?.focus();
-  };
-  // Every option is [top pick, ...alternates]; all passed the same checks. Another proposal's current choice is off limits unless repeats are allowed.
-  const takenElsewhere = new Set(state.propose!.proposals.filter((o) => o.id !== p.id).map((o) => effective(o).toThemeId));
-  const pool = [top.toThemeId, ...top.alternates.map((a) => a.toThemeId)].filter((id) => id !== p.toThemeId);
-  const chips = d === undefined && top.alternates.length > 0
-    ? h("div", { class: "alts", role: "group", "aria-label": "Other themes that pass the same checks" }, h("span", { class: "small" }, "Or:"), pool.map((id) => {
-      const blocked = !state.allowDuplicates && takenElsewhere.has(id);
-      return h("button", { type: "button", class: "chip-btn", "data-testid": "alt", disabled: blocked ? "" : null, title: blocked ? "Already chosen for another night" : null, onclick: () => { state.altChoice[top.id] = id; rerender(); document.querySelector<HTMLElement>(`[data-proposal="${top.id}"] [data-testid="alt"]`)?.focus(); } }, label(id));
-    }))
-    : null;
-  return h(
-    "article",
-    { class: "proposal", "data-proposal": p.id, "data-decision": d ?? "open", "data-testid": "proposal" },
-    tile(v),
-    h(
-      "div",
-      { class: "proposal-body" },
-      h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), label(p.toThemeId)),
-      h("p", null, p.why),
-      h("p", { class: "small", "data-testid": "cited" }, `${label(p.toThemeId)}: ${vsAverage(p.to.z)} · ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}`, p.whySource === "model" ? ". Reason written by the model from the computed facts." : ""),
-      chips,
-      h("details", null, h("summary", { class: "small" }, "Checks passed"), h("ul", { class: "checks" }, p.checks.map((c) => h("li", null, c)))),
-      d === "approved"
-        ? h("div", { class: "actions" }, h("span", { class: "decision" }, icon("check"), "Approved"), h("button", { type: "button", class: "btn btn--quiet btn--small", "data-focus": "", onclick: set(undefined) }, "Undo"))
-        : d === "rejected"
-          ? h("div", { class: "actions" }, h("span", { class: "decision" }, icon("x"), "Rejected, stays as planned"), h("button", { type: "button", class: "btn btn--quiet btn--small", "data-focus": "", onclick: set(undefined) }, "Undo"))
-          : h("div", { class: "actions" }, h("button", { type: "button", class: "btn btn--small", "data-testid": "approve", "data-focus": "", onclick: set("approved") }, icon("check"), "Approve"), h("button", { type: "button", class: "btn btn--quiet btn--small", "data-testid": "reject", onclick: set("rejected") }, "Reject")),
-    ),
-  );
+    this.repaintTally();
+    this.layout();
+    if (reduced()) {
+      setFlip(s.card, 180);
+      this.paintConsole();
+      void this.paintAgent(true);
+      this.refocus();
+      return;
+    }
+    this.busy = true;
+    const p = effective(s.top);
+    this.console.querySelector(".acts")!.replaceChildren(h("span", { class: "note", role: "status" }, "Playing the swap…"));
+    this.ctx.add(() => {
+      gsap
+        .timeline({
+          onComplete: () => {
+            s.card.classList.add("landed");
+            sparks(s.card);
+            this.busy = false;
+            if (!this.alive) return;
+            this.paintConsole();
+            void this.paintAgent(true);
+            this.refocus();
+          },
+        })
+        .to(s.lift, { y: -34, scale: 1.12, duration: 0.38, ease: "power2.out" }, 0)
+        .to(flipper(s.card), { rotationY: 180, duration: 0.95, ease: "power2.inOut" }, 0.05)
+        .add(() => {
+          const v = this.console.querySelector<HTMLElement>("#idxV");
+          if (v) tween(p.from.z ?? 0, p.to.z ?? 0, 1100, (x) => {
+            v.textContent = fmt(x);
+            v.className = `v ${x < 0 ? "neg" : "pos"}`;
+          });
+        }, 0.5)
+        .to(s.lift, { y: 0, scale: 1, duration: 0.55, ease: "back.out(1.8)" }, 0.5);
+    });
+  }
+
+  private reject(s: Slide): void {
+    state.decisions[s.top.id] = "rejected";
+    state.memo = null;
+    this.repaintTally();
+    this.layout();
+    if (!reduced()) {
+      this.ctx.add(() => {
+        gsap.fromTo(s.card, { x: -4 }, { x: 0, duration: 0.5, ease: "elastic.out(1,0.3)" });
+      });
+    }
+    this.paintConsole();
+    void this.paintAgent(true);
+    this.refocus();
+  }
+
+  private undo(s: Slide): void {
+    if (this.busy) return;
+    const was = state.decisions[s.top.id];
+    delete state.decisions[s.top.id];
+    state.memo = null;
+    this.repaintTally();
+    this.layout();
+    if (was === "approved") {
+      if (reduced()) setFlip(s.card, 0);
+      else this.ctx.add(() => gsap.to(flipper(s.card), { rotationY: 0, duration: 0.6, ease: "power2.inOut" }));
+    }
+    this.paintConsole();
+    void this.paintAgent(true);
+    this.refocus();
+  }
+
+  private refocus(): void {
+    this.console.querySelector<HTMLElement>("[data-focus]")?.focus({ preventScroll: true });
+  }
+
+  // ----- the agent -----
+
+  private add(html: Child[], instant: boolean): HTMLElement {
+    const d = h("div", { class: "st" }, ...html);
+    if (instant || reduced()) d.style.animation = "none";
+    this.steps.append(d);
+    return d;
+  }
+
+  private qloo(themeId: string, kicker: string, instant: boolean): HTMLElement {
+    const th = state.analysis?.themes[themeId];
+    const items: Child[] = (th?.entities ?? []).flatMap((e, i) => [i > 0 ? " · " : null, h("b", null, e.name), ` (${TYPE_WORDS[e.type] ?? e.type.replace("_", " ")}) `, h("i", null, e.affinity === null ? "no reading" : e.affinity.toFixed(2))]);
+    const index = th?.index ?? null;
+    return this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, kicker), h("div", { class: "m" }, items, index === null ? null : h("span", { class: `ix ${index < 0 ? "neg" : "pos"}` }, `→ index ${fmt(index)}`)))], instant);
+  }
+
+  private idleAgent(): void {
+    const a = state.analysis!, p = state.propose!;
+    this.steps.replaceChildren();
+    this.add([h("div", { class: "ic" }, "A"), h("div", null, h("div", { class: "k" }, "Ready"), h("div", { class: "m" }, `The agent compared all ${a.nights.length} nights with this market's own taste level and found `, h("b", null, `${p.proposals.length} swap${p.proposals.length === 1 ? "" : "s"}`), `, ${p.angles.length} sponsor idea${p.angles.length === 1 ? "" : "s"} and ${p.unfixed.length} night${p.unfixed.length === 1 ? "" : "s"} it could not fix.`))], true);
+    this.add([h("div", { class: "ic" }, "★"), h("div", null, h("div", { class: "k" }, "Next"), h("div", { class: "m" }, "Open the pack. Each swap keeps its ", h("b", null, "date and sponsor"), ". You decide, one at a time."))], true);
+  }
+
+  private async paintAgent(instant: boolean): Promise<void> {
+    const tok = ++this.tok;
+    const s = this.slides[stage.cur]!;
+    const p = effective(s.top);
+    const night = state.analysis!.nights[p.index]!;
+    const d = state.decisions[p.id];
+    this.steps.replaceChildren();
+    const quick = instant || reduced();
+    const wait = (ms: number): Promise<void> => (quick ? Promise.resolve() : sleep(ms));
+    const live = (): boolean => this.alive && tok === this.tok;
+    this.qloo(p.fromThemeId, "Qloo lookup · the weak night", quick);
+    await wait(520);
+    if (!live()) return;
+    this.qloo(p.toThemeId, "Qloo lookup · the better fit", quick);
+    await wait(520);
+    if (!live()) return;
+    const items = p.checks.map((c) => h("li", null, c));
+    const rt = h("b", { class: "rt" }, `Checking ${p.checks.length} rule${p.checks.length === 1 ? "" : "s"}`);
+    const ic = h("div", { class: "ic" }, "R");
+    this.add([ic, h("div", null, h("div", { class: "k" }, "Rules"), h("div", { class: "m" }, rt, h("ul", { class: "ck" }, items)))], quick);
+    for (const li of items) {
+      await wait(300);
+      if (!live()) return;
+      li.classList.add("on");
+    }
+    items.forEach((l) => l.classList.add("on"));
+    rt.textContent = `${p.checks.length} of ${p.checks.length} checks passed`;
+    ic.classList.add("ok");
+    ic.textContent = "✓";
+    await wait(300);
+    if (!live()) return;
+    if (d === "approved") this.add([h("div", { class: "ic ok" }, "✓"), h("div", null, h("div", { class: "k" }, "Approved"), h("div", { class: "m" }, h("b", null, label(p.toThemeId)), ` lands on ${shortDate(p.date)}. ${night.sponsor ? `${night.sponsor} stays.` : "The date stays."}`))], quick);
+    else if (d === "rejected") this.add([h("div", { class: "ic" }, "–"), h("div", null, h("div", { class: "k" }, "Rejected"), h("div", { class: "m" }, "Kept as planned. You can still approve it."))], quick);
+    else this.add([h("div", { class: "ic" }, "…"), h("div", { class: "wait" }, h("div", { class: "k" }, "Waiting for your approval"), h("div", { class: "m" }, "Approve the swap or reject it", h("span", { class: "dots" }, h("span", null, "."), h("span", null, "."), h("span", null, "."))))], quick);
+    this.steps.append(h("div", { class: "why" }, p.why));
+  }
+}
+
+function relabel(face: HTMLElement): HTMLElement {
+  face.classList.remove("front");
+  face.classList.add("alt");
+  return face;
+}
+
+function sparks(card: HTMLElement): void {
+  if (reduced()) return;
+  const r = card.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const cols = ["#ffd97a", "#fff", "#ff8fb0", "#8fe9ff"];
+  for (let i = 0; i < 22; i++) {
+    const s = h("i", { class: "spark", "aria-hidden": "true", style: `left:${cx}px;top:${cy}px;background:${cols[i % 4]}` });
+    document.body.append(s);
+    const a = Math.random() * 6.28, d = 80 + Math.random() * 130;
+    gsap.to(s, { x: Math.cos(a) * d, y: Math.sin(a) * d + 30, opacity: 0, scale: 0.2, duration: 0.9 + Math.random() * 0.5, ease: "power2.out", onComplete: () => s.remove() });
+  }
 }
 
 export function openTrace(): void {
@@ -114,3 +552,4 @@ export function openTrace(): void {
     ),
   ]);
 }
+

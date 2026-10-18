@@ -12,6 +12,7 @@ import info from "@phosphor-icons/core/assets/regular/info.svg?raw";
 import list from "@phosphor-icons/core/assets/regular/list-magnifying-glass.svg?raw";
 import lock from "@phosphor-icons/core/assets/regular/lock-simple.svg?raw";
 import search from "@phosphor-icons/core/assets/regular/magnifying-glass.svg?raw";
+import pin from "@phosphor-icons/core/assets/regular/push-pin.svg?raw";
 import printer from "@phosphor-icons/core/assets/regular/printer.svg?raw";
 import prohibit from "@phosphor-icons/core/assets/regular/prohibit.svg?raw";
 import question from "@phosphor-icons/core/assets/regular/question.svg?raw";
@@ -24,7 +25,7 @@ import warning from "@phosphor-icons/core/assets/regular/warning.svg?raw";
 import x from "@phosphor-icons/core/assets/regular/x.svg?raw";
 import { h } from "./dom";
 
-const ICONS = { arrowLeft, arrowRight, swap, caretDown, check, clock, download, equals, flask, info, list, lock, search, printer, prohibit, question, refresh, star, trendDown, trendUp, upload, warning, x };
+const ICONS = { arrowLeft, arrowRight, swap, caretDown, check, clock, download, equals, flask, info, list, lock, search, pin, printer, prohibit, question, refresh, star, trendDown, trendUp, upload, warning, x };
 export type IconName = keyof typeof ICONS;
 
 export function icon(name: IconName): HTMLSpanElement {
