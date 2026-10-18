@@ -25,7 +25,7 @@ for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) {
     await shot(page, info, `check-${id}`);
     const summary = await page.getByTestId("summary").innerText();
     await page.getByTestId("to-fix").click();
-    await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible({ timeout: 30_000 }); // the live agent can take a while to propose
     const skip = page.getByTestId("skip-pack");
     await expect(skip.or(page.getByText("Nothing needs swapping.")).first()).toBeVisible({ timeout: 30_000 });
     await shot(page, info, `fix-pack-${id}`);
@@ -60,7 +60,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.screenshot({ path: `test-results/screens-real/${info.project.name}-why-viewport.png` });
   await page.keyboard.press("Escape");
   await page.getByTestId("to-fix").click();
-  await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible({ timeout: 30_000 }); // the live agent can take a while to propose
   const pack = page.getByRole("button", { name: /Open the pack/ });
   await expect(pack.or(page.getByText("Nothing needs swapping."))).toBeVisible({ timeout: 30_000 });
   await noSideScroll(page);
