@@ -49,7 +49,7 @@ h1.h2,h2.h2{overflow-wrap:anywhere}
   .hero-actions .btn{padding:12px 18px}
   .tag{max-width:36ch}
 }
-@media (max-height:760px) and (min-width:821px){.hero-lede{margin-top:8px}.tag{display:none}}
+@media (max-height:760px) and (min-width:821px){.hero-lede{margin-top:8px}}
 .btn{min-height:44px;text-decoration:none;cursor:pointer}
 .btn.sm{min-height:44px}
 .btn.dark{color:#14183e;border-color:rgba(20,24,62,.45)}
@@ -234,7 +234,7 @@ input[type=file]{font-size:13px;color:#2a1f10;max-width:100%}
 .send .h2 em{font-size:1em}
 .send .notice{max-width:520px}
 .memo-h{font-family:var(--slab);font-weight:400;font-size:clamp(18px,1.8vw,22px);color:#fff}
-.memo-sheet{position:relative;background:linear-gradient(#fbf3de,#f1e5c4);color:#2a1f10;padding:22px 24px 20px;border-radius:3px;transform:rotate(-.6deg);box-shadow:0 24px 50px rgba(0,0,0,.55);font-size:13.5px;line-height:1.55;max-width:600px;width:100%;overflow-x:auto}
+.memo-sheet{position:relative;background:linear-gradient(#fbf3de,#f1e5c4);color:#2a1f10;padding:22px 24px 20px;border-radius:3px;transform:rotate(-.6deg);box-shadow:0 24px 50px rgba(0,0,0,.55);font-size:13.5px;line-height:1.55;max-width:600px;width:100%;overflow:hidden}
 .memo-sheet::before{content:"";position:absolute;left:50%;top:-12px;width:90px;height:24px;transform:translateX(-50%) rotate(2deg);background:rgba(240,185,74,.55);box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .memo-sheet h1{font-family:var(--slab);font-weight:400;font-size:17px;color:#16194a;letter-spacing:.03em;text-transform:uppercase;margin-bottom:8px;border-bottom:2px solid #a8382c;padding-bottom:6px;overflow-wrap:anywhere}
 .memo-sheet h2{font-family:var(--slab);font-weight:400;font-size:14px;color:#16194a;margin:14px 0 6px}
@@ -307,3 +307,65 @@ table.data .num{text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:820px){.under{margin-right:72px}.under.fin{margin-right:0}}
 .fw-art,.pack-art,.fan3{width:100%}
 .tk-city{font-size:clamp(20px,1.9vw,28px);overflow-wrap:anywhere}
+
+/* ---------- clarity pass: plain copy on solid panels, readable on phones ---------- */
+.honest{margin:0;padding:12px 16px;border-radius:12px;background:#0d1346;border:1.5px solid rgba(255,217,122,.5);color:#fff;font-size:14px;line-height:1.5;font-weight:500;text-shadow:none}
+.honest a{color:var(--gold2)}
+.hero .copy .tag.honest{max-width:54ch;margin-top:14px;padding:12px 16px;font-size:14.5px;color:#fff;background:#0d1346;text-shadow:none}
+.hero .copy .hero-lede{max-width:52ch;padding:12px 18px;font-size:16px;color:#fff;background:rgba(6,9,30,.86);border:1px solid rgba(255,217,122,.32);text-shadow:none}
+.own-link{margin-top:22px;font-size:15px;color:#e2e5f6}
+.own-link a{color:var(--gold2);font-weight:600}
+.cols{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0;font-size:13.5px;color:#2a1f10}
+.cols dt{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:700;color:#16194a}
+.cols dd{margin:0}
+.paper .btn.gold{color:#2a1a02}
+textarea::placeholder{color:#8a7a58;opacity:1}
+.deck-l .check-line{font-family:var(--slab);font-size:clamp(20px,1.9vw,25px);line-height:1.2;color:#fff;margin:0}
+.slot-note{display:flex;flex-wrap:wrap;gap:1px 8px;justify-content:center;margin:7px 2px 2px;font-size:12px;line-height:1.3;color:#e6e3f5;text-align:center;overflow-wrap:anywhere}
+.sn-lock{display:inline-flex;gap:4px;align-items:center;color:var(--gold2);font-weight:700}
+.sn-lock .icon{display:inline-flex}
+.sn-lock .icon svg{width:12px;height:12px;fill:currentColor}
+.check-note{flex:1 1 280px;font-size:13px;line-height:1.4;color:#c9cdea;max-width:60ch}
+.next-step{font-weight:600;color:#ffe9c4}
+.pinbar{flex-wrap:wrap;justify-content:center}
+.pinbar small{display:inline!important}
+.console{display:flex;flex-direction:column;gap:10px}
+.acts{position:sticky;bottom:10px;z-index:30;padding:10px 12px;border-radius:16px;background:rgba(8,11,36,.985);border:1px solid rgba(255,217,122,.35);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.acts:empty{display:none}
+.verdict{gap:14px}
+.stampv{margin:12px 12px 18px 4px;max-width:calc(100% - 20px);overflow-wrap:anywhere}
+.stamp-plain{font-size:17px;font-weight:700;color:#fff;max-width:60ch;margin:0}
+.review .lead{margin:6px 0 14px}
+body.why-open .nav{visibility:hidden}
+.bk-h,.bk-r{grid-template-columns:1fr 16cqw}
+.bk-h span:last-child{line-height:1.2}
+.dnote{font-size:13.5px;line-height:1.5}
+.dls{font-size:14px}
+
+@media (max-width:820px){
+  .hero .copy .hero-lede{font-size:14px;max-width:36ch;padding:10px 14px}
+  .hero .copy .tag.honest{font-size:14px;max-width:36ch;padding:10px 14px}
+  .copy{top:max(11%,120px)}
+}
+@media (max-width:760px){
+  .nav{padding-top:8px;padding-bottom:4px}
+  .nav .steps{gap:4px;font-size:14px;letter-spacing:.1em}
+  .nav .step{min-height:44px;min-width:44px;padding:0 12px;justify-content:center}
+  .nav .step .n{font-size:14px}
+  .nav a.step::after{bottom:5px;left:12px}
+  .nav a.step:hover::after,.nav a.step[aria-current]::after{right:12px}
+  .fix,.study,.send,.deck,.scene{padding-top:124px}
+  .send{padding-top:270px}
+  .send>#fx3{bottom:auto;height:260px}
+  .check-note{flex-basis:100%}
+  .acts{bottom:6px}
+  .nav.solid,.nav{background:rgba(5,8,24,.97)}
+}
+/* Sticky Approve/Reject needs an ancestor that clips without becoming a scroll container. */
+.fix{overflow:hidden;overflow:clip}
+.tk-city{overflow-wrap:break-word;font-size:clamp(18px,1.7vw,26px)}
+.lb{background:rgba(4,6,20,.95)}
+@media (max-width:640px){.lb{padding-top:64px}}
+.audit-line.honest{color:#fff;font-weight:500;max-width:64ch}
+.memo-scroll{overflow-x:auto}
+.nav .step{min-width:44px;justify-content:center}

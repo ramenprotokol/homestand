@@ -16,7 +16,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "rm -rf .wrangler/e2e && npx wrangler dev --local --env check --ip 127.0.0.1 --port 8788 --persist-to .wrangler/e2e",
+      command: "rm -rf .wrangler/e2e && npx wrangler dev --local --env check --var RATE_LIMIT_SCALE:10 --ip 127.0.0.1 --port 8788 --persist-to .wrangler/e2e",
       url: "http://127.0.0.1:8788/api/health",
       reuseExistingServer: false,
       timeout: 120_000,

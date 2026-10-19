@@ -8,15 +8,38 @@ export const navigate = (hash: string): void => {
   else location.hash = hash;
 };
 
-/** Step 0 to Check: parse is done by the caller; this asks the Worker to resolve, score and flag. */
-export async function startCheck(market: MarketIn, rows: CalendarRow[], parseErrors: RowError[], sampleId: string | null): Promise<void> {
-  reset();
-  Object.assign(state, { market, rows, parseErrors, sampleId });
-  ui.loading = true;
-  ui.error = null;
-  navigate("#/check");
+const CLUB_KEY = "homestand.club";
+
+interface SavedClub {
+  market: MarketIn;
+  rows: CalendarRow[];
+  parseErrors: RowError[];
+  sampleId: string | null;
+}
+
+/** The chosen club survives a reload for this tab. Storage can be missing or throw (private windows), so the app never relies on it. */
+function saveClub(c: SavedClub): void {
   try {
-    const a = await api.analyze(market, rows);
+    sessionStorage.setItem(CLUB_KEY, JSON.stringify(c));
+  } catch {
+    /* no storage: the club is simply not remembered */
+  }
+}
+
+function savedClub(): SavedClub | null {
+  try {
+    const raw = sessionStorage.getItem(CLUB_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as Partial<SavedClub>;
+    return c.market && Array.isArray(c.rows) && c.rows.length > 0 && Array.isArray(c.parseErrors) ? (c as SavedClub) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function analyzeClub(c: SavedClub): Promise<void> {
+  try {
+    const a = await api.analyze(c.market, c.rows);
     state.analysis = a;
     addTrace("Check: resolve, score, flag", a.trace);
   } catch (err) {
@@ -24,6 +47,28 @@ export async function startCheck(market: MarketIn, rows: CalendarRow[], parseErr
   }
   ui.loading = false;
   window.dispatchEvent(new HashChangeEvent("hashchange"));
+}
+
+/** Start of a visit on Check, Fix or Send with nothing in memory (a reload): pick the saved club up again and re-check it, staying on the same screen. */
+export function resumeClub(): void {
+  const c = savedClub();
+  if (!c || state.analysis || ui.loading) return;
+  reset();
+  Object.assign(state, c);
+  ui.loading = true;
+  ui.error = null;
+  void analyzeClub(c);
+}
+
+/** Step 1 of 3, Check: parse is done by the caller; this asks the Worker to resolve, score and flag. */
+export async function startCheck(market: MarketIn, rows: CalendarRow[], parseErrors: RowError[], sampleId: string | null): Promise<void> {
+  reset();
+  Object.assign(state, { market, rows, parseErrors, sampleId });
+  saveClub({ market, rows, parseErrors, sampleId });
+  ui.loading = true;
+  ui.error = null;
+  navigate("#/check");
+  await analyzeClub({ market, rows, parseErrors, sampleId });
 }
 
 export async function ensureProposals(): Promise<void> {

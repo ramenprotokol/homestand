@@ -10,7 +10,7 @@ async function noSideScroll(page: Page): Promise<void> {
 
 test("real data: start page", async ({ page }, info) => {
   await page.goto("/");
-  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 theme nights");
+  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 nights");
   await noSideScroll(page);
   await shot(page, info, "start");
 });
@@ -24,6 +24,7 @@ for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) {
     await noSideScroll(page);
     await shot(page, info, `check-${id}`);
     const summary = await page.getByTestId("summary").innerText();
+    await expect(page.getByTestId("check-result")).toHaveText(/^(None of the \d+ nights lean|\d+ of \d+ nights? leans?) away from what .+ likes\.$/);
     await page.getByTestId("to-fix").click();
     await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible({ timeout: 30_000 }); // the live agent can take a while to propose
     const skip = page.getByTestId("skip-pack");
@@ -51,7 +52,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await why.getByRole("button", { name: "Show the numbers" }).click();
   await expect(why.getByText(/Index = z - market average/)).toBeVisible();
   await expect(why).toContainText(/Compared with other ballpark markets, this market scores/);
-  await expect(why.getByTestId("why-footer")).toContainText("not an attendance predictor");
+  await expect(why.getByTestId("why-footer")).toContainText("It doesn't predict ticket sales");
   await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Result recorded/);
   await shot(page, info, "why");
   await why.getByTestId("recheck").click();
@@ -79,6 +80,8 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.getByTestId("to-send").click();
   await expect(page.getByTestId("memo")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("memo")).not.toContainText("SYNTHETIC");
+  await expect(page.getByTestId("memo")).toContainText(/Homestand checked \d+ theme nights for Albuquerque, NM sample club against local taste data from Qloo and suggests (\d+ swaps?|no swaps)\./);
+  await expect(page.getByTestId("memo")).not.toContainText("Bundle score");
   await shot(page, info, "send");
   await page.getByTestId("to-study").click();
   await expect(page.getByText("Make your call first")).toBeVisible();
@@ -86,11 +89,22 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await shot(page, info, "study-call");
   await page.getByTestId("call-not-sure").click();
   await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
-  await expect(page.getByTestId("audit-line")).toContainText("H1 did not pass, so Homestand is a reasoned, cited audit of local taste, not an attendance predictor.");
+  await expect(page.getByTestId("audit-line")).toContainText("It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.");
   await expect(page.getByTestId("h1-text")).toContainText("49.1%");
   await expect(page.getByTestId("h1-text")).toContainText("521 pairs");
   await expect(page.getByTestId("results-pending")).toHaveCount(0);
-  await expect(page.getByText("not detected at this sample size").first()).toBeVisible();
+  await expect(page.getByTestId("stamp-plain")).toHaveText("Not enough evidence to overturn: taste didn't predict bigger crowds.");
   await noSideScroll(page);
   await shot(page, info, "study-result");
+});
+
+test("real data: the own path finds a city through the local worker (live geocoding)", async ({ page }) => {
+  await page.goto("/#/own");
+  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page.getByRole("button", { name: "Tulsa, Oklahoma, US" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText("Something upstream failed")).toHaveCount(0);
+  await page.getByRole("button", { name: "Tulsa, Oklahoma, US" }).click();
+  await page.getByTestId("load-example").click();
+  await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/Bluey Night/);
 });

@@ -4,8 +4,9 @@ import { h } from "./dom";
 import { clear } from "./dom";
 import { closeDrawer } from "./components";
 import { closeWhy } from "./foil/why";
+import { resumeClub } from "./flow";
 import { route as routeState, runMounts, teardown } from "./foil/lifecycle";
-import { state } from "./store";
+import { state, ui } from "./store";
 import { checkView } from "./views/check";
 import { fixView } from "./views/fix";
 import { sendView } from "./views/send";
@@ -50,6 +51,8 @@ function topbar(route: string): HTMLElement {
 }
 
 function view(route: string): HTMLElement {
+  // A reload on Fix or Send re-checks the saved club first: show Check's loading or error screen until it is ready.
+  if ((route === "/fix" || route === "/send") && !state.analysis && (ui.loading || ui.error)) return checkView();
   switch (route) {
     case "/sample": return pickView();
     case "/own": return ownView();
@@ -96,4 +99,5 @@ function render(): void {
 let navScroll: () => void = () => undefined;
 window.addEventListener("scroll", () => navScroll(), { passive: true });
 window.addEventListener("hashchange", render);
+if (["#/check", "#/fix", "#/send"].includes(location.hash)) resumeClub();
 render();
