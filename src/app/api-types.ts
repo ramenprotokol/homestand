@@ -66,6 +66,8 @@ export interface NightOut {
   label: FitLabel;
   /** The theme's index (see ThemeScoreOut). */
   z: number | null;
+  /** Set when the name is a library theme we recognise but have no live Qloo scores for. The night is left alone. */
+  recognisedAs: string | null;
 }
 
 export interface AnalyzeResponse {

@@ -229,7 +229,7 @@ function backOf(v: NightView): BackSpec {
   const s = v.score;
   const scored = !!s && s.label !== "not-scored";
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
-  const reason = v.discovered ? `Qloo found this title among the top family ${v.discovered.type === "movie" ? "movies" : "shows"} for fans near ${city()}. It is not scored against the library, so there is no local-pull number.` : v.fit === "classic" ? CLASSIC_REASON : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
+  const reason = v.discovered ? `Qloo found this title among the top family ${v.discovered.type === "movie" ? "movies" : "shows"} for fans near ${city()}. It is not scored against the library, so there is no local-pull number.` : v.fit === "classic" ? CLASSIC_REASON : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone.` : `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
   return {
     no: n.index + 1,
     total: state.analysis!.nights.length,
@@ -288,7 +288,7 @@ function whyInfo(index: number): Child {
     return out;
   }
   if (!v.themeId || !v.score) {
-    out.push(h("p", { class: "panel-box" }, `"${n.theme}" is not one of the ${Object.keys(a.themes).length} themes Qloo has local data for, so it is not scored. It stays as planned.`));
+    out.push(h("p", { class: "panel-box" }, n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone. It stays as planned.` : `"${n.theme}" is not one of the ${Object.keys(a.themes).length} themes we score with Qloo, so it is not scored. It stays as planned.`));
     return out;
   }
   const s = v.score;

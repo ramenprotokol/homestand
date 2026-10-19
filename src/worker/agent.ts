@@ -6,6 +6,7 @@ import { marketKey } from "../app/markets";
 import { propose, type Discovered, type PlanNight, type ThemeFit } from "../app/propose/propose";
 import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
 import { idsOfType, type LiveTheme } from "../app/themes/ids";
+import { THEME_LIBRARY } from "../app/themes/library";
 import { step, type TraceStep } from "../app/trace";
 import { createQlooClient, type QlooType } from "../qloo/client";
 import { AI_MODEL, type AiPort, type KvPort } from "./ports";
@@ -328,7 +329,13 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
 
   // 1. Resolve: alias table first, then (only for text the table cannot place) one batched model call.
   const resolutions: Resolution[] = input.rows.map((r) => resolveTheme(r.theme, d.library));
-  const unknownIdx = resolutions.flatMap((r, i) => (r.kind === "unknown" ? [i] : []));
+  // A name the whole library knows but the live library cannot score (no Qloo id, or no local signal): recognised, left alone.
+  const recognised: Array<string | null> = input.rows.map((r, i) => {
+    if (resolutions[i]!.kind === "theme" || resolutions[i]!.kind === "ambiguous") return null;
+    const full = resolveTheme(r.theme, THEME_LIBRARY);
+    return full.kind === "theme" && !activeIds.has(full.themeId) ? THEME_LIBRARY.find((t) => t.id === full.themeId)!.label : null;
+  });
+  const unknownIdx = resolutions.flatMap((r, i) => (r.kind === "unknown" && recognised[i] === null ? [i] : []));
   if (unknownIdx.length > 0 && d.ai) {
     const list = d.library.map((t) => `${t.id}: ${t.label}`).join("\n");
     const texts = unknownIdx.map((i, n) => `${n}: ${input.rows[i]!.theme}`).join("\n");
@@ -351,7 +358,8 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
   input.rows.forEach((r, i) => {
     const res = resolutions[i]!;
     const text =
-      res.kind === "theme" ? `"${r.theme}" matched ${d.library.find((t) => t.id === res.themeId)?.label ?? res.themeId} (${res.method === "alias" ? "name list" : "model"}).`
+      recognised[i] ? `"${r.theme}" is a theme we recognise (${recognised[i]}), but we have no Qloo scores for it yet, so it is left alone.`
+      : res.kind === "theme" ? `"${r.theme}" matched ${d.library.find((t) => t.id === res.themeId)?.label ?? res.themeId} (${res.method === "alias" ? "name list" : "model"}).`
       : res.kind === "classic" ? `"${r.theme}" is a classic night, so it is not scored.`
       : res.kind === "ambiguous" ? `"${r.theme}" fits more than one theme, so the director is asked to choose.`
       : `"${r.theme}" is not a theme we can place, so it is not scored.`;
@@ -371,7 +379,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     const label: FitLabel = res.kind === "classic" ? "classic" : themeId ? (sc?.label ?? "not-scored") : "not-scored";
     return {
       index: i, line: r.line, date: r.date, weekday: weekdayName(r.date), theme: r.theme, sponsor: r.sponsor, locked: r.locked, notes: r.notes,
-      resolution: res, candidates: res.kind === "ambiguous" ? res.candidates : [], themeId, label, z: sc?.index ?? null,
+      resolution: res, candidates: res.kind === "ambiguous" ? res.candidates : [], themeId, label, z: sc?.index ?? null, recognisedAs: recognised[i] ?? null,
     };
   });
   const count = (l: FitLabel): number => nights.filter((n) => n.label === l).length;

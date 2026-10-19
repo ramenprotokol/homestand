@@ -26,7 +26,7 @@ A promotions director plans dozens of theme nights a season, and most of them ar
 
 ## How Qloo is used
 
-- **Entity resolution, done offline** with `npm run qloo:resolve`. Each theme in the 41-theme library is a small, declared bundle of Qloo entities, for example Star Wars = *A New Hope* + *The Mandalorian*. IDs come from `/search` by exact name match (and release year for films); a fuzzy match is never forced.
+- **Entity resolution, done offline** with `npm run qloo:resolve`. The library recognises 41 theme names, and 25 of them are scored live with Qloo (30 entities). Each scored theme is a small, declared bundle of Qloo entities, for example Star Wars = *A New Hope* + *The Mandalorian*. The other 16 names (PAW Patrol, Pokemon, Peanuts, Batman and so on) are recognised but left alone, because Qloo returned no local signal for them or no exact-name match was found; the app says so instead of treating them as unknown text. IDs come from `/search` by exact name match (and release year for films); a fuzzy match is never forced.
   - **Coverage check.** Entities that return no local affinity at the sample markets are dropped. One example is *Toy Story*, which returns nothing even with the release-year floor below.
   - **What's committed:** the IDs, in `src/app/data/entity-ids.json`.
 - **Local affinity, at runtime.** The call is `GET /v2/insights` with these parameters:
@@ -60,7 +60,7 @@ A pre-registered test of one question: **at the same ballpark, did the theme wit
 ## Limitations
 
 - Qloo's affinity sits near 1 for very popular entities (Country above all), so differences between markets can be tiny.
-- Several themes rest on a single Qloo entity. Fifteen library entities were dropped for having no local signal.
+- Several themes rest on a single Qloo entity. Fifteen library entities were dropped for having no local signal, and one more name has no committed Qloo id, so 16 of the 41 recognised themes are not scored.
 - Labels describe what a market leans toward relative to its own average. They do not forecast ticket sales.
 - The sample calendars are written by us, with fictional sponsors.
 

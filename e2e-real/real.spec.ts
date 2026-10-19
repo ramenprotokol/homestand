@@ -150,3 +150,21 @@ test("real data: Tulsa with the example calendar gets a swap, with Discovered by
   await page.getByTestId("open-trace").click();
   await expect(page.getByRole("dialog")).toContainText(/Asked Qloo for top family movies near Tulsa|Used the recorded top family movies, top family shows and under-25 picks near Tulsa/);
 });
+
+test("real data: a recognised theme with no Qloo scores is not called unknown", async ({ page }) => {
+  await page.goto("/#/own");
+  await page.getByLabel("1. Your ballpark's city").fill("Fresno");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Fresno, CA" }).click();
+  await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\n2027-05-01,PAW Patrol Day,,no,\n2027-05-08,Rubber Duck Regatta,,no,\n2027-05-15,Star Wars Night,,no,\n");
+  await page.getByTestId("check-mine").click();
+  await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("button", { name: /PAW Patrol Day/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toContainText("We recognise PAW Patrol, but we don't have Qloo scores for it yet, so it's left alone.");
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /Rubber Duck Regatta/ }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toContainText(/Rubber Duck Regatta" is not one of the \d+ themes we score with Qloo/);
+  await expect(page.getByRole("dialog")).not.toContainText("We recognise");
+});
