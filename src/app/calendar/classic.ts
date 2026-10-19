@@ -22,7 +22,8 @@ export function hasPhrase(normalised: string, phrase: string): boolean {
   return ` ${normalised} `.includes(` ${normalizeText(phrase)} `);
 }
 
-export function isClassicNight(text: string): boolean {
+/** `extra` adds phrases that are classic nights only for one kind of run (a concert venue's "battle of the bands"). */
+export function isClassicNight(text: string, extra: readonly string[] = []): boolean {
   const n = normalizeText(text);
-  return CLASSIC_PHRASES.some((p) => hasPhrase(n, p));
+  return CLASSIC_PHRASES.some((p) => hasPhrase(n, p)) || extra.some((p) => hasPhrase(n, p));
 }

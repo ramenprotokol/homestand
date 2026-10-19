@@ -1,5 +1,6 @@
 import type { AnalyzeResponse, ApiError, GeoHit, MarketIn, ProposeNightIn, ProposeResponse, RecheckResponse } from "../app/api-types";
 import type { CalendarRow } from "../app/calendar/csv";
+import type { Kind } from "../app/kind";
 
 const BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 
@@ -27,8 +28,9 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T>(path: string, body: unknown): Promise<T> => call<T>(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
 export const api = {
-  analyze: (market: MarketIn, rows: CalendarRow[]) => post<AnalyzeResponse>("/api/analyze", { market, rows }),
-  propose: (market: MarketIn, nights: ProposeNightIn[], allowDuplicates: boolean) => post<ProposeResponse>("/api/propose", { market, nights, allowDuplicates }),
-  recheck: (market: MarketIn, themeId: string) => post<RecheckResponse>("/api/recheck", { market, themeId }),
+  // A club run sends no `kind`, exactly as before venue mode; only a venue run says so.
+  analyze: (market: MarketIn, rows: CalendarRow[], kind: Kind = "club") => post<AnalyzeResponse>("/api/analyze", { market, rows, ...(kind === "venue" ? { kind } : {}) }),
+  propose: (market: MarketIn, nights: ProposeNightIn[], allowDuplicates: boolean, kind: Kind = "club") => post<ProposeResponse>("/api/propose", { market, nights, allowDuplicates, ...(kind === "venue" ? { kind } : {}) }),
+  recheck: (market: MarketIn, themeId: string, kind: Kind = "club") => post<RecheckResponse>("/api/recheck", { market, themeId, ...(kind === "venue" ? { kind } : {}) }),
   geocode: (q: string) => call<{ results: GeoHit[] }>(`/api/geocode?q=${encodeURIComponent(q)}`),
 };

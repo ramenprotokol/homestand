@@ -5,10 +5,10 @@ export const plural = (n: number, one: string, many = `${one}s`): string => (n =
 export const leanVerb = (n: number): string => (n === 1 ? "leans" : "lean");
 
 /** The Check screen's headline result, from the cards themselves. */
-export function checkResultLine(away: number, total: number, city: string): string {
-  if (total === 1) return away === 0 ? `This night doesn't lean away from what ${city} likes.` : `This night leans away from what ${city} likes.`;
-  if (away === 0) return `None of the ${total} nights lean away from what ${city} likes.`;
-  return `${away} of ${total} nights ${leanVerb(away)} away from what ${city} likes.`;
+export function checkResultLine(away: number, total: number, city: string, night = "night", nights = "nights"): string {
+  if (total === 1) return away === 0 ? `This ${night} doesn't lean away from what ${city} likes.` : `This ${night} leans away from what ${city} likes.`;
+  if (away === 0) return `None of the ${total} ${nights} lean away from what ${city} likes.`;
+  return `${away} of ${total} ${nights} ${leanVerb(away)} away from what ${city} likes.`;
 }
 
 export function fitSummary(c: { in: number; average: number; away: number; notScored: number; classic: number; found?: number }): string {
@@ -16,8 +16,8 @@ export function fitSummary(c: { in: number; average: number; away: number; notSc
   return `${c.in} ${leanVerb(c.in)} in, ${c.average} about average, ${c.away} ${leanVerb(c.away)} away, ${c.notScored} not scored, ${c.classic} classic${found}.`;
 }
 
-export function lockedLine(n: number): string {
-  return `${n} locked ${plural(n, "night")} ${n === 1 ? "stays" : "stay"} exactly as planned`;
+export function lockedLine(n: number, night = "night"): string {
+  return `${n} locked ${plural(n, night)} ${n === 1 ? "stays" : "stay"} exactly as planned`;
 }
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -42,8 +42,9 @@ export function personalLine(call: "Yes" | "No" | "Not sure", verdict: "CONFIRME
 
 const NIGHT_SUFFIXES = ["Night", "Day", "Friday", "Giveaway", "Showdown"];
 
-/** The real night name for a swap: the new theme keeps the original's ending. "Barbie Day" with LEGO Movie is "LEGO Movie Day". */
-export function swapName(original: string, newLabel: string): string {
+/** The real night name for a swap: the new theme keeps the original's ending. "Barbie Day" with LEGO Movie is "LEGO Movie Day". A concert date is just the act's name. */
+export function swapName(original: string, newLabel: string, kind?: "club" | "venue"): string {
+  if (kind === "venue") return newLabel;
   const w = original.trim().split(/\s+/);
   const last = w[w.length - 1] ?? "";
   return `${newLabel} ${w.length > 1 && NIGHT_SUFFIXES.includes(last) ? last : "Night"}`;

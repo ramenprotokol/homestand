@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { COMMITTED_IDS, activeLibrary, type IdMap } from "../src/app/themes/ids";
-import { THEME_LIBRARY } from "../src/app/themes/library";
+import { ALL_THEMES, VENUE_LIBRARY } from "../src/app/themes/artists";
 import { createQlooClient, type QlooType } from "../src/qloo/client";
 
 export const IDS_PATH = new URL("../src/app/data/entity-ids.json", import.meta.url);
@@ -22,10 +22,13 @@ export function client() {
   return createQlooClient({ baseUrl: process.env.QLOO_API_URL, apiKey: process.env.QLOO_API_KEY, delayMs: 300 });
 }
 
-/** Live library from the committed IDs (never synthetic). */
+/** Live club library from the committed IDs (never synthetic). */
 export const liveLibrary = () => activeLibrary(readIds().ids, false);
 
-export const allEntities = () => THEME_LIBRARY.flatMap((t) => t.entities.map((e) => ({ ...e, theme: t.id })));
+/** Live venue library (music themes + artist themes) from the committed IDs. */
+export const liveVenueLibrary = () => activeLibrary(readIds().ids, false, VENUE_LIBRARY);
+
+export const allEntities = () => ALL_THEMES.flatMap((t) => t.entities.map((e) => ({ ...e, theme: t.id })));
 
 export const typesOf = (lib: ReturnType<typeof liveLibrary>): QlooType[] => [...new Set(lib.flatMap((t) => t.entities.map((e) => e.type)))];
 

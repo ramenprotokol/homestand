@@ -111,6 +111,7 @@ export function startView(): HTMLElement {
       h("a", { class: "btn ghost", href: "#/own", "data-testid": "use-own" }, "Use your own"),
     ),
     h("p", { class: "tag honest", id: "tag", "data-testid": "hero-honest" }, "It reads what your town likes. It doesn't forecast ticket sales, and we tested that: ", h("a", { href: "#/study" }, "see The Study"), "."),
+    h("p", { class: "tag", id: "venue-tag", "data-testid": "hero-venue" }, "Also works for concert venues: ", h("a", { href: "#/check/raleigh", "data-testid": "try-venue" }, "try the amphitheatre sample"), "."),
   ];
   return h("div", { class: "landing" }, heroShell(copy), ridge(), teaseSection());
 }
@@ -121,6 +122,30 @@ function sceneHead(eyebrow: string, title: string, accent: string, lede: string)
   return h("div", { class: "scene-head" }, h("div", { class: "eyebrow" }, eyebrow), h("h1", { class: "h2", tabindex: "-1" }, `${title} `, h("em", null, accent)), h("p", { class: "lede" }, lede));
 }
 
+function ticketFor(m: (typeof SAMPLE_MARKETS)[number]): HTMLElement {
+  const venue = m.kind === "venue";
+  return h(
+    "button",
+    {
+      type: "button",
+      class: "ticket",
+      "data-testid": `market-${m.id}`,
+      onclick: () => {
+        const { rows, errors } = parseCalendar(sampleCsv(m.id));
+        void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, m.id, true, m.kind);
+      },
+    },
+    h("span", { class: "tk-stub" }, h("span", { class: "tk-k" }, venue ? "Sample venue" : "Sample club"), h("span", { class: "tk-city" }, m.city)),
+    h(
+      "span",
+      { class: "tk-main" },
+      h("b", null, m.label),
+      h("span", null, venue ? `${m.region}. A made-up summer concert calendar for a sample amphitheatre. It is not a real venue.` : `${m.region}. Starts with their next season's calendar.`),
+      h("span", { class: "tk-go" }, venue ? "Open this venue" : "Open this club", icon("arrowRight")),
+    ),
+  );
+}
+
 export function pickView(): HTMLElement {
   return h(
     "section",
@@ -129,26 +154,10 @@ export function pickView(): HTMLElement {
       "div",
       { class: "wrap" },
       sceneHead("Get started · Pick a club", "Pick a", "sample club", "Each is a real ballpark market with a season calendar we wrote. Sponsors are made up."),
-      h(
-        "div",
-        { class: "tickets" },
-        SAMPLE_MARKETS.map((m) =>
-          h(
-            "button",
-            {
-              type: "button",
-              class: "ticket",
-              "data-testid": `market-${m.id}`,
-              onclick: () => {
-                const { rows, errors } = parseCalendar(sampleCsv(m.id));
-                void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, m.id);
-              },
-            },
-            h("span", { class: "tk-stub" }, h("span", { class: "tk-k" }, "Sample club"), h("span", { class: "tk-city" }, m.city)),
-            h("span", { class: "tk-main" }, h("b", null, m.label), h("span", null, `${m.region}. Starts with their next season's calendar.`), h("span", { class: "tk-go" }, "Open this club", icon("arrowRight"))),
-          ),
-        ),
-      ),
+      h("div", { class: "tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "club").map(ticketFor)),
+      h("div", { class: "eyebrow venue-eyebrow" }, "Also works for concert venues"),
+      h("p", { class: "lede venue-lede" }, "Same Check, Fix and Send on a touring-act calendar. This one is a made-up summer calendar for a sample amphitheatre."),
+      h("div", { class: "tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "venue").map(ticketFor)),
       h("p", { class: "own-link" }, "Have your own season? ", h("a", { href: "#/own", "data-testid": "use-own-schedule" }, "Use your own schedule"), "."),
     ),
   );

@@ -39,9 +39,9 @@ function nextDay(iso: string): string {
 }
 
 /** All-day events, one per night. `stamp` is an ISO timestamp, passed in so the output is reproducible. */
-export function exportIcs(rows: readonly ExportRow[], calendarName: string, stamp: string): string {
+export function exportIcs(rows: readonly ExportRow[], calendarName: string, stamp: string, kind?: "club" | "venue"): string {
   const dtstamp = stamp.replace(/[-:]/g, "").replace(/\.\d+/, "").replace(/Z?$/, "Z");
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Homestand//Season calendar//EN", "CALSCALE:GREGORIAN", `X-WR-CALNAME:${icsEscape(calendarName)}`];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", `PRODID:-//Homestand//${kind === "venue" ? "Summer series" : "Season"} calendar//EN`, "CALSCALE:GREGORIAN", `X-WR-CALNAME:${icsEscape(calendarName)}`];
   [...rows].sort((a, b) => a.date.localeCompare(b.date)).forEach((r, i) => {
     const summary = r.sponsor ? `${r.theme} (${r.sponsor})` : r.theme;
     lines.push(

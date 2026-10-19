@@ -25,7 +25,9 @@
     "reference:synthetic": "tsx scripts/make-synthetic-reference.ts",
     "study:pull": "tsx study/pull.ts",
     "study:analyze": "tsx study/analyze.ts",
-    "qloo:discovery-reference": "node --env-file=.dev.vars --import tsx scripts/qloo-discovery-reference.ts"
+    "qloo:discovery-reference": "node --env-file=.dev.vars --import tsx scripts/qloo-discovery-reference.ts",
+    "qloo:popularity": "node --env-file=.dev.vars --import tsx scripts/qloo-popularity.ts",
+    "qloo:acts-reference": "node --env-file=.dev.vars --import tsx scripts/qloo-acts-reference.ts"
   },
   "engines": {
     "node": ">=22.13"

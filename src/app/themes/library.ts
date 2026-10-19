@@ -18,6 +18,13 @@ export interface DateWindow {
   to: string;
 }
 
+/** Music genre of a theme, for concert venues. Swaps for a music night stay in the same genre where they can. */
+export type Genre = "country" | "rock" | "pop" | "hip-hop" | "latin" | "classic-rock" | "jam" | "indie" | "r&b" | "emo" | "yacht-rock";
+
+export const GENRE_WORDS: Record<Genre, string> = {
+  country: "country", rock: "rock", pop: "pop", "hip-hop": "hip-hop", latin: "Latin", "classic-rock": "classic rock", jam: "jam band", indie: "indie", "r&b": "R&B", emo: "emo", "yacht-rock": "yacht rock",
+};
+
 export interface Theme {
   id: string;
   label: string;
@@ -25,6 +32,12 @@ export interface Theme {
   aliases: string[];
   category: "kids tv" | "film" | "tv" | "music" | "toys and games" | "sports entertainment" | "holiday";
   audience: Audience;
+  /** Music themes only. Used by venue runs; club runs ignore it. */
+  genre?: Genre;
+  /** False for an act that no longer tours (venue runs never offer it as a swap or a support act). Left out means it tours. */
+  touring?: boolean;
+  /** A tribute or theme night (Yacht Rock, Emo Night): only a tribute date may be swapped to one. */
+  tribute?: boolean;
   window?: DateWindow;
   entities: EntitySpec[];
 }
@@ -44,11 +57,11 @@ export const THEME_LIBRARY: readonly Theme[] = [
   { id: "bluey", label: "Bluey", category: "kids tv", audience: "kids", aliases: ["bluey"], entities: [e("bluey:tv", "tv_show", "Bluey")] },
   { id: "harry-potter", label: "Harry Potter", category: "film", audience: "family", aliases: ["harry potter", "hogwarts", "wizarding"],
     entities: [{ key: "harry-potter:books", type: "book", query: "Harry Potter", names: ["Harry Potter and the Sorcerer's Stone (Harry Potter, #1)"] }] },
-  { id: "margaritaville", label: "Margaritaville", category: "music", audience: "adult", aliases: ["margaritaville", "jimmy buffett", "parrot head", "parrotheads"],
+  { id: "margaritaville", label: "Margaritaville", category: "music", audience: "adult", genre: "country", touring: false, aliases: ["margaritaville", "jimmy buffett", "parrot head", "parrotheads"],
     entities: [e("margaritaville:buffett", "artist", "Jimmy Buffett")] },
   { id: "dinosaur", label: "Dinosaur", category: "kids tv", audience: "kids", aliases: ["dinosaur", "dinosaurs", "dino", "dinos", "jurassic"],
     entities: [e("dinosaur:jp", "movie", "Jurassic Park", 1993), e("dinosaur:jw", "movie", "Jurassic World", 2015)] },
-  { id: "country", label: "Country music", category: "music", audience: "adult", aliases: ["country music", "country night", "country western", "country weekend", "country hits"],
+  { id: "country", label: "Country music", category: "music", audience: "adult", genre: "country", aliases: ["country music", "country night", "country western", "country weekend", "country hits"],
     entities: [e("country:combs", "artist", "Luke Combs"), e("country:wallen", "artist", "Morgan Wallen"), e("country:underwood", "artist", "Carrie Underwood")] },
   { id: "marvel", label: "Marvel", category: "film", audience: "family", aliases: ["marvel", "avengers", "spider-man", "spiderman", "superhero", "superheroes", "super heroes"],
     entities: [e("marvel:nwh", "movie", "Spider-Man: No Way Home", 2021)] },
@@ -59,10 +72,10 @@ export const THEME_LIBRARY: readonly Theme[] = [
   { id: "pokemon", label: "Pokemon", category: "toys and games", audience: "kids", aliases: ["pokemon", "pikachu"], entities: [e("pokemon:tv", "tv_show", "Pokémon")] },
   { id: "super-mario", label: "Super Mario", category: "toys and games", audience: "family", aliases: ["super mario", "mario", "nintendo"],
     entities: [e("super-mario:film", "movie", "The Super Mario Bros. Movie", 2023)] },
-  { id: "taylor-swift", label: "Taylor Swift", category: "music", audience: "adult", aliases: ["taylor swift", "swiftie", "swifties"], entities: [e("taylor-swift:artist", "artist", "Taylor Swift")] },
-  { id: "elvis", label: "Elvis", category: "music", audience: "adult", aliases: ["elvis"], entities: [e("elvis:artist", "artist", "Elvis Presley")] },
-  { id: "grateful-dead", label: "Grateful Dead", category: "music", audience: "adult", aliases: ["grateful dead", "jerry garcia", "deadhead"], entities: [e("grateful-dead:artist", "artist", "Grateful Dead")] },
-  { id: "beatles", label: "The Beatles", category: "music", audience: "adult", aliases: ["beatles", "beatlemania"], entities: [e("beatles:artist", "artist", "The Beatles")] },
+  { id: "taylor-swift", label: "Taylor Swift", category: "music", audience: "adult", genre: "pop", aliases: ["taylor swift", "swiftie", "swifties"], entities: [e("taylor-swift:artist", "artist", "Taylor Swift")] },
+  { id: "elvis", label: "Elvis", category: "music", audience: "adult", genre: "classic-rock", touring: false, aliases: ["elvis"], entities: [e("elvis:artist", "artist", "Elvis Presley")] },
+  { id: "grateful-dead", label: "Grateful Dead", category: "music", audience: "adult", genre: "jam", touring: false, aliases: ["grateful dead", "jerry garcia", "deadhead"], entities: [e("grateful-dead:artist", "artist", "Grateful Dead")] },
+  { id: "beatles", label: "The Beatles", category: "music", audience: "adult", genre: "classic-rock", touring: false, aliases: ["beatles", "beatlemania"], entities: [e("beatles:artist", "artist", "The Beatles")] },
   { id: "lord-of-the-rings", label: "Lord of the Rings", category: "film", audience: "teen", aliases: ["lord of the rings", "lotr", "middle earth", "hobbit"],
     entities: [e("lord-of-the-rings:film", "movie", "The Lord of the Rings: The Fellowship of the Ring", 2001)] },
   { id: "stranger-things", label: "Stranger Things", category: "tv", audience: "adult", aliases: ["stranger things", "upside down"], entities: [e("stranger-things:tv", "tv_show", "Stranger Things")] },
@@ -79,15 +92,15 @@ export const THEME_LIBRARY: readonly Theme[] = [
   { id: "ghostbusters", label: "Ghostbusters", category: "film", audience: "family", aliases: ["ghostbusters"], entities: [e("ghostbusters:film", "movie", "Ghostbusters", 1984)] },
   { id: "back-to-the-future", label: "Back to the Future", category: "film", audience: "family", aliases: ["back to the future", "delorean"], entities: [e("back-to-the-future:film", "movie", "Back to the Future", 1985)] },
   { id: "yellowstone", label: "Yellowstone", category: "tv", audience: "adult", aliases: ["yellowstone", "dutton"], entities: [e("yellowstone:tv", "tv_show", "Yellowstone")] },
-  { id: "garth-brooks", label: "Garth Brooks", category: "music", audience: "adult", aliases: ["garth brooks", "garth"], entities: [e("garth-brooks:artist", "artist", "Garth Brooks")] },
-  { id: "dolly-parton", label: "Dolly Parton", category: "music", audience: "adult", aliases: ["dolly parton", "dolly"], entities: [e("dolly-parton:artist", "artist", "Dolly Parton")] },
-  { id: "kenny-chesney", label: "Kenny Chesney", category: "music", audience: "adult", aliases: ["kenny chesney", "chesney"], entities: [e("kenny-chesney:artist", "artist", "Kenny Chesney")] },
+  { id: "garth-brooks", label: "Garth Brooks", category: "music", audience: "adult", genre: "country", aliases: ["garth brooks", "garth"], entities: [e("garth-brooks:artist", "artist", "Garth Brooks")] },
+  { id: "dolly-parton", label: "Dolly Parton", category: "music", audience: "adult", genre: "country", touring: false, aliases: ["dolly parton", "dolly"], entities: [e("dolly-parton:artist", "artist", "Dolly Parton")] },
+  { id: "kenny-chesney", label: "Kenny Chesney", category: "music", audience: "adult", genre: "country", aliases: ["kenny chesney", "chesney"], entities: [e("kenny-chesney:artist", "artist", "Kenny Chesney")] },
   { id: "peanuts", label: "Peanuts", category: "kids tv", audience: "family", aliases: ["peanuts", "charlie brown", "snoopy"], entities: [e("peanuts:tv", "tv_show", "Peanuts")] },
   { id: "grinch", label: "The Grinch", category: "holiday", audience: "family", window: { from: "11-01", to: "12-31" }, aliases: ["grinch"],
     entities: [e("grinch:film", "movie", "The Grinch", 2018)] },
   { id: "hocus-pocus", label: "Hocus Pocus", category: "holiday", audience: "family", window: { from: "09-01", to: "10-31" }, aliases: ["hocus pocus", "sanderson sisters"],
     entities: [e("hocus-pocus:film", "movie", "Hocus Pocus", 1993)] },
-  { id: "bad-bunny", label: "Bad Bunny", category: "music", audience: "adult", aliases: ["bad bunny"], entities: [e("bad-bunny:artist", "artist", "Bad Bunny")] },
+  { id: "bad-bunny", label: "Bad Bunny", category: "music", audience: "adult", genre: "latin", aliases: ["bad bunny"], entities: [e("bad-bunny:artist", "artist", "Bad Bunny")] },
   { id: "hello-kitty", label: "Hello Kitty", category: "toys and games", audience: "kids", aliases: ["hello kitty", "sanrio"], entities: [e("hello-kitty:brand", "brand", "Hello Kitty")] },
   { id: "top-gun", label: "Top Gun", category: "film", audience: "teen", aliases: ["top gun", "maverick"], entities: [e("top-gun:film", "movie", "Top Gun", 1986)] },
   { id: "pirates", label: "Pirates", category: "film", audience: "family", aliases: ["pirate", "pirates", "jolly roger"],

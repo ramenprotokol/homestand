@@ -53,10 +53,11 @@ describe("theme library", () => {
 });
 
 describe("sample markets", () => {
-  it("are four places, named as places", () => {
-    expect(SAMPLE_MARKETS).toHaveLength(4);
+  it("are four clubs and one venue, named as places", () => {
+    expect(SAMPLE_MARKETS.filter((m) => m.kind === "club")).toHaveLength(4);
+    expect(SAMPLE_MARKETS.filter((m) => m.kind === "venue")).toHaveLength(1);
     for (const m of SAMPLE_MARKETS) {
-      expect(m.label).toMatch(/sample club$/);
+      expect(m.label).toMatch(m.kind === "club" ? /sample club$/ : /sample amphitheatre$/);
       expect(Math.abs(m.lat)).toBeLessThan(90);
       expect(m.lon).toBeLessThan(0);
     }

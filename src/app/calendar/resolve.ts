@@ -40,12 +40,12 @@ function aliasHits(normalised: string, library: readonly Pick<Theme, "id" | "ali
  * Two different themes in one text are never forced: the director is asked. No match and no classic keyword is "unknown",
  * which the Worker may hand to the model before giving up.
  */
-export function resolveTheme(text: string, library: readonly Pick<Theme, "id" | "aliases">[]): Resolution {
+export function resolveTheme(text: string, library: readonly Pick<Theme, "id" | "aliases">[], extraClassic: readonly string[] = []): Resolution {
   const hits = aliasHits(normalizeText(text), library);
   const ids = [...new Set(hits.map((h) => h.themeId))];
   if (ids.length === 1) return { kind: "theme", themeId: ids[0]!, method: "alias" };
   if (ids.length > 1) return { kind: "ambiguous", candidates: ids };
-  if (isClassicNight(text)) return { kind: "classic" };
+  if (isClassicNight(text, extraClassic)) return { kind: "classic" };
   return { kind: "unknown" };
 }
 

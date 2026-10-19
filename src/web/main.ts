@@ -4,6 +4,7 @@ import { h } from "./dom";
 import { clear } from "./dom";
 import { closeDrawer } from "./components";
 import { closeWhy } from "./foil/why";
+import { shortLabel } from "../app/kind";
 import { openSample, resumeClub, navigate } from "./flow";
 import { route as routeState, runMounts, teardown } from "./foil/lifecycle";
 import { state, ui } from "./store";
@@ -44,7 +45,7 @@ function topbar(route: string): HTMLElement {
     h(
       "div",
       { class: "nav-r" },
-      state.market ? h("span", { class: "club" }, h("i"), state.market.label.replace(/ (sample )?club$/, "")) : null,
+      state.market ? h("span", { class: "club" }, h("i"), shortLabel(state.market.label)) : null,
       h("a", { class: "out study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
     ),
   );

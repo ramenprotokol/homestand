@@ -1,0 +1,247 @@
+{
+ "biloxi": {
+  "hash": "fb5ad7490ed5c16996c75a46a4c3ba5094e061d74318692740f59d3ac3980086",
+  "summary": {
+   "bands": [
+    "2027-04-09 Margaritaville Night: leans-away",
+    "2027-04-10 Bluey Day: leans-away",
+    "2027-04-17 Star Wars Night: average",
+    "2027-04-23 Fireworks Friday: classic",
+    "2027-04-24 Elvis Night: average",
+    "2027-05-01 Barbie Day: leans-in",
+    "2027-05-08 Harry Potter Night: leans-in",
+    "2027-05-14 Military Appreciation Night: classic",
+    "2027-05-15 Dinosaur Day: leans-in",
+    "2027-05-22 Marvel Super Heroes Night: leans-away",
+    "2027-05-29 Beatles Night: leans-away",
+    "2027-06-05 Dinosaurs & Superheroes: not-scored",
+    "2027-06-12 Super Mario Day: leans-away",
+    "2027-06-18 Country Music Night: average",
+    "2027-06-19 Dollar Dog Night: classic",
+    "2027-06-26 Taylor Swift Night: leans-away",
+    "2027-07-02 Bad Bunny Night: leans-away",
+    "2027-07-10 Stranger Things Night: average",
+    "2027-07-17 Hot Sauce Showdown: not-scored",
+    "2027-07-24 Star Trek Day: average",
+    "2027-07-31 Kenny Chesney Night: leans-away",
+    "2027-08-07 Barbie Night: leans-in",
+    "2027-08-14 Grateful Dead Night: average",
+    "2027-08-28 Bobblehead Giveaway: classic",
+    "2027-09-04 Dolly Parton Night: average"
+   ],
+   "swaps": [
+    "2027-04-10 bluey > toy-story | alt ",
+    "2027-05-22 marvel > qloo:SYN-D-tv_show-6 (discovered) | alt ",
+    "2027-05-29 beatles > ghostbusters | alt ",
+    "2027-06-12 super-mario > back-to-the-future | alt ",
+    "2027-06-26 taylor-swift > wrestling | alt ",
+    "2027-07-31 kenny-chesney > paw-patrol | alt "
+   ],
+   "angles": [
+    "Margaritaville on Fri Apr 9 is locked, so it stays exactly as planned. Fans of Margaritaville near Biloxi also lean toward Garth Brooks, so if Magnolia Mutual is open to it, a small Garth Brooks touch (walk-up songs, PA clips or a photo spot) fits the night."
+   ],
+   "unfixed": [
+    "2027-07-02 No theme that leans in passes the date, audience and no-repeat checks."
+   ]
+  }
+ },
+ "albuquerque": {
+  "hash": "ef0e7b0427287ab5beb4c665cc8e8ba9045f4a8d6dd4507081f80c0037df6b38",
+  "summary": {
+   "bands": [
+    "2027-04-10 Taylor Swift Night: leans-in",
+    "2027-04-17 Bluey Day: leans-away",
+    "2027-04-24 Hispanic Heritage Night: classic",
+    "2027-05-01 Bad Bunny Night: leans-away",
+    "2027-05-08 Princess Day: leans-in",
+    "2027-05-15 Marvel Night: leans-in",
+    "2027-05-21 Fireworks Friday: classic",
+    "2027-05-29 Stranger Things Night: leans-in",
+    "2027-06-05 Dinosaur Day: leans-away",
+    "2027-06-12 Country Night: average",
+    "2027-06-19 Star Wars and Star Trek Night: not-scored",
+    "2027-06-26 Margaritaville Night: average",
+    "2027-07-02 Grateful Dead Night: leans-in",
+    "2027-07-10 Ghostbusters Day: average",
+    "2027-07-17 Chile Roasting Fiesta: not-scored",
+    "2027-07-24 Super Mario Day: leans-away",
+    "2027-07-31 Faith and Family Night: classic",
+    "2027-08-07 Wrestling Night: leans-away",
+    "2027-08-14 Garth Brooks Night: leans-away",
+    "2027-08-21 Harry Potter Day: leans-away",
+    "2027-09-04 Barbie Night: average",
+    "2027-09-11 Jersey Giveaway: classic"
+   ],
+   "swaps": [
+    "2027-04-17 bluey > toy-story | alt ninja-turtles,spongebob",
+    "2027-05-01 bad-bunny > dolly-parton | alt beatles,back-to-the-future",
+    "2027-06-05 dinosaur > peanuts | alt ninja-turtles,spongebob",
+    "2027-07-24 super-mario > hello-kitty | alt back-to-the-future,ninja-turtles",
+    "2027-08-07 wrestling > batman | alt beatles,back-to-the-future",
+    "2027-08-21 harry-potter > pirates | alt back-to-the-future,ninja-turtles"
+   ],
+   "angles": [
+    "Garth Brooks on Sat Aug 14 is locked, so it stays exactly as planned. Fans of Garth Brooks near Albuquerque also lean toward Dolly Parton, so if Red Mesa Tires is open to it, a small Dolly Parton touch (walk-up songs, PA clips or a photo spot) fits the night."
+   ],
+   "unfixed": []
+  }
+ },
+ "akron": {
+  "hash": "2f217fc570793ead52b3bac29c6f607a40e729f3f05374c32af2dd734115a7db",
+  "summary": {
+   "bands": [
+    "2027-04-10 Bluey Day: leans-in",
+    "2027-04-16 Star Trek Night: leans-away",
+    "2027-04-24 Marvel Super Heroes Day: leans-in",
+    "2027-05-01 Harry Potter Night: leans-away",
+    "2027-05-07 Fireworks Friday: classic",
+    "2027-05-15 Dolly Parton Night: leans-in",
+    "2027-05-22 Veterans Salute Night: classic",
+    "2027-05-29 Princess Day: leans-away",
+    "2027-06-05 Star Wars Night: average",
+    "2027-06-12 Super Mario Day: average",
+    "2027-06-18 Country Music Night: average",
+    "2027-06-26 Elvis and the Beatles Night: not-scored",
+    "2027-07-02 Bad Bunny Night: leans-in",
+    "2027-07-10 Dinosaur Day: leans-away",
+    "2027-07-17 Taylor Swift Night: leans-in",
+    "2027-07-24 Spider-Man Night: leans-in",
+    "2027-07-31 Garth Brooks Night: leans-away",
+    "2027-08-07 Harry Potter Day: leans-away",
+    "2027-08-14 Rubber Duck Regatta: not-scored",
+    "2027-08-21 Marvel Night: leans-in",
+    "2027-08-28 Bark in the Park: classic",
+    "2027-09-04 Star Trek Day: leans-away",
+    "2027-09-11 Hocus Pocus Night: leans-in",
+    "2027-09-17 Kenny Chesney Night: average"
+   ],
+   "swaps": [
+    "2027-04-16 star-trek > pirates | alt batman,stranger-things",
+    "2027-05-01 harry-potter > spongebob | alt ",
+    "2027-05-29 princess > qloo:SYN-D-movie-4 (discovered) | alt ",
+    "2027-07-10 dinosaur > qloo:SYN-D-tv_show-4 (discovered) | alt ",
+    "2027-07-31 garth-brooks > margaritaville | alt elvis,stranger-things",
+    "2027-08-07 harry-potter > toy-story | alt ",
+    "2027-09-04 star-trek > top-gun | alt batman,stranger-things"
+   ],
+   "angles": [],
+   "unfixed": []
+  }
+ },
+ "portland-me": {
+  "hash": "6f9876bc06d0379248da3bca19714c0a1c3e1dce75d6971bfa949a3271a3fdaa",
+  "summary": {
+   "bands": [
+    "2027-04-17 Bluey Day: leans-in",
+    "2027-04-23 Star Wars Night: leans-in",
+    "2027-05-01 Barbie Day: leans-in",
+    "2027-05-08 Harry Potter Night: leans-away",
+    "2027-05-15 Princess Day: leans-in",
+    "2027-05-21 Fireworks Friday: classic",
+    "2027-05-29 Super Mario Day: leans-in",
+    "2027-06-05 Dinosaur Day: leans-away",
+    "2027-06-12 Taylor Swift Night: average",
+    "2027-06-19 Princess & Dinosaur Day: not-scored",
+    "2027-06-26 Margaritaville Night: average",
+    "2027-07-02 Grateful Dead Night: leans-away",
+    "2027-07-10 Elvis Night: average",
+    "2027-07-17 Lobster Boat Parade Night: not-scored",
+    "2027-07-24 Ghostbusters Day: leans-away",
+    "2027-07-31 Garth Brooks Night: average",
+    "2027-08-07 Star Trek Day: leans-away",
+    "2027-08-14 Wrestling Night: leans-in",
+    "2027-08-21 Irish Heritage Night: classic",
+    "2027-09-04 Yellowstone Night: average",
+    "2027-09-11 Harry Potter Day: leans-away",
+    "2027-09-18 Giveaway Saturday: classic"
+   ],
+   "swaps": [
+    "2027-05-08 harry-potter > spongebob | alt ",
+    "2027-06-05 dinosaur > paw-patrol | alt ",
+    "2027-07-02 grateful-dead > bad-bunny | alt beatles,country",
+    "2027-07-24 ghostbusters > back-to-the-future | alt ",
+    "2027-08-07 star-trek > batman | alt beatles,country",
+    "2027-09-11 harry-potter > hocus-pocus | alt "
+   ],
+   "angles": [],
+   "unfixed": []
+  }
+ },
+ "example@biloxi": {
+  "hash": "7be05ee430a61b8ddc2142ec1a9ddddf0d809543f27c4105d4402a161c0f4a22",
+  "summary": {
+   "bands": [
+    "2027-04-09 Fireworks Friday: classic",
+    "2027-04-10 Bluey Day: leans-away",
+    "2027-04-17 Marvel Super Heroes Night: leans-away",
+    "2027-04-24 PAW Patrol Day: leans-in",
+    "2027-05-01 Taylor Swift Night: leans-away",
+    "2027-05-08 Barbie Day: leans-in",
+    "2027-05-14 Country Music Night: average",
+    "2027-05-15 Dinosaur Day: leans-in",
+    "2027-05-22 Super Mario Day: leans-away",
+    "2027-05-29 Princess Day: average",
+    "2027-06-04 Beatles Night: leans-away",
+    "2027-06-05 Ghostbusters Day: leans-in",
+    "2027-06-12 Star Trek Night: average",
+    "2027-06-19 Stranger Things Night: average",
+    "2027-06-26 Bad Bunny Night: leans-away",
+    "2027-07-03 Elvis Night: average",
+    "2027-07-10 Margaritaville Night: leans-away",
+    "2027-07-17 Grateful Dead Night: average",
+    "2027-07-24 Yellowstone Night: average",
+    "2027-08-07 Pro Wrestling Night: leans-in"
+   ],
+   "swaps": [
+    "2027-04-10 bluey > qloo:SYN-D-tv_show-6 (discovered) | alt ",
+    "2027-04-17 marvel > qloo:SYN-D-movie-6 (discovered) | alt ",
+    "2027-05-01 taylor-swift > back-to-the-future | alt ",
+    "2027-05-22 super-mario > harry-potter | alt ",
+    "2027-07-10 margaritaville > toy-story | alt "
+   ],
+   "angles": [],
+   "unfixed": [
+    "2027-06-04 No theme that leans in passes the date, audience and no-repeat checks.",
+    "2027-06-26 No theme that leans in passes the date, audience and no-repeat checks."
+   ]
+  }
+ },
+ "example@akron": {
+  "hash": "d6843e5328c4a0b4f8715efae8c67421977a946b2f1443c783406274653fbd5d",
+  "summary": {
+   "bands": [
+    "2027-04-09 Fireworks Friday: classic",
+    "2027-04-10 Bluey Day: leans-in",
+    "2027-04-17 Marvel Super Heroes Night: leans-in",
+    "2027-04-24 PAW Patrol Day: average",
+    "2027-05-01 Taylor Swift Night: leans-in",
+    "2027-05-08 Barbie Day: average",
+    "2027-05-14 Country Music Night: average",
+    "2027-05-15 Dinosaur Day: leans-away",
+    "2027-05-22 Super Mario Day: average",
+    "2027-05-29 Princess Day: leans-away",
+    "2027-06-04 Beatles Night: leans-away",
+    "2027-06-05 Ghostbusters Day: leans-away",
+    "2027-06-12 Star Trek Night: leans-away",
+    "2027-06-19 Stranger Things Night: leans-in",
+    "2027-06-26 Bad Bunny Night: leans-in",
+    "2027-07-03 Elvis Night: leans-in",
+    "2027-07-10 Margaritaville Night: leans-in",
+    "2027-07-17 Grateful Dead Night: leans-away",
+    "2027-07-24 Yellowstone Night: leans-away",
+    "2027-08-07 Pro Wrestling Night: average"
+   ],
+   "swaps": [
+    "2027-05-15 dinosaur > qloo:SYN-D-tv_show-4 (discovered) | alt ",
+    "2027-05-29 princess > qloo:SYN-D-movie-4 (discovered) | alt ",
+    "2027-06-04 beatles > dolly-parton | alt top-gun,batman",
+    "2027-06-05 ghostbusters > spongebob | alt ",
+    "2027-06-12 star-trek > pirates | alt top-gun,batman",
+    "2027-07-17 grateful-dead > toy-story | alt top-gun,batman",
+    "2027-07-24 yellowstone > the-office | alt top-gun,batman"
+   ],
+   "angles": [],
+   "unfixed": []
+  }
+ }
+}

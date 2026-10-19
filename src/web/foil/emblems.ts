@@ -59,7 +59,7 @@ const CATEGORY_EMBLEM: Record<string, string> = {
 
 const CLASSIC_EMBLEM: ReadonlyArray<readonly [RegExp, string]> = [
   [/firework/i, "fireworks"], [/militar|veteran|patriot|salute|armed/i, "military"], [/dollar|dog|hot ?dog|\$1/i, "dollar-dog"],
-  [/bobble|giveaway/i, "bobblehead"], [/hot ?sauce|salsa|chili|wing/i, "hot-sauce"],
+  [/bobble|giveaway/i, "bobblehead"], [/hot ?sauce|salsa|chili|wing/i, "hot-sauce"], [/band|symphony|orchestra|concert|showcase/i, "music"],
 ];
 
 export const EMBLEMS: Record<string, string> = { ...BASE, ...EXTRA };

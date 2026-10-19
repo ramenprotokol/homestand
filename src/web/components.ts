@@ -1,4 +1,4 @@
-import { FIT_WORDS, type FitLabel } from "../app/score";
+import { fitWord, type FitLabel } from "../app/score";
 import { h, type Child } from "./dom";
 import { icon, type IconName } from "./icons";
 import { state } from "./store";
@@ -14,7 +14,7 @@ const FIT_ICON: Record<FitLabel, IconName> = {
 
 /** The fit in words, with an icon: colour is never the only signal. */
 export function fitChip(fit: FitLabel | "pick"): HTMLElement {
-  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), FIT_WORDS[fit]);
+  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWord(fit, state.kind));
 }
 
 export function syntheticBanner(): HTMLElement | null {

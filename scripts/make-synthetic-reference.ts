@@ -2,6 +2,7 @@
 // Worker and the e2e run offline. Nothing here is Qloo data. The real aggregates live in reference-stats.json.
 import { writeFileSync } from "node:fs";
 import { bundleScore } from "../src/app/score";
+import { ALL_THEMES } from "../src/app/themes/artists";
 import { activeLibrary } from "../src/app/themes/ids";
 import { populationSd, mean, mulberry32 } from "../src/study/stats";
 import { syntheticAffinity } from "../src/worker/synthetic";
@@ -9,7 +10,7 @@ import { syntheticAffinity } from "../src/worker/synthetic";
 const rand = mulberry32(20261015);
 const points = Array.from({ length: 40 }, () => ({ lon: -122 + rand() * 52, lat: 26 + rand() * 22 }));
 const themes: Record<string, { n: number; mean: number; sd: number }> = {};
-for (const t of activeLibrary({}, true)) {
+for (const t of activeLibrary({}, true, ALL_THEMES)) {
   const scores = points.flatMap((p) => {
     const s = bundleScore(t.entities.map((e) => syntheticAffinity(e.id, p.lon, p.lat)));
     return s === null ? [] : [s];

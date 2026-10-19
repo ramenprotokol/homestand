@@ -49,6 +49,24 @@ export interface DiscoveredRow {
   popularity: number | null;
 }
 
+export interface DiscoverArtistsQuery {
+  lon: number;
+  lat: number;
+  radiusM?: number;
+  take: number;
+  /** A Qloo tag id such as "urn:tag:genre:music:country". Sent as filter.tags. */
+  tag?: string;
+}
+
+export interface ArtistRow {
+  entityId: string;
+  name: string;
+  affinity: number | null;
+  popularity: number | null;
+  /** Ids of the genre tags Qloo attached to the artist (for bucketing the offline pool; never stored or shown). */
+  genreTags: string[];
+}
+
 /** Always sent with discovery: without it, local results include adult and explicit titles. */
 export const FAMILY_TAG = "urn:tag:genre:media:family";
 /** Family AND animation: family alone also returns faith films and sitcoms. Sent as an intersection. */
@@ -196,7 +214,28 @@ export function createQlooClient(opts: ClientOptions) {
     return discoveredFromBody(await get("/v2/insights", params), q.type);
   }
 
-  return { search, localAffinity, discoverFamily, get requests() { return requests; }, get retries() { return { ...retries }; } };
+  /** The top artists near a point, optionally limited to one genre tag. Used only by the offline pool script. */
+  async function discoverArtists(q: DiscoverArtistsQuery): Promise<ArtistRow[]> {
+    const params: Record<string, string> = {
+      "filter.type": "urn:entity:artist",
+      "signal.location": `POINT(${q.lon} ${q.lat})`,
+      "signal.location.radius": String(q.radiusM ?? 80000),
+      take: String(q.take),
+    };
+    if (q.tag) params["filter.tags"] = q.tag;
+    const body = (await get("/v2/insights", params)) as { results?: { entities?: Record<string, unknown>[] } };
+    return (body.results?.entities ?? []).flatMap((e) => {
+      const name = typeof e.name === "string" ? e.name.trim() : "";
+      const id = typeof e.entity_id === "string" ? e.entity_id : "";
+      if (!name || !id) return [];
+      const tags = Array.isArray(e.tags) ? (e.tags as Array<Record<string, unknown>>) : [];
+      const genreTags = tags.flatMap((t) => (typeof t.tag_id === "string" && t.tag_id.includes(":genre:") ? [t.tag_id] : typeof t.id === "string" && t.id.includes(":genre:") ? [t.id] : []));
+      const query = e.query as { affinity?: unknown } | undefined;
+      return [{ entityId: id, name, affinity: num(query?.affinity), popularity: num(e.popularity), genreTags }];
+    });
+  }
+
+  return { search, localAffinity, discoverFamily, discoverArtists, get requests() { return requests; }, get retries() { return { ...retries }; } };
 }
 
 export type QlooClient = ReturnType<typeof createQlooClient>;

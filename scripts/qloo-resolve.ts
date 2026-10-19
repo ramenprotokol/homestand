@@ -4,7 +4,9 @@ import { pickEntity } from "../src/study/day1";
 import { allEntities, announce, client, dry, readIds, writeIds } from "./lib";
 
 const file = readIds();
-const todo = allEntities().filter((e) => !file.ids[e.key] && !file.dropped?.[e.key]);
+// --type=artist limits a run to one entity type (so an already-unresolved entity of another type is not searched again).
+const only = process.argv.find((a) => a.startsWith("--type="))?.slice(7);
+const todo = allEntities().filter((e) => !file.ids[e.key] && !file.dropped?.[e.key] && (!only || e.type === only));
 announce("qloo:resolve", todo.length);
 if (dry) {
   todo.forEach((e) => console.log(`  would search ${e.type} "${e.query}"${e.year ? ` (${e.year})` : ""}`));

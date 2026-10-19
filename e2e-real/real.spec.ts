@@ -175,3 +175,53 @@ test("real data: a recognised theme with no Qloo scores is not called unknown", 
   await expect(page.getByRole("dialog")).toContainText(/Rubber Duck Regatta" is not one of the \d+ themes we score with Qloo/);
   await expect(page.getByRole("dialog")).not.toContainText("We recognise");
 });
+
+// Venue mode on real Qloo data: the made-up Raleigh amphitheatre calendar. Cold, it costs one library request, two act-pool requests and one
+// taste-graph request per locked headliner; after that it is cached. Screenshots go to VENUE_SHOTS when set.
+test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) => {
+  const dir = process.env.VENUE_SHOTS ?? "test-results/screens-real";
+  const snap = (name: string): Promise<Buffer> => page.screenshot({ path: `${dir}/${info.project.name}-venue-${name}.png`, fullPage: true });
+  await page.goto("/#/sample");
+  await page.getByTestId("market-raleigh").click();
+  await expect(page.getByTestId("summary")).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText("Synthetic demo data")).toHaveCount(0);
+  await expect(page.getByTestId("venue-note")).toContainText("made-up");
+  await expect(page.getByTestId("check-result")).toHaveText(/^(None of the 18 dates lean|\d+ of 18 dates? leans?) away from what Raleigh likes\.$/);
+  await noSideScroll(page);
+  await snap("1-check");
+  // A flipped card.
+  await page.getByRole("button", { name: /Stevie Nicks/ }).click();
+  const why = page.getByRole("dialog");
+  await expect(why).toContainText("What Qloo looked at");
+  await expect(why).toContainText(/Compared with other reference markets, this market scores/);
+  await expect(why).not.toContainText(/ballpark/i);
+  await snap("2-why");
+  await page.keyboard.press("Escape");
+  await page.getByTestId("to-fix").click();
+  await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible({ timeout: 60_000 });
+  const skip = page.getByTestId("skip-pack");
+  await expect(skip).toBeVisible({ timeout: 60_000 });
+  await snap("3-fix-pack");
+  await skip.click();
+  await page.waitForTimeout(1500);
+  console.log("boxes", JSON.stringify([await page.locator(".acts").boundingBox(), await page.locator(".idx").boundingBox(), await page.locator(".now-card").boundingBox(), page.viewportSize()]));
+  await page.screenshot({ path: `${dir}/${info.project.name}-venue-3b-viewport.png` });
+  expect(await page.locator(".slide").count()).toBeGreaterThanOrEqual(1);
+  expect(await page.getByTestId("angle").count()).toBe(4);
+  await expect(page.getByTestId("angle").first()).toContainText(/(Support act idea: fans of .+ near Raleigh also lean toward|Fans of .+ near Raleigh also lean toward .+ promo tie-in)/);
+  await expect(page.getByTestId("ideas")).toContainText(/Acts that stand out near Raleigh/);
+  await expect(page.getByTestId("disc-badge").first()).toBeVisible(); // at least one swap is an act Qloo found
+  if ((page.viewportSize()?.width ?? 0) >= 900) {
+    const bar = (await page.locator(".acts").boundingBox())!;
+    const idx = (await page.locator(".idx").boundingBox())!;
+    expect(bar.y < idx.y + idx.height && idx.y < bar.y + bar.height && bar.x < idx.x + idx.width && idx.x < bar.x + bar.width, "the Approve bar covers the local-pull meter").toBe(false);
+  }
+  await noSideScroll(page);
+  await snap("4-fix");
+  await page.getByTestId("approve").click();
+  await expect(page.locator(".decision")).toContainText("Approved");
+  await page.getByTestId("to-send").click();
+  await expect(page.getByTestId("memo")).toContainText("Summer-series rationale: Raleigh, NC sample amphitheatre");
+  await noSideScroll(page);
+  await snap("5-send");
+});

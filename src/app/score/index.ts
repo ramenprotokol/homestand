@@ -1,5 +1,6 @@
 import statsFile from "../data/reference-stats.json";
 import syntheticFile from "../data/reference-stats.synthetic.json";
+import { copyFor, type Kind } from "../kind";
 
 export type FitLabel = "leans-in" | "average" | "leans-away" | "not-scored" | "classic" | "found";
 
@@ -11,6 +12,9 @@ export const FIT_WORDS: Record<FitLabel, string> = {
   classic: "Classic night",
   found: "Found by Qloo",
 };
+
+/** The label as a person reads it. A venue calls a classic night a classic date; everything else is the same for both kinds. */
+export const fitWord = (fit: FitLabel, kind?: Kind): string => (fit === "classic" && kind === "venue" ? "Classic date" : FIT_WORDS[fit]);
 
 /** z at or beyond these cut-offs is "Leans in" / "Leans away". */
 export const Z_CUT = 0.5;
@@ -60,11 +64,11 @@ export function labelForZ(z: number): "leans-in" | "average" | "leans-away" {
   return "average";
 }
 
-export function fitFor(score: number | null, ref: RefStat | undefined): Fit {
+export function fitFor(score: number | null, ref: RefStat | undefined, kind?: Kind): Fit {
   if (score === null) return { label: "not-scored", z: null, reason: "Qloo had no reading for part of this theme in this market." };
   if (!ref || ref.n < MIN_REF_N) return { label: "not-scored", z: null, reason: "There is no reference set for this theme yet." };
   const z = zScore(score, ref);
-  if (z === null) return { label: "not-scored", z: null, reason: "Ballpark markets barely differ on this theme, so there is nothing to compare." };
+  if (z === null) return { label: "not-scored", z: null, reason: `${copyFor(kind).markets.replace(/^./, (c) => c.toUpperCase())} barely differ on this theme, so there is nothing to compare.` };
   return { label: labelForZ(z), z };
 }
 
@@ -92,10 +96,10 @@ export function centre(zs: ReadonlyArray<number | null>): Centred {
 }
 
 /** How the market compares with other ballpark markets overall, in plain words. */
-export function marketLevelSentence(meanZ: number | null): string {
+export function marketLevelSentence(meanZ: number | null, kind?: Kind): string {
   if (meanZ === null) return "";
   const level = meanZ <= -0.25 ? "lower than usual" : meanZ >= 0.25 ? "higher than usual" : "about the same as usual";
-  return `Compared with other ballpark markets, this market scores ${level} on most themes.`;
+  return `Compared with other ${copyFor(kind).markets}, this market scores ${level} on most themes.`;
 }
 
 /** The theme against this market's own average, in plain words. */
@@ -112,11 +116,13 @@ export function comparisonSentence(themeLabel: string, label: FitLabel): string 
   }
 }
 
-export const METHOD_WORDS =
-  "We ask Qloo how strongly people near this ballpark lean toward each thing in a theme, and compare that with 40 other ballpark markets. " +
+export const methodWords = (kind?: Kind): string =>
+  `We ask Qloo how strongly people near this ${copyFor(kind).place} lean toward each thing in a theme, and compare that with 40 other ${copyFor(kind).markets}. ` +
   "Then we compare each theme with this market's own average lean, the same within-market comparison The Study uses. " +
   "A theme clearly above its own average (by at least half the usual spread between markets) is \"Leans in\". Clearly below is \"Leans away\". In between is \"About average\". " +
   "It describes local taste. It does not say a theme will raise attendance.";
+
+export const METHOD_WORDS = methodWords("club");
 
 /** "stands out above this market's average (+1.1)": the cited comparison, in plain words plus the number. */
 export function vsAverageWords(index: number | null): string {
@@ -132,6 +138,7 @@ export function vsAverage(index: number | null): string {
 }
 
 export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.";
+export const classicReason = (kind?: Kind): string => (kind === "venue" ? "Classic dates (fireworks, symphony nights, local showcases) aren't a music taste, so Qloo doesn't score them. They stay as planned." : CLASSIC_REASON);
 
 /**
  * What the study found, in plain words. Shown on the landing page, the Why panel, The Study and the memo.
@@ -139,14 +146,15 @@ export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qlo
  */
 export const AUDIT_LINE = "It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.";
 
-/** How a score compares with the 40 reference ballpark markets, from its z, in plain words. */
-export function vsMarketsWords(z: number | null): string {
+/** How a score compares with the 40 reference markets, from its z, in plain words. */
+export function vsMarketsWords(z: number | null, kind?: Kind): string {
+  const m = copyFor(kind).markets;
   if (z === null) return "not compared";
-  if (z <= -2 * Z_CUT) return "well below most ballpark markets";
-  if (z <= -Z_CUT) return "below most ballpark markets";
-  if (z < Z_CUT) return "about typical for ballpark markets";
-  if (z < 2 * Z_CUT) return "above most ballpark markets";
-  return "well above most ballpark markets";
+  if (z <= -2 * Z_CUT) return `well below most ${m}`;
+  if (z <= -Z_CUT) return `below most ${m}`;
+  if (z < Z_CUT) return `about typical for ${m}`;
+  if (z < 2 * Z_CUT) return `above most ${m}`;
+  return `well above most ${m}`;
 }
 
 /** Why a theme everyone scores near the top can still sit below average: the small gaps between markets are what is compared. */

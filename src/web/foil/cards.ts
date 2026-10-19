@@ -1,15 +1,14 @@
-import { FIT_WORDS, pullWords, vsMarketsWords, type FitLabel } from "../../app/score";
-import { swapName } from "../../app/text";
-import { themeById } from "../../app/themes/library";
+import { fitWord, pullWords, vsMarketsWords, type FitLabel } from "../../app/score";
+import { themeById } from "../../app/themes/artists";
 import { h } from "../dom";
 import { canHover, gsap, reduced } from "./motion";
 import { emblemFor } from "./emblems";
-import type { NightView } from "../store";
+import { copy, state, swapTitle, type NightView } from "../store";
 
 /** A night needing the director's pick is drawn as an unpainted sketch card and says so in words. */
 export type CardFit = FitLabel | "pick";
 
-export const FIT_NAME: Record<CardFit, string> = { ...FIT_WORDS, pick: "Needs your pick" };
+export const fitName = (fit: CardFit): string => (fit === "pick" ? "Needs your pick" : fitWord(fit, state.kind));
 
 export interface CardSpec {
   title: string;
@@ -78,12 +77,12 @@ function raw<T extends Element>(html: string): T {
   return t.content.firstElementChild as T;
 }
 
-/** "Bluey Day" becomes the script "Bluey" over the slab "DAY". Anything else gets "THEME NIGHT". */
+/** "Bluey Day" becomes the script "Bluey" over the slab "DAY". Anything else gets "THEME NIGHT" (a venue's "SHOW"). */
 export function nameParts(t: string): [string, string] {
   const w = t.trim().split(/\s+/);
   const last = w[w.length - 1] ?? "";
-  if (SUFFIX.includes(last) && w.length > 1) return [w.slice(0, -1).join(" "), last.toUpperCase()];
-  return [t, "THEME NIGHT"];
+  if (copy().night === "night" && SUFFIX.includes(last) && w.length > 1) return [w.slice(0, -1).join(" "), last.toUpperCase()];
+  return [t, copy().slab];
 }
 
 function parts(iso: string): { month: string; day: number } {
@@ -95,14 +94,14 @@ function parts(iso: string): { month: string; day: number } {
 export function specOf(v: NightView): CardSpec {
   const n = v.night;
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
-  const title = v.swappedFrom ? swapName(n.theme, v.themeLabel) : n.theme;
+  const title = v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme;
   const category = v.themeId ? (themeById(v.themeId)?.category ?? null) : null;
   const { month, day } = parts(n.date);
-  const words = FIT_NAME[fit];
+  const words = fitName(fit);
   return {
     title,
     fit,
-    emblem: emblemFor(v.discovered ? (v.discovered.type === "movie" ? "film" : "tv") : v.themeId, category, n.theme, n.resolution.kind === "classic"),
+    emblem: emblemFor(v.discovered ? (v.discovered.type === "artist" ? "music" : v.discovered.type === "movie" ? "film" : "tv") : v.themeId, category, n.theme, n.resolution.kind === "classic"),
     month,
     day,
     weekday: n.weekday,
@@ -116,7 +115,7 @@ export function specOf(v: NightView): CardSpec {
 /** A card for a theme the agent proposes: the night's date and sponsor, the new theme's art and fit. */
 export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel): CardSpec {
   const category = themeById(themeId)?.category ?? null;
-  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${FIT_WORDS[fit]}` };
+  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWord(fit, state.kind)}` };
 }
 
 function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
@@ -134,7 +133,7 @@ function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
     h("div", { class: "fine" }),
     raw(gemSVG(s.fit)),
     penn,
-    h("span", { class: "fitword" }, FIT_NAME[s.fit]),
+    h("span", { class: "fitword" }, fitName(s.fit)),
     h("div", { class: "plate" }, h("span", { class: "nm-s", style: `--fs:${fs}cqw` }, script), h("span", { class: "nm-b" }, slab), s.sponsor ? h("span", { class: "spons" }, s.sponsor) : null),
     h("div", { class: "foil" }),
     ...extra,
@@ -146,10 +145,15 @@ export function whyHead(fit: CardFit, city: string): string {
   return fit === "leans-in" ? `Why it fits ${city}` : fit === "leans-away" ? `Why it misses ${city}` : `How ${city} reads it`;
 }
 
-const WHY_TEXT: Partial<Record<CardFit, string>> = {
-  "leans-in": "People near the ballpark like these more than they like the average theme, so this night fits the market's taste.",
-  average: "People near the ballpark like these about as much as the average theme: neither a draw nor a drag.",
-  "leans-away": "People near the ballpark like these less than the average theme, so a swap may fit the market's taste better.",
+const whyText = (fit: CardFit): string => {
+  const c = copy();
+  const t = c.night === "date" ? "act" : "theme";
+  const text: Partial<Record<CardFit, string>> = {
+    "leans-in": `People near the ${c.place} like these more than they like the average ${t}, so this ${c.night} fits the market's taste.`,
+    average: `People near the ${c.place} like these about as much as the average ${t}: neither a draw nor a drag.`,
+    "leans-away": `People near the ${c.place} like these less than the average ${t}, so a swap may fit the market's taste better.`,
+  };
+  return text[fit] ?? "";
 };
 
 /** The cardboard stat back: taste match per item, the local pull, and the plain-words reason. */
@@ -161,11 +165,11 @@ function backFace(b: BackSpec): HTMLElement {
   if (scored && ix !== null) {
     body.push(
       h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Local pull", h("b", null, pullWords(ix)))),
-      h("div", { class: "bk-vs", "data-testid": "bk-vs" }, `${b.themeName} here: ${vsMarketsWords(b.z)}`),
-      h("div", { class: "bk-why" }, h("b", null, whyHead(b.fit, b.city)), WHY_TEXT[b.fit] ?? ""),
+      h("div", { class: "bk-vs", "data-testid": "bk-vs" }, `${b.themeName} here: ${vsMarketsWords(b.z, state.kind)}`),
+      h("div", { class: "bk-why" }, h("b", null, whyHead(b.fit, b.city)), whyText(b.fit)),
     );
   } else {
-    body.push(h("div", { class: "bk-why" }, h("b", null, FIT_NAME[b.fit]), b.reason ?? ""));
+    body.push(h("div", { class: "bk-why" }, h("b", null, fitName(b.fit)), b.reason ?? ""));
   }
   return h(
     "div",
@@ -176,7 +180,7 @@ function backFace(b: BackSpec): HTMLElement {
       h(
         "div",
         { class: "bk" },
-        h("div", { class: "bk-top" }, h("span", null, `${b.city} nights`), h("b", null, `No. ${pad(b.no)} / ${pad(b.total)}`)),
+        h("div", { class: "bk-top" }, h("span", null, `${b.city} ${copy().nights}`), h("b", null, `No. ${pad(b.no)} / ${pad(b.total)}`)),
         h("div", { class: "bk-nm" }, b.title),
         h("div", { class: "bk-sub" }, b.dateLine),
         ...body,

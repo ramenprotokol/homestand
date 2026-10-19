@@ -120,6 +120,122 @@
     "bad-bunny:artist": {
       "id": "BDA1B73F-10E7-4D09-AC51-B796CCEC5FF3",
       "name": "Bad Bunny"
+    },
+    "zach-bryan:artist": {
+      "id": "3221FBAC-2C10-4BAA-ADE0-AB40D02D5670",
+      "name": "Zach Bryan"
+    },
+    "chris-stapleton:artist": {
+      "id": "50D63FB3-3D36-46FD-B047-EC073A3D35BD",
+      "name": "Chris Stapleton"
+    },
+    "luke-bryan:artist": {
+      "id": "4A09478F-69D8-4D49-B969-0E023D317864",
+      "name": "Luke Bryan"
+    },
+    "jason-aldean:artist": {
+      "id": "782462EC-6DE6-47A9-B4F1-D629CC179199",
+      "name": "Jason Aldean"
+    },
+    "foo-fighters:artist": {
+      "id": "44518083-AA99-408A-A87A-170542920125",
+      "name": "Foo Fighters"
+    },
+    "imagine-dragons:artist": {
+      "id": "13087295-1C74-4EA7-8D1B-9C3A87A6A1E4",
+      "name": "Imagine Dragons"
+    },
+    "green-day:artist": {
+      "id": "76922890-5BBA-42BB-B3F9-1AF72114CF44",
+      "name": "Green Day"
+    },
+    "red-hot-chili-peppers:artist": {
+      "id": "CCED2E0D-F6C1-42CA-8BF1-118C70D946E8",
+      "name": "Red Hot Chili Peppers"
+    },
+    "ed-sheeran:artist": {
+      "id": "058B79A3-49F5-4927-9AB6-DE713C706796",
+      "name": "Ed Sheeran"
+    },
+    "dua-lipa:artist": {
+      "id": "1D792A35-7D72-4D57-88D0-C3A4F3E73EF6",
+      "name": "Dua Lipa"
+    },
+    "bruno-mars:artist": {
+      "id": "A8A71B45-1FF5-475F-8559-581CECF97563",
+      "name": "Bruno Mars"
+    },
+    "kendrick-lamar:artist": {
+      "id": "C915A918-39C5-47A3-A101-D9FA1DECBD9C",
+      "name": "Kendrick Lamar"
+    },
+    "post-malone:artist": {
+      "id": "ADB51D79-491A-49E7-9A99-E1F739382E9F",
+      "name": "Post Malone"
+    },
+    "travis-scott:artist": {
+      "id": "1651869C-3277-47AC-8535-62784C799EDF",
+      "name": "Travis Scott"
+    },
+    "karol-g:artist": {
+      "id": "658495BB-DF77-472E-A6B2-9E37FF248FB3",
+      "name": "Karol G"
+    },
+    "fleetwood-mac:artist": {
+      "id": "B1414851-6A23-4C52-B647-2A0249B664F9",
+      "name": "Fleetwood Mac"
+    },
+    "journey:artist": {
+      "id": "AE1A744A-5B67-4B89-B829-67F831074EAB",
+      "name": "Journey"
+    },
+    "dave-matthews-band:artist": {
+      "id": "26E0C3C5-F5C0-4A7B-A555-B2180EC79B77",
+      "name": "Dave Matthews Band"
+    },
+    "phish:artist": {
+      "id": "658C9541-F0E0-47AF-B033-8F5EB601E650",
+      "name": "Phish"
+    },
+    "widespread-panic:artist": {
+      "id": "228CA635-61E3-49D7-95C5-47C6363F90EC",
+      "name": "Widespread Panic"
+    },
+    "the-lumineers:artist": {
+      "id": "24E70404-379A-4D46-8A7B-6E33F666CAC5",
+      "name": "The Lumineers"
+    },
+    "sza:artist": {
+      "id": "E2E58680-EE3F-4D1D-88B6-B79F87205B2C",
+      "name": "SZA"
+    },
+    "the-weeknd:artist": {
+      "id": "A9C3CE3F-9A0C-47B3-8AF8-E75B252F86D8",
+      "name": "The Weeknd"
+    },
+    "yacht-rock:hall-oates": {
+      "id": "BB4668B1-10EA-4BB0-B0FA-5A45576B520B",
+      "name": "Hall & Oates"
+    },
+    "emo-night:mcr": {
+      "id": "97C28558-47C8-4D19-88EC-CD5F8EA82B3B",
+      "name": "My Chemical Romance"
+    },
+    "emo-night:fob": {
+      "id": "ED7388A1-E004-4FC6-A70E-C6AD990A1B12",
+      "name": "Fall Out Boy"
+    },
+    "emo-night:paramore": {
+      "id": "E7D47221-D574-401A-B0A6-9286FA74EB17",
+      "name": "Paramore"
+    },
+    "yacht-rock:loggins": {
+      "id": "74D2E1C4-F26B-4AEB-92C8-9EB147697116",
+      "name": "Kenny Loggins"
+    },
+    "stevie-nicks:artist": {
+      "id": "1C595E6F-D008-48F2-8EAB-4EFA935B29EE",
+      "name": "Stevie Nicks"
     }
   },
   "dropped": {
@@ -137,6 +253,9 @@
     "peanuts:tv": "no local affinity at the 4 sample markets",
     "grinch:film": "no local affinity at the 4 sample markets",
     "top-gun:film": "no local affinity at the 4 sample markets",
-    "pirates:film": "no local affinity at the 4 sample markets"
+    "pirates:film": "no local affinity at the 4 sample markets",
+    "peso-pluma:artist": "no local affinity at any of the 40 reference markets",
+    "eagles:artist": "no local affinity at any of the 40 reference markets",
+    "yacht-rock:steely-dan": "no local affinity at any of the 40 reference markets"
   }
 }

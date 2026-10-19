@@ -1,7 +1,7 @@
 import { shortDate } from "../../app/dates";
-import { cleanTitle, swapName } from "../../app/text";
+import { cleanTitle } from "../../app/text";
 import { pullBand, pullWords, vsAverageWords, vsMarketsWords } from "../../app/score";
-import { themeById } from "../../app/themes/library";
+import { themeById } from "../../app/themes/artists";
 import { openDrawer, syntheticBanner } from "../components";
 import { formatDateTime, h, localizeDates, type Child } from "../dom";
 import { ensureProposals, navigate } from "../flow";
@@ -11,15 +11,18 @@ import { gsap, reduced, sleep } from "../foil/motion";
 import { packEl } from "../foil/pack";
 import { setTally, tally } from "../foil/tally";
 import { icon } from "../icons";
-import type { ProposeResponse } from "../../app/api-types";
+import type { ActsOut, ProposeResponse } from "../../app/api-types";
+import { ACTS_REFERENCE, worthABooking } from "../../app/acts";
+import { GENRE_WORDS } from "../../app/themes/library";
+import { cityOfLabel } from "../../app/kind";
 import { DISCOVERY_REFERENCE, worthAnIdea } from "../../app/discovery";
 import type { Discovered } from "../../app/propose/propose";
-import { approvedSwaps, effective, state, ui, viewOf, type ShownProposal } from "../store";
+import { approvedSwaps, copy, effective, state, swapTitle, ui, viewOf, type ShownProposal } from "../store";
 
 const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hashchange"));
 const label = (id: string): string => themeById(id)?.label ?? id;
 /** What the swap puts on the night: a library theme, or a title Qloo found. */
-const foundWordsOf = (f: { z?: number | null }): string => `${vsMarketsWords(f.z ?? null)}.`.replace(/^./, (c) => c.toUpperCase());
+const foundWordsOf = (f: { z?: number | null }): string => `${vsMarketsWords(f.z ?? null, state.kind)}.`.replace(/^./, (c) => c.toUpperCase());
 /** The badge on a best-option swap. The "about this town's usual" detail lives in the reason. */
 const bestLabel = (p: ShownProposal): string => `Best ${themeById(p.fromThemeId)?.audience === "kids" ? "kids" : "family"} option`;
 /** Colour of a local-pull reading by its band: red below the town's usual, silver about usual, gold above. */
@@ -54,7 +57,7 @@ export function fixView(): HTMLElement {
         "div",
         { class: "wrap" },
         h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Working out ", h("em", null, "the fixes")), h("p", { class: "lede", role: "status" }, "Checking each swap against your locks, dates and audience."))),
-        h("div", { class: "fix-grid" }, h("div", { class: "stage2" }, h("div", { class: "pack-wrap" }, packEl("div", "", "swaps · sealing"))), h("aside", { class: "agent" }, h("div", { class: "ag-h" }, h("i"), "How Homestand decided"), h("div", { class: "skeleton", style: "min-height:160px;margin-top:12px" }))),
+        h("div", { class: "fix-grid" }, h("div", { class: "stage2" }, h("div", { class: "pack-wrap" }, packEl("div", "", "swaps · sealing", copy().season === "season" ? undefined : "Summer swaps"))), h("aside", { class: "agent" }, h("div", { class: "ag-h" }, h("i"), "How Homestand decided"), h("div", { class: "skeleton", style: "min-height:160px;margin-top:12px" }))),
       ),
     );
   }
@@ -102,29 +105,29 @@ export function fixView(): HTMLElement {
             rerender();
           },
         }),
-        "Allow a theme to repeat in the season",
+        `Allow a theme to repeat in the ${copy().season}`,
       ),
-      h("span", { class: "check-note" }, "Off by default: each theme is used once, so two weak nights never get the same replacement."),
+      h("span", { class: "check-note" }, `Off by default: each theme is used once, so two weak ${copy().nights} never get the same replacement.`),
       ui.dupesNote ? h("p", { class: "dupes-note", role: "status", "data-testid": "dupes-note" }, ui.dupesNote) : null,
     ),
   );
   const tools = h("div", { class: "fix-tools" }, h("button", { type: "button", class: "btn ghost sm", "data-testid": "open-trace", onclick: openTrace }, icon("list"), "Full step log"), advanced);
 
-  const lead = swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked nights are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
+  const lead = swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
   const section = h(
     "section",
     { class: "fix", id: "fix" },
     h(
       "div",
       { class: "wrap" },
-      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, "nights that lean away")), h("p", { class: "lede" }, lead)), headTally),
+      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `${copy().nights} that lean away`)), h("p", { class: "lede" }, lead)), headTally),
       synth,
       tools,
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
-      ideasPanel(p.discovery, a.market.label),
+      state.kind === "venue" ? actsPanel(p.acts, a.market.label) : ideasPanel(p.discovery, a.market.label),
       p.angles.length > 0
-        ? h("section", { class: "sect side" }, h("h2", null, "Locked nights: keep them, add an angle"), h("div", { class: "side-list" }, p.angles.map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))))
+        ? h("section", { class: "sect side" }, h("h2", null, state.kind === "venue" ? "Locked headliners: keep them, add a support act" : `Locked ${copy().nights}: keep them, add an angle`), h("div", { class: "side-list" }, p.angles.map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))))
         : null,
       p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
     ),
@@ -143,7 +146,7 @@ function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLE
   if (!d) return null;
   const titles = ideaTitles(d);
   if (titles.length === 0) return null;
-  const city = marketLabel.split(",")[0]!.replace(/ (sample )?club$/, "");
+  const city = cityOfLabel(marketLabel);
   return h(
     "section",
     { class: "ideas", "data-testid": "ideas", "aria-label": `Family titles that stand out near ${city}` },
@@ -153,27 +156,50 @@ function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLE
   );
 }
 
+/** Venue runs: the acts that stand out most near this venue, best first, up to six. Only acts that clear the "Leans in" bar and are nationally well known. */
+export function actIdeas(d: ActsOut, max = 6): Discovered[] {
+  return d.acts.filter(worthABooking).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max);
+}
+
+function actsPanel(d: ActsOut | null | undefined, marketLabel: string): HTMLElement | null {
+  if (!d) return null;
+  const city = cityOfLabel(marketLabel);
+  const acts = actIdeas(d);
+  if (acts.length === 0) {
+    return h("section", { class: "ideas", "data-testid": "ideas", "aria-label": `Touring acts near ${city}` }, h("h2", null, `Touring acts near ${city}`), h("p", { class: "small", "data-testid": "ideas-note" }, `No act in our pool of ${d.poolSize} stands out near ${city} right now: none is clearly above its own usual here. That happens, and we say so rather than pad the list.`));
+  }
+  return h(
+    "section",
+    { class: "ideas", "data-testid": "ideas", "aria-label": `Acts that stand out near ${city}` },
+    h("h2", null, `Acts that stand out near ${city}`),
+    h("ul", { class: "idea-chips" }, acts.map((x) => h("li", { class: "idea" }, x.name, x.genre ? h("small", null, ` · ${GENRE_WORDS[x.genre]}`) : null))),
+    h("p", { class: "small", "data-testid": "ideas-note" }, `Qloo had local data for ${d.scored} of our ${d.poolSize} touring acts near ${city}. These stand out against ${ACTS_REFERENCE.markets} reference markets and are nationally well known. They come from Qloo's taste data for this area.${d.fetchedAt ? ` Pulled from Qloo ${formatDateTime(d.fetchedAt)}.` : ""}`),
+  );
+}
+
 /** One compact block for every night that could not be fixed, with one shared explanation instead of a card each. */
 function unfixedBlock(list: ProposeResponse["unfixed"]): HTMLElement {
   const young = list.filter((u) => u.reason.startsWith("No family theme")).length;
   const why =
-    young === list.length
+    state.kind === "venue"
+      ? "No act in the same genre, or a related one, leans in here for these dates, so they stay as planned."
+      : young === list.length
       ? "Nothing in these nights' audience leans in here, and no theme close to this town's usual beats the planned night by enough. A kids' night stays a kids' night, so these stay as planned."
       : young === 0
-        ? "No theme passes the date, audience and no-repeat checks for these nights, so they stay as planned."
+        ? `No theme passes the date, audience and no-repeat checks for these ${copy().nights}, so they stay as planned.`
         : "No replacement passes the checks and clearly beats the planned night, so these stay as planned.";
   return h(
     "section",
     { class: "sect nofix", "data-testid": "unfixed-block" },
-    h("h2", null, `Could not fix: ${list.length} night${list.length === 1 ? "" : "s"}`),
+    h("h2", null, `Could not fix: ${list.length} ${list.length === 1 ? copy().night : copy().nights}`),
     h("p", { class: "nofix-why" }, why),
-    h("p", { class: "next-step" }, "Next step: keep the original nights, or change a theme in your own calendar and check again."),
+    h("p", { class: "next-step" }, copy().night === "date" ? "Next step: keep the original dates, or change an act in your own calendar and check again." : "Next step: keep the original nights, or change a theme in your own calendar and check again."),
     h(
       "ul",
       { class: "nofix-list" },
       list.map((u) => {
         const n = state.analysis!.nights[u.index]!;
-        return h("li", null, h("b", null, shortDate(u.date)), ` ${n.theme}${n.sponsor ? ` · ${n.sponsor}` : ""}`);
+        return h("li", null, h("b", null, shortDate(u.date)), ` ${n.theme}${n.sponsor ? ` · ${n.sponsor}` : ""}`, state.kind === "venue" ? h("small", null, ` · ${u.reason}`) : null);
       }),
     ),
   );
@@ -249,7 +275,7 @@ class FixStage {
   private buildPack(): void {
     const n = this.swaps.length;
     const wrap = h("div", { class: "pack-wrap", id: "packWrap" });
-    const pack = packEl("button", `Open the pack: ${n} swap${n === 1 ? "" : "s"}`, `${n} new card${n === 1 ? "" : "s"} · sealed`);
+    const pack = packEl("button", `Open the pack: ${n} swap${n === 1 ? "" : "s"}`, `${n} new card${n === 1 ? "" : "s"} · sealed`, copy().season === "season" ? undefined : "Summer swaps");
     const hint = h("p", { class: "pack-hint" }, `Homestand has ${n} swap${n === 1 ? "" : "s"} ready. Tap the pack to tear it open.`);
     const skip = h("button", { type: "button", class: "btn ghost sm", "data-testid": "skip-pack", onclick: () => this.open(false) }, "Skip the tearing");
     wrap.append(pack, hint, skip);
@@ -329,7 +355,7 @@ class FixStage {
     const p = effective(top);
     const base = specOf(viewOf(state.analysis!.nights[p.index]!));
     const night = state.analysis!.nights[p.index]!;
-    return { front: specForSwap(base, p.fromThemeId, swapName(night.theme, label(p.fromThemeId)), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, swapName(night.theme, toLabel(p)), p.to.label) };
+    return { front: specForSwap(base, p.fromThemeId, swapTitle(night.theme, label(p.fromThemeId)), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "artist" ? "music" : p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, swapTitle(night.theme, toLabel(p)), p.to.label) };
   }
 
   private buildSlides(): void {
@@ -424,7 +450,7 @@ class FixStage {
       ? `Found by Qloo: ${foundWordsOf(found)} It is not scored against the library, so there is no local-pull rating. ${label(p.fromThemeId)}: ${vsAverageWords(p.from.z)}.`
       : `${label(p.toThemeId)}: ${vsAverageWords(p.to.z)}. ${label(p.fromThemeId)}: ${vsAverageWords(p.from.z)}.`;
     const shown = d === "approved" ? p.to.z : p.from.z;
-    const foundWords = found ? vsMarketsWords(found.z ?? null) : "";
+    const foundWords = found ? vsMarketsWords(found.z ?? null, state.kind) : "";
     const was = bandWord(p.from.z).toLowerCase();
     const sub = d === "approved" && found ? `Approved. ${foundWords.replace(/^./, (c) => c.toUpperCase())}.` : d === "approved" ? `Approved. Was ${was}.` : d === "rejected" ? "Rejected. Kept as planned." : found ? `now ${was} → found by Qloo, ${foundWords}` : `now ${was} → proposed ${bandWord(p.to.z).toLowerCase()}`;
 
@@ -434,7 +460,7 @@ class FixStage {
       d === undefined && top.alternates.length > 0
         ? h("div", { class: "alts", role: "group", "aria-label": "Other themes that pass the same checks" }, h("span", { class: "small" }, "Or:"), pool.map((id) => {
             const blocked = !state.allowDuplicates && takenElsewhere.has(id);
-            return h("button", { type: "button", class: "chip-btn", "data-testid": "alt", disabled: blocked ? "" : null, title: blocked ? "Already chosen for another night" : null, onclick: () => this.switchAlt(top, id) }, label(id));
+            return h("button", { type: "button", class: "chip-btn", "data-testid": "alt", disabled: blocked ? "" : null, title: blocked ? `Already chosen for another ${copy().night}` : null, onclick: () => this.switchAlt(top, id) }, label(id));
           }))
         : null;
 
@@ -596,7 +622,7 @@ class FixStage {
   private idleAgent(): void {
     const a = state.analysis!, p = state.propose!;
     this.steps.replaceChildren();
-    this.add([h("div", { class: "ic" }, "A"), h("div", null, h("div", { class: "k" }, "Ready"), h("div", { class: "m" }, `Homestand compared all ${a.nights.length} nights with this market's own taste level and found `, h("b", null, `${p.proposals.length} swap${p.proposals.length === 1 ? "" : "s"}`), `, ${p.angles.length} sponsor idea${p.angles.length === 1 ? "" : "s"} and ${p.unfixed.length} night${p.unfixed.length === 1 ? "" : "s"} it could not fix.`))], true);
+    this.add([h("div", { class: "ic" }, "A"), h("div", null, h("div", { class: "k" }, "Ready"), h("div", { class: "m" }, `Homestand compared all ${a.nights.length} ${copy().nights} with this market's own taste level and found `, h("b", null, `${p.proposals.length} swap${p.proposals.length === 1 ? "" : "s"}`), `, ${p.angles.length} ${state.kind === "venue" ? "support-act" : "sponsor"} idea${p.angles.length === 1 ? "" : "s"} and ${p.unfixed.length} ${p.unfixed.length === 1 ? copy().night : copy().nights} it could not fix.`))], true);
     this.add([h("div", { class: "ic" }, "★"), h("div", null, h("div", { class: "k" }, "Next"), h("div", { class: "m" }, "Open the pack. Each swap keeps its ", h("b", null, "date and sponsor"), ". You decide, one at a time."))], true);
   }
 
@@ -627,10 +653,10 @@ class FixStage {
     const quick = instant || reduced();
     const wait = (ms: number): Promise<void> => (quick ? Promise.resolve() : sleep(ms));
     const live = (): boolean => this.alive && tok === this.tok;
-    this.qloo(p.fromThemeId, "Taste lookup · the weak night", quick);
+    this.qloo(p.fromThemeId, `Taste lookup · the weak ${copy().night}`, quick);
     await wait(520);
     if (!live()) return;
-    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, "Discovered by Qloo"), h("div", { class: "m" }, h("b", null, p.discovered.name), ` stands out near ${state.analysis!.market.label.split(",")[0]!.replace(/ (sample )?club$/, "")}: ${vsMarketsWords(p.discovered.z ?? null)}. No library theme leaned in for this night. It has no local-pull number: it was found, not scored.`))], quick);
+    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, "Discovered by Qloo"), h("div", { class: "m" }, h("b", null, p.discovered.name), ` stands out near ${cityOfLabel(state.analysis!.market.label)}: ${vsMarketsWords(p.discovered.z ?? null, state.kind)}. ${state.kind === "venue" ? "No library theme that close in genre leaned in for this date." : "No library theme leaned in for this night."} It has no local-pull number: it was found, not scored.`))], quick);
     else this.qloo(p.toThemeId, "Taste lookup · the better fit", quick);
     await wait(520);
     if (!live()) return;

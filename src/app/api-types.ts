@@ -1,4 +1,5 @@
 import type { Resolution } from "./calendar/resolve";
+import type { Kind } from "./kind";
 import type { Discovered, Proposal, SponsorAngle } from "./propose/propose";
 import type { FitLabel } from "./score";
 import type { TraceStep } from "./trace";
@@ -74,6 +75,8 @@ export interface NightOut {
 
 export interface AnalyzeResponse {
   market: MarketIn;
+  /** Present only for a venue run; a club run has no such field. */
+  kind?: Kind;
   mode: "live" | "synthetic";
   /** Date the scores were recorded when they came from the cache. */
   recordedOn: string | null;
@@ -106,10 +109,22 @@ export interface DiscoveryOut {
   fetchedAt: string;
 }
 
+/** Qloo's local ranking of the touring-act pool for a venue market. Only name, id, genre and a z are kept. */
+export interface ActsOut {
+  acts: Discovered[];
+  /** How many pool acts Qloo had a local reading for here, and how big the pool is. */
+  scored: number;
+  poolSize: number;
+  source: "live" | "cache" | "synthetic";
+  fetchedAt: string;
+}
+
 export interface ProposeResponse {
   proposals: Array<Proposal & { whySource: "model" | "template" }>;
-  /** Null when discovery was unavailable (cap reached or Qloo trouble); swaps then use library themes only. */
+  /** Null when discovery was unavailable (cap reached or Qloo trouble); swaps then use library themes only. Always null for a venue run. */
   discovery: DiscoveryOut | null;
+  /** Venue runs only: the acts that stand out near the venue. Null when unavailable; absent for a club run. */
+  acts?: ActsOut | null;
   angles: SponsorAngle[];
   unfixed: Array<{ index: number; date: string; reason: string }>;
   trace: TraceStep[];

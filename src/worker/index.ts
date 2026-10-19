@@ -1,4 +1,6 @@
 import { activeLibrary, COMMITTED_IDS } from "../app/themes/ids";
+import { VENUE_LIBRARY } from "../app/themes/artists";
+import { ACTS_REFERENCE, syntheticActsReference } from "../app/acts";
 import { REFERENCE, SYNTHETIC_REFERENCE } from "../app/score";
 import type { Deps } from "./agent";
 import type { Env } from "./env";
@@ -47,6 +49,9 @@ function depsFor(env: Env): RouterDeps {
     qlooBase: env.QLOO_API_URL ?? (synthetic ? "https://synthetic.invalid" : ""),
     qlooKey: env.QLOO_API_KEY ?? "",
     library: activeLibrary(COMMITTED_IDS, synthetic),
+    venueLibrary: activeLibrary(COMMITTED_IDS, synthetic, VENUE_LIBRARY),
+    actsRef: synthetic ? syntheticActsReference() : ACTS_REFERENCE,
+    ...(synthetic ? { popularityOf: (id: string) => (id.startsWith("SYN-") ? 0.9 : undefined) } : {}),
     reference: synthetic ? SYNTHETIC_REFERENCE : REFERENCE,
     discoveryRef: synthetic ? syntheticDiscoveryReference() : DISCOVERY_REFERENCE,
     now: () => new Date(),

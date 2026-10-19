@@ -8,12 +8,13 @@ import { announce, client, dry, liveLibrary, readIds, typesOf, writeIds } from "
 
 const lib = liveLibrary();
 const types = typesOf(lib);
-announce("qloo:coverage", SAMPLE_MARKETS.length * types.length);
+const CLUBS = SAMPLE_MARKETS.filter((m) => m.kind === "club"); // the coverage rule is about the club library at the four ballpark samples
+announce("qloo:coverage", CLUBS.length * types.length);
 if (dry) process.exit(0);
 const q = client();
 const seen = new Map<string, boolean>(); // entity id -> any value at any sample market
 const counts: string[] = [];
-for (const m of SAMPLE_MARKETS) {
+for (const m of CLUBS) {
   for (const type of types) {
     const ids = idsOfType(lib, type);
     const rows = await q.localAffinity({

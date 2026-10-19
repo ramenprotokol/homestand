@@ -1,6 +1,7 @@
 import type { ApiError, GeoHit, MarketIn, ProposeNightIn } from "../app/api-types";
 import { parseDate, type CalendarRow } from "../app/calendar/csv";
-import { analyze, capsOf, CappedError, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
+import { analyze, capsOf, CappedError, forKind, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
+import { kindOf } from "../app/kind";
 import { placeLabel } from "../app/geo";
 import { DAILY_QUOTA, type Limiter, type QuotaKind } from "./limits";
 import { safeGet, safePut } from "./safe";
@@ -217,7 +218,7 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
       if (!deps.signingKey && !isSampleMarket(m)) console.error("MARKET_SIGNING_KEY is not set: only the sample clubs are accepted");
       return fail(400, "bad-market", "Search for your city and pick it from the list, or use a sample club.", headers);
     }
-    const agent: Deps = { ...deps.agent, gate: gateFor(deps, req, m) };
+    const agent: Deps = { ...forKind(deps.agent, kindOf(body.kind)), gate: gateFor(deps, req, m) };
 
     if (route === "analyze") {
       const rows = rowsOf(body.rows);
@@ -227,12 +228,12 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
     if (route === "propose") {
       const nights = nightsOf(body.nights);
       if (!nights) return fail(400, "bad-request", "The nights are missing or invalid.", headers);
-      if (nights.some((n) => n.themeId !== null && !deps.agent.library.some((t) => t.id === n.themeId))) return fail(400, "bad-request", "Unknown theme.", headers);
+      if (nights.some((n) => n.themeId !== null && !agent.library.some((t) => t.id === n.themeId))) return fail(400, "bad-request", "Unknown theme.", headers);
       return json(await proposeSwaps(agent, { market: m, nights, allowDuplicates: body.allowDuplicates === true }), 200, headers);
     }
     if (route === "recheck") {
       const themeId = str(body.themeId, 60);
-      if (!themeId || !deps.agent.library.some((t) => t.id === themeId)) return fail(400, "bad-request", "Unknown theme.", headers);
+      if (!themeId || !agent.library.some((t) => t.id === themeId)) return fail(400, "bad-request", "Unknown theme.", headers);
       const caps = await capsOf(deps.agent);
       if (caps.recheckDisabled) return fail(429, "capped", "Live re-check is switched off for today. The recorded results below are still good.", headers);
       return json(await recheck(agent, { market: m, themeId }), 200, headers);

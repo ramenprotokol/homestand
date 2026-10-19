@@ -1,9 +1,12 @@
 import type { AnalyzeResponse, MarketIn, NightOut, ProposeResponse, ThemeScoreOut } from "../app/api-types";
 import type { CalendarRow, RowError } from "../app/calendar/csv";
+import type { Kind } from "../app/kind";
 import type { FitLabel } from "../app/score";
 import type { TraceStep } from "../app/trace";
 import { templateWhy, type Proposal } from "../app/propose/propose";
-import { themeById } from "../app/themes/library";
+import { copyFor, type Copy } from "../app/kind";
+import { swapName } from "../app/text";
+import { themeById } from "../app/themes/artists";
 
 export type Decision = "approved" | "rejected";
 
@@ -14,6 +17,8 @@ export interface TraceGroup {
 }
 
 export interface State {
+  /** "venue" for the concert-venue sample, else "club": decides wording and which library the Worker scores. */
+  kind: Kind;
   market: MarketIn | null;
   sampleId: string | null;
   rows: CalendarRow[];
@@ -31,8 +36,14 @@ export interface State {
 
 export const state: State = blank();
 
+/** The wording for the run on screen: club wording unless the concert-venue sample is loaded. */
+export const copy = (): Copy => copyFor(state.kind);
+
+/** A swapped date's name: a club keeps the original's ending ("Bluey Day"), a venue date is just the act. */
+export const swapTitle = (original: string, newLabel: string): string => swapName(original, newLabel, state.kind);
+
 function blank(): State {
-  return { market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: {}, propose: null, decisions: {}, altChoice: {}, allowDuplicates: false, traceGroups: [] };
+  return { kind: "club", market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: {}, propose: null, decisions: {}, altChoice: {}, allowDuplicates: false, traceGroups: [] };
 }
 
 export function reset(): void {
@@ -65,7 +76,7 @@ export interface NightView {
   swappedFrom: string | null;
   needsChoice: boolean;
   /** Set when an approved swap replaced the night with a title Qloo found. */
-  discovered: { name: string; type: "movie" | "tv_show"; z: number | null } | null;
+  discovered: { name: string; type: "movie" | "tv_show" | "artist"; z: number | null } | null;
 }
 
 /** What a night looks like right now: the director's choice and any approved swap applied. */

@@ -444,3 +444,5 @@ body.why-open .nav{visibility:hidden}
 .idx .v.mid{color:#cfd3ee;text-shadow:none}
 .now-card .disc-badge,.now-card .best-badge{font-size:9.5px;letter-spacing:.07em;white-space:nowrap;padding:3px 7px;max-width:none}
 @media (max-width:420px){.swap-card{grid-template-columns:96px minmax(0,1fr)}}
+.venue-eyebrow{margin-top:clamp(28px,4vw,44px)}
+.venue-lede{margin:6px 0 16px;max-width:60ch}
