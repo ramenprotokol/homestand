@@ -1,5 +1,5 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { AUDIT_LINE, CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS } from "../../app/score";
+import { AUDIT_LINE, CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS, pullWords } from "../../app/score";
 import { themeById } from "../../app/themes/library";
 import { ApiFailure } from "../api";
 import { fitChip, syntheticBanner } from "../components";
@@ -8,7 +8,7 @@ import { recheckTheme, navigate } from "../flow";
 import { bindTilt, FIT_NAME, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
 import { tally } from "../foil/tally";
 import { onCleanup, onMount, route, routeContext } from "../foil/lifecycle";
-import { fmt, gsap, reduced } from "../foil/motion";
+import { fmt1, gsap, reduced } from "../foil/motion";
 import { rand } from "../foil/rng";
 import { bokeh, garland, lamp, ridge } from "../foil/scenery";
 import { openWhy, refreshWhy } from "../foil/why";
@@ -25,6 +25,18 @@ const LEGEND: ReadonlyArray<readonly [CardFit, string, string]> = [
 ];
 
 const city = (): string => (state.analysis?.market.label ?? "").split(",")[0]!.replace(/ (sample )?club$/, "");
+
+/** Sponsor and lock, in words under the card: the card art is too small to carry them. */
+function slotNote(v: NightView): HTMLElement | null {
+  const n = v.night;
+  if (!n.sponsor && !n.locked) return null;
+  return h(
+    "p",
+    { class: "slot-note", "data-locked": n.locked ? "1" : null },
+    n.locked ? h("span", { class: "sn-lock" }, icon("lock"), "Locked") : null,
+    n.sponsor ? h("span", { class: "sn-sp" }, n.sponsor) : null,
+  );
+}
 
 export function checkView(): HTMLElement {
   if (ui.loading) return loadingView();
@@ -64,6 +76,7 @@ export function checkView(): HTMLElement {
 
   const summary = `${count("leans-in")} lean in, ${count("average")} about average, ${away} lean away, ${count("not-scored")} not scored, ${count("classic")} classic.`;
   const locked = views.filter((v) => v.night.locked);
+  const result = away === 0 ? `None of the ${views.length} nights lean away from what ${city()} likes.` : `${away} of ${views.length} nights ${away === 1 ? "leans" : "lean"} away from what ${city()} likes.`;
 
   const asks = pendingViews.map((v) =>
     h(
@@ -91,7 +104,7 @@ export function checkView(): HTMLElement {
         h("h2", { class: "month-tag" }, name),
         h("div", { class: "grid" }, vs.map((v) => {
           const c = makeCard(specOf(v));
-          return h("div", { class: "slot" }, c);
+          return h("div", { class: "slot" }, c, slotNote(v));
         })),
       ),
     );
@@ -111,19 +124,21 @@ export function checkView(): HTMLElement {
   const deckL = h(
     "div",
     { class: "deck-l", id: "deckL" },
-    h("div", { class: "eyebrow" }, "Scene 1 · Check"),
+    h("div", { class: "eyebrow" }, "Step 1 of 3 \u00b7 Check"),
     h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
+    h("p", { class: "check-line", "data-testid": "check-result" }, result),
     h("p", { class: "lede", "data-testid": "summary" }, summary),
+    asks,
     notices,
     tally(views),
     h("div", { class: "legend", role: "list", "aria-label": "What the cards mean" }, LEGEND.map(([fit, word, text]) => h("div", { class: `lg${fit === "leans-away" ? " away" : ""}`, role: "listitem" }, gemChip(fit), h("span", null, h("b", null, `${word}: `), text)))),
     locked.length > 0
       ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, `${locked.length} locked night${locked.length === 1 ? "" : "s"}`), ` stay exactly as planned: ${locked.map((v) => v.night.theme).join(", ")}.`))
       : null,
-    asks,
     h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
     pendingViews.length > 0 ? h("p", { class: "small" }, `${pendingViews.length} night${pendingViews.length === 1 ? " needs" : "s need"} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} unscored.`) : null,
-    h("p", { class: "small" }, `Taste data from Qloo. Scores describe what this market leans toward. ${AUDIT_LINE}`),
+    h("p", { class: "honest" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See how we tested it")),
+    h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Scores describe what this market leans toward."),
   );
 
   const section = h(
@@ -187,7 +202,7 @@ function loadingView(): HTMLElement {
     h(
       "div",
       { class: "wrap deck-in" },
-      h("div", { class: "deck-l" }, h("div", { class: "eyebrow" }, "Scene 1 · Check"), h("h1", { class: "h2", tabindex: "-1" }, "Checking ", h("em", null, "your calendar")), h("p", { class: "lede", role: "status" }, "Matching theme names and asking Qloo what this market leans toward. A few seconds.")),
+      h("div", { class: "deck-l" }, h("div", { class: "eyebrow" }, "Step 1 of 3 · Check"), h("h1", { class: "h2", tabindex: "-1" }, "Checking ", h("em", null, "your calendar")), h("p", { class: "lede", role: "status" }, "Matching theme names and asking Qloo what this market leans toward. A few seconds.")),
       h("div", { class: "deck-r" }, h("div", { class: "binder" }, h("div", { class: "rings", "aria-hidden": "true" }), h("div", { class: "grid" }, Array.from({ length: 10 }, () => h("div", { class: "skeleton" }))))),
     ),
   );
@@ -278,13 +293,12 @@ function whyInfo(index: number): Child {
     out.push(h("p", { class: "panel-box" }, s.reason ?? "Not scored."));
   } else {
     out.push(
-      h("p", { class: "why-index" }, h("b", null, `Index ${fmt(s.index ?? 0)}.`), ` ${FIT_NAME[fit]}.`),
+      h("p", { class: "why-index", "data-testid": "why-pull" }, h("b", null, `Local pull: ${fmt1(s.index)}`), `, ${pullWords(s.index)}. ${FIT_NAME[fit]}.`),
       h("div", { class: "panel-box" }, h("p", null, marketLevelSentence(s.marketMeanZ)), h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label))),
     );
   }
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${e.name} (${e.type.replace("_", " ")})`)))),
-    h("p", { class: "small" }, METHOD_WORDS),
   );
 
   const toggle = h("button", { type: "button", class: "toggle", "aria-expanded": String(showNumbers), "data-keep": "numbers", onclick: () => { showNumbers = !showNumbers; refreshWhy(); } }, icon("caretDown"), showNumbers ? "Hide the numbers" : "Show the numbers");
@@ -294,11 +308,13 @@ function whyInfo(index: number): Child {
       h(
         "div",
         { class: "panel-box" },
+        h("p", { class: "small" }, METHOD_WORDS),
+        h("p", { class: "small" }, "Taste match here, item by item:"),
         h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, e.name), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(4))])),
         h(
           "dl",
           { class: "kv kv--sum" },
-          h("dt", null, "This market's bundle score (mean)"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
+          h("dt", null, "This market's overall taste match (mean)"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
           h("dt", null, `Typical ballpark market (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
           h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
           h("dt", null, "z = (score - typical) / spread"), h("dd", null, rel(s.z)),
@@ -311,7 +327,7 @@ function whyInfo(index: number): Child {
     );
   }
 
-  out.push(h("p", { class: "small", "data-testid": "why-footer" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See The Study")));
+  out.push(h("p", { class: "honest", "data-testid": "why-footer" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See The Study")));
   const caps = a.caps;
   const disabled = caps.recheckDisabled || recheckBusy;
   out.push(

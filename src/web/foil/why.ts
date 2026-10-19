@@ -82,6 +82,7 @@ export function openWhy(opts: WhyOptions): void {
   fill(info, opts.info());
   document.body.append(root);
   document.body.style.overflow = "hidden";
+  document.body.classList.add("why-open");
   document.addEventListener("keydown", onKey);
 
   const fl = flipper(card);
@@ -129,7 +130,10 @@ export function closeWhy(restoreFocus = true): void {
   o.root.setAttribute("aria-hidden", "true");
   const finish = (): void => {
     o.root.remove();
-    if (!open) document.body.style.overflow = o.prevOverflow;
+    if (!open) {
+      document.body.style.overflow = o.prevOverflow;
+      document.body.classList.remove("why-open");
+    }
     if (!restoreFocus) return;
     const back = document.querySelector<HTMLElement>(`.card[data-index="${o.opts.index}"]`);
     (back ?? document.getElementById("main"))?.focus({ preventScroll: true });

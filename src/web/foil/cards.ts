@@ -1,7 +1,7 @@
-import { FIT_WORDS, type FitLabel } from "../../app/score";
+import { FIT_WORDS, pullWords, type FitLabel } from "../../app/score";
 import { themeById } from "../../app/themes/library";
 import { h } from "../dom";
-import { canHover, fmt, gsap, reduced } from "./motion";
+import { canHover, fmt1, gsap, reduced } from "./motion";
 import { emblemFor } from "./emblems";
 import type { NightView } from "../store";
 
@@ -147,7 +147,7 @@ const WHY_TEXT: Partial<Record<CardFit, string>> = {
   "leans-away": "People near the ballpark like these less than the average theme, so a swap may fit the market's taste better.",
 };
 
-/** The cardboard stat back: Qloo affinity per entity, the index, and the plain-words reason. */
+/** The cardboard stat back: taste match per item, the local pull, and the plain-words reason. */
 function backFace(b: BackSpec): HTMLElement {
   const pad = (n: number): string => String(n).padStart(2, "0");
   const rows = b.rows.slice(0, 3).map((e) => {
@@ -164,8 +164,8 @@ function backFace(b: BackSpec): HTMLElement {
   const body: Node[] = [];
   if (scored && ix !== null) {
     body.push(
-      h("div", { class: "bk-tbl" }, h("div", { class: "bk-h" }, h("span", null, "Qloo taste match"), h("span", { style: "text-align:right" }, "Affinity")), ...rows),
-      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : "pos"}` }, fmt(ix)), h("div", { class: "t" }, "Index", h("b", null, FIT_NAME[b.fit]))),
+      h("div", { class: "bk-tbl" }, h("div", { class: "bk-h" }, h("span", null, "What Qloo looked at"), h("span", { style: "text-align:right" }, "Taste match here")), ...rows),
+      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : "pos"}` }, fmt1(ix)), h("div", { class: "t" }, "Local pull", h("b", null, pullWords(ix)))),
       h("div", { class: "bk-why" }, h("b", null, whyHead(b.fit, b.city)), WHY_TEXT[b.fit] ?? ""),
     );
   } else {

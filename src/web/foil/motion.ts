@@ -46,3 +46,6 @@ export function tween(from: number, to: number, dur: number, fn: (v: number) => 
 export const MINUS = "−";
 /** "+1.39" or "−2.14": the signed index, with a real minus sign. */
 export const fmt = (x: number): string => (x < 0 ? MINUS : "+") + Math.abs(x).toFixed(2);
+
+/** One decimal, for plain-words copy: "\u22122.1". */
+export const fmt1 = (x: number | null): string => (x === null ? "n/a" : (x < 0 ? MINUS : x > 0 ? "+" : "") + Math.abs(x).toFixed(1));
