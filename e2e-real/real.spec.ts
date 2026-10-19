@@ -209,6 +209,8 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   expect(await page.locator(".slide").count()).toBeGreaterThanOrEqual(1);
   expect(await page.getByTestId("angle").count()).toBe(5);
   await expect(page.getByTestId("angle").first()).toContainText(/(Support act idea: fans of .+ near Raleigh also lean toward|Fans of .+ near Raleigh also lean toward .+ promo tie-in)/);
+  // On real data every Raleigh headliner gets a real support-act line, not the generic sponsor angle.
+  for (const t of await page.getByTestId("angle").allInnerTexts()) expect(t).toMatch(/Support act idea: fans of .+ near Raleigh also lean toward .+, so an act like .+ could fit the opening slot\./);
   await expect(page.getByTestId("ideas")).toContainText(/Acts that stand out near Raleigh/);
   await expect(page.getByTestId("disc-badge").first()).toBeVisible(); // at least one swap is an act Qloo found
   if ((page.viewportSize()?.width ?? 0) >= 900) {
