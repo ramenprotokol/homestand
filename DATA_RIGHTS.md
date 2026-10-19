@@ -16,7 +16,7 @@ Qloo results come from the hackathon API with an event key. The key is used only
 
 - Responses are cached on the server so the demo stays within the event's limits.
 - They are shown only inside the app, with Qloo attribution, as the evidence behind each recommendation (the per-entity numbers sit behind "Show the numbers"). The exported CSV and calendar carry no Qloo values. The one-page memo cites only the derived index (z) and bundle score behind each approved swap, never per-entity values.
-- They are not published as a dataset. What is committed: Qloo entity IDs, per-theme aggregates (count, mean, SD) over a 40-market reference set, and a pool of 56 family-friendly animated titles ({id, name, type}) with the same kind of aggregates per title (`src/app/data/discovery-reference.json`). Raw pulls for both stay in `data/raw/` (gitignored). The reference set's market names and coordinates are not stored. Test fixtures are synthetic numbers in Qloo's response shape.
+- They are not published as a dataset. What is committed: Qloo entity IDs, per-theme aggregates (count, mean, SD) over a 40-market reference set, and a pool of 46 family-friendly animated titles ({id, name, type, national popularity}) with the same kind of aggregates per title (`src/app/data/discovery-reference.json`). Raw pulls for both stay in `data/raw/` (gitignored). The reference set's market names and coordinates are not stored. Test fixtures are synthetic numbers in Qloo's response shape.
 - The live Qloo allowance is capped per day in the Worker; past the cap the app serves recorded results with a "recorded on" label.
 
 ## Questions

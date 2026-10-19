@@ -29,6 +29,8 @@ export interface Discovered {
   affinity: number | null;
   /** How far this title's reading here sits above or below its spread over the 40 reference markets. */
   z?: number | null;
+  /** National popularity of the title, 0 to 1. */
+  popularity?: number;
 }
 
 export const discoveredId = (d: Pick<Discovered, "entityId">): string => `qloo:${d.entityId}`;

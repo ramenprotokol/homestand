@@ -7,7 +7,13 @@ export interface PoolTitle {
   entityId: string;
   name: string;
   type: "movie" | "tv_show";
+  /** Qloo's national popularity for the title (0 to 1): a director only runs a night for a title people know. */
+  popularity: number;
 }
+
+/** A discovered title must be this well known to be offered as a swap, and a little less to be listed as an idea. */
+export const SWAP_POPULARITY = 0.9;
+export const IDEA_POPULARITY = 0.85;
 
 export interface DiscoveryReference {
   synthetic: boolean;
@@ -29,8 +35,8 @@ export function syntheticDiscoveryReference(): DiscoveryReference {
   const movies = ["Moonpie Pirates", "Captain Pocketwatch", "The Marmalade Express", "Zippy and the Cloud Zoo", "Little Lantern Dragon", "Biscuit Bay Heroes", "Pip the Rocket Mouse", "The Tiny Tuba Parade", "Sunny Side Sleuths", "Wobbly Knight"];
   const shows = ["Puddle Patrol", "The Jellybean Bus", "Mango Moon Club", "Clementine Calling", "Fizz and Flick", "Treehouse Tuesday", "Sprocket Street", "The Pudding Pals", "Kite Runners", "Nimbus Nights"];
   const pool: PoolTitle[] = [
-    ...movies.map((n, i) => ({ entityId: `SYN-D-movie-${i}`, name: `${n} (made up)`, type: "movie" as const })),
-    ...shows.map((n, i) => ({ entityId: `SYN-D-tv_show-${i}`, name: `${n} (made up)`, type: "tv_show" as const })),
+    ...movies.map((n, i) => ({ entityId: `SYN-D-movie-${i}`, name: `${n} (made up)`, type: "movie" as const, popularity: 0.95 })),
+    ...shows.map((n, i) => ({ entityId: `SYN-D-tv_show-${i}`, name: `${n} (made up)`, type: "tv_show" as const, popularity: 0.95 })),
   ];
   return { synthetic: true, markets: 40, pulledAt: null, pool, stats: Object.fromEntries(pool.map((p) => [p.entityId, { n: 40, mean: 0.7, sd: 0.1 }])) };
 }
@@ -48,10 +54,14 @@ export function rankPool(readings: ReadonlyMap<string, number | null>, ref: Disc
     if (p.type !== type) continue;
     const affinity = readings.get(p.entityId) ?? null;
     const z = discoveryZ(affinity, ref.stats[p.entityId]);
-    if (z !== null) out.push({ name: p.name, entityId: p.entityId, type: p.type, affinity, z });
+    if (z !== null) out.push({ name: p.name, entityId: p.entityId, type: p.type, affinity, z, popularity: p.popularity });
   }
   return out.sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name));
 }
 
 /** A title stands out when its z clears the same bar the library uses for "Leans in". */
 export const standsOut = (d: Pick<Discovered, "z">): boolean => d.z !== undefined && d.z !== null && labelForZ(d.z) === "leans-in";
+
+/** Stands out here and is well known enough to be a night. */
+export const worthASwap = (d: Pick<Discovered, "z" | "popularity">): boolean => standsOut(d) && (d.popularity ?? 0) >= SWAP_POPULARITY;
+export const worthAnIdea = (d: Pick<Discovered, "z" | "popularity">): boolean => standsOut(d) && (d.popularity ?? 0) >= IDEA_POPULARITY;

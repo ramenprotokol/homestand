@@ -428,6 +428,21 @@ describe("propose", () => {
       expect(res.p.proposals.length).toBeGreaterThan(0);
     });
 
+    it("lists ideas from popularity 0.85 up but offers a swap only from 0.90, and leaves out unknown titles", async () => {
+      const ref = syntheticDiscoveryReference();
+      const pops: Record<string, number> = { "SYN-D-movie-0": 0.95, "SYN-D-movie-1": 0.87, "SYN-D-movie-2": 0.8 };
+      ref.pool = ref.pool.map((p) => ({ ...p, popularity: pops[p.entityId] ?? 0.95 }));
+      const h = harness({ discoveryRef: ref }, null, poolFetch((id) => (id.startsWith("SYN-D-movie-") && Number(id.slice(12)) <= 2 ? 0.9 : 0.7)));
+      const { p } = await proposeOk(h);
+      const names = p.discovery!.movies.map((m) => m.entityId);
+      expect(names).toContain("SYN-D-movie-0");
+      expect(names).toContain("SYN-D-movie-1"); // 0.87: fine as an idea
+      expect(names).not.toContain("SYN-D-movie-2"); // 0.80: not recognisable enough even to list
+      const offered = p.proposals.flatMap((x) => (x.discovered ? [x.discovered.entityId] : []));
+      expect(offered).not.toContain("SYN-D-movie-1"); // 0.87 is below the 0.90 a swap needs
+      expect(offered).not.toContain("SYN-D-movie-2");
+    });
+
     it("offers a discovered title only when it stands out here, to a kids or family night the library cannot fix, with the date and sponsor kept", async () => {
       // Every library theme is average except the planned kids night, so nothing in the library can replace it.
       const lib = activeLibrary({}, true);

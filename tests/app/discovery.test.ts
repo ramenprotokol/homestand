@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DISCOVERY_REFERENCE, discoveryZ, rankPool, standsOut, syntheticDiscoveryReference } from "../../src/app/discovery";
+import { DISCOVERY_REFERENCE, discoveryZ, IDEA_POPULARITY, rankPool, standsOut, SWAP_POPULARITY, syntheticDiscoveryReference, worthAnIdea, worthASwap } from "../../src/app/discovery";
 import { COMMITTED_IDS } from "../../src/app/themes/ids";
 import { THEME_LIBRARY } from "../../src/app/themes/library";
 import { libraryTitleMatcher } from "../../src/app/themes/match";
@@ -37,6 +37,24 @@ describe("discovery z and ranking", () => {
   });
 });
 
+describe("recognisable titles only", () => {
+  it("a swap needs popularity 0.90 and to stand out; an idea needs 0.85", () => {
+    expect(SWAP_POPULARITY).toBe(0.9);
+    expect(IDEA_POPULARITY).toBe(0.85);
+    expect(worthASwap({ z: 1, popularity: 0.9 })).toBe(true);
+    expect(worthASwap({ z: 1, popularity: 0.89 })).toBe(false);
+    expect(worthASwap({ z: 0.2, popularity: 0.99 })).toBe(false);
+    expect(worthASwap({ z: 1 })).toBe(false); // no popularity: not recognisable
+    expect(worthAnIdea({ z: 1, popularity: 0.85 })).toBe(true);
+    expect(worthAnIdea({ z: 1, popularity: 0.84 })).toBe(false);
+    expect(worthAnIdea({ z: -1, popularity: 0.99 })).toBe(false);
+  });
+  it("the pool carries each title's popularity through the ranking", () => {
+    const ref = syntheticDiscoveryReference();
+    expect(rankPool(new Map([["SYN-D-movie-0", 0.9]]), ref, "movie")[0]).toMatchObject({ popularity: 0.95 });
+  });
+});
+
 describe("the committed discovery reference", () => {
   const ref = DISCOVERY_REFERENCE;
   it("is a pool plus per-title aggregates over the same 40 reference markets, and nothing market-level", () => {
@@ -46,7 +64,8 @@ describe("the committed discovery reference", () => {
     expect(ref.pool.length).toBeLessThanOrEqual(120);
     expect(new Set(ref.pool.map((p) => p.entityId)).size).toBe(ref.pool.length);
     for (const p of ref.pool) {
-      expect(Object.keys(p).sort()).toEqual(["entityId", "name", "type"]);
+      expect(Object.keys(p).sort()).toEqual(["entityId", "name", "popularity", "type"]);
+      expect(p.popularity).toBeGreaterThanOrEqual(0.7); // recognisable titles only; none with a missing popularity
       expect(["movie", "tv_show"]).toContain(p.type);
       const s = ref.stats[p.entityId]!;
       expect(Object.keys(s).sort()).toEqual(["mean", "n", "sd"]);

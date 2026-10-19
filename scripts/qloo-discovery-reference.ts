@@ -1,7 +1,7 @@
 // Builds the fixed pool of family-friendly animated titles that "Discovered by Qloo" scores in every market, and each title's
 // spread over the same 40 reference markets the library uses. Two steps:
 //   1. Pool: the top 30 family+animation (intersection) movies and top 30 shows at 8 evenly spread reference markets (16 requests).
-//      Titles that are already library themes are dropped; a popularity floor of 0.7 applies where Qloo sends one; 60 per type at most.
+//      Titles that are already library themes are dropped; a title with no popularity from Qloo, or under 0.7, is dropped; 60 per type at most.
 //   2. Reference: the pool scored at all 40 markets, one request per type per market with filter.results.entities (80 requests).
 // Raw responses are checkpointed in data/raw (gitignored). What is committed (src/app/data/discovery-reference.json) is derived:
 // the pool as {entityId, name, type} and per-title aggregates (n, mean, population SD). No market-level values, same as reference-stats.json.
@@ -55,11 +55,11 @@ for (const [i, m] of poolMarkets.entries()) {
 const pool: PoolTitle[] = [];
 for (const type of types) {
   const kept = [...seen.entries()]
-    .filter(([id, v]) => v.type === type && !isLibrary(id, v.name) && (v.popularity === null || v.popularity >= POPULARITY_FLOOR))
+    .filter(([id, v]) => v.type === type && !isLibrary(id, v.name) && v.popularity !== null && v.popularity >= POPULARITY_FLOOR)
     .sort((a, b) => b[1].appearances - a[1].appearances || (b[1].popularity ?? 0) - (a[1].popularity ?? 0) || a[1].name.localeCompare(b[1].name))
     .slice(0, PER_TYPE);
   console.log(`${type}: ${[...seen.values()].filter((v) => v.type === type).length} candidates, ${kept.length} kept`);
-  for (const [entityId, v] of kept) pool.push({ entityId, name: v.name, type });
+  for (const [entityId, v] of kept) pool.push({ entityId, name: v.name, type, popularity: Number(v.popularity!.toFixed(4)) });
 }
 
 // 2. Reference: the pool at every reference market

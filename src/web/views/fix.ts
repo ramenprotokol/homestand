@@ -12,7 +12,7 @@ import { packEl } from "../foil/pack";
 import { setTally, tally } from "../foil/tally";
 import { icon } from "../icons";
 import type { ProposeResponse } from "../../app/api-types";
-import { DISCOVERY_REFERENCE, standsOut } from "../../app/discovery";
+import { DISCOVERY_REFERENCE, worthAnIdea } from "../../app/discovery";
 import type { Discovered } from "../../app/propose/propose";
 import { approvedSwaps, effective, state, ui, viewOf, type ShownProposal } from "../store";
 
@@ -108,7 +108,7 @@ export function fixView(): HTMLElement {
 
 /** The family titles that stand out most near this ballpark, best first, up to six. Only titles that clear the "Leans in" bar. */
 export function ideaTitles(d: { movies: Discovered[]; shows: Discovered[] }, max = 6): string[] {
-  return [...d.movies, ...d.shows].filter(standsOut).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max).map((x) => x.name);
+  return [...d.movies, ...d.shows].filter(worthAnIdea).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max).map((x) => x.name);
 }
 
 const ideaPoolSize = (d: { movies: unknown[]; shows: unknown[] }): number => d.movies.length + d.shows.length;

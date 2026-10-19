@@ -128,27 +128,27 @@ test("real data: a non-sample city with the example calendar gets swaps to look 
   await shot(page, info, "own-example-fix");
 });
 
-test("real data: Tulsa with the example calendar gets a swap, with Discovered by Qloo titles", async ({ page }, info) => {
+test("real data: Boise with the example calendar gets discovered family-title swaps", async ({ page }, info) => {
   await page.goto("/#/own");
-  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByLabel("1. Your ballpark's city").fill("Boise");
   await page.getByRole("button", { name: "Search" }).click();
-  await page.getByRole("button", { name: "Tulsa, OK" }).click();
+  await page.getByRole("button", { name: "Boise, ID" }).click();
   await page.getByTestId("load-example").click();
   await page.getByTestId("check-mine").click();
   await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
   await page.getByTestId("to-fix").click();
   const pack = page.getByRole("button", { name: /Open the pack/ });
   await expect(pack).toBeVisible({ timeout: 40_000 });
-  await expect(page.getByTestId("ideas")).toContainText("Family titles that stand out near Tulsa");
+  await expect(page.getByTestId("ideas")).toContainText("Family titles that stand out near Boise");
   await expect(page.getByTestId("ideas-young")).toContainText("Top picks with under-25 fans here:");
   await pack.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("proposal")).toBeVisible();
   await expect(page.getByTestId("disc-badge")).toHaveText("Discovered by Qloo");
-  await expect(page.locator(".swap-why")).toContainText(/^.+ stands out near Tulsa: fans here like it more than at most of the 40 ballpark markets we compare against\.$/);
-  await shot(page, info, "tulsa-discovered");
+  await expect(page.locator(".swap-why")).toContainText(/^.+ stands out near Boise: fans here like it more than at most of the 40 ballpark markets we compare against\.$/);
+  await shot(page, info, "boise-discovered");
   await page.getByTestId("open-trace").click();
-  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo how \d+ family-friendly animated movies score near Tulsa|Used the recorded family-title scores and under-25 picks near Tulsa/);
+  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo how \d+ family-friendly animated movies score near Boise|Used the recorded family-title scores and under-25 picks near Boise/);
 });
 
 test("real data: a recognised theme with no Qloo scores is not called unknown", async ({ page }) => {

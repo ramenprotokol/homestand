@@ -12,7 +12,7 @@ import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceSt
 import { idsOfType, type LiveTheme } from "../app/themes/ids";
 import { THEME_LIBRARY } from "../app/themes/library";
 import { libraryTitleMatcher } from "../app/themes/match";
-import { DISCOVERY_REFERENCE, rankPool, standsOut, type DiscoveryReference } from "../app/discovery";
+import { DISCOVERY_REFERENCE, IDEA_POPULARITY, rankPool, standsOut, worthASwap, type DiscoveryReference } from "../app/discovery";
 import { step, type TraceStep } from "../app/trace";
 import { createQlooClient, type QlooType } from "../qloo/client";
 import { AI_MODEL, type AiPort, type KvPort } from "./ports";
@@ -300,7 +300,7 @@ interface StoredDiscovery {
 
 const discoveryKey = (d: Deps, m: MarketIn): string => {
   const ref = d.discoveryRef ?? DISCOVERY_REFERENCE;
-  return `disc:v3:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
+  return `disc:v4:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
 };
 
 /**
@@ -340,7 +340,7 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     for (const type of ["movie", "tv_show"] as const) {
       const ids = ref.pool.filter((p) => p.type === type).map((p) => p.entityId);
       const rows = await client.localAffinity({ type, entityIds: ids, lon: m.lon, lat: m.lat, radiusM: RADIUS_M, take: ids.length, ...(type === "movie" ? { releaseYearMin: 1900 } : {}) });
-      ranked[type] = rankPool(new Map(rows.map((r) => [r.entityId, r.affinity])), ref, type).slice(0, 12);
+      ranked[type] = rankPool(new Map(rows.map((r) => [r.entityId, r.affinity])), ref, type).filter((x) => (x.popularity ?? 0) >= IDEA_POPULARITY).slice(0, 12);
       const standing = ranked[type].filter(standsOut).length;
       trace.push(step(iso(d), "qloo", `Asked Qloo how ${ids.length} family-friendly animated ${type === "movie" ? "movies" : "shows"} score near ${city} (80 km), and compared each with its spread over ${ref.markets} ballpark markets.`, `Live call at ${iso(d)}. ${standing} stand out here.${synthetic}`));
     }
@@ -527,7 +527,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   const discovery = await discover(d, input.market, trace);
   const city = input.market.label.split(",")[0]!.replace(/ (sample )?club$/, "");
   const nights: PlanNight[] = input.nights.map((n) => ({ ...n, themeId: n.themeId && Object.hasOwn(themes, n.themeId) ? n.themeId : null }));
-  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter(standsOut) : [], city });
+  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter(worthASwap) : [], city });
   trace.push(...res.trace);
 
   const whys = new Map<string, string>();
