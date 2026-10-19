@@ -535,42 +535,43 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   if (libraryProposals.length > 0) {
     const label = (id: string): string => d.library.find((t) => t.id === id)?.label ?? id;
     const pairOf = (p: (typeof libraryProposals)[number]): string => `${label(p.fromThemeId)}>${label(p.toThemeId)}`;
-    // The wording depends only on the two theme names, so it is cached by the sorted pairs and shared across markets.
-    const key = `ai:why:v1:${await sha256Hex(libraryProposals.map(pairOf).sort().join("\n"))}`;
-    const saved = await safeGet(d.kv, key);
-    let byPair: Record<string, string> | null = null;
-    if (saved !== null) {
-      try {
-        byPair = JSON.parse(saved) as Record<string, string>;
-        trace.push(step(iso(d), "model", "Writing the reasons for the swaps: used the saved wording (no model call)."));
-      } catch {
-        byPair = null;
-      }
+    // The wording depends only on the two theme names, so each pair's validated model text is saved on its own and shared across
+    // markets. Only genuine, validated model text is ever saved: never template text, and never a failure.
+    const byPair: Record<string, string> = {};
+    const pairKey = async (pair: string): Promise<string> => `ai:why:v2:${await sha256Hex(pair)}`;
+    const wanted = [...new Set(libraryProposals.map(pairOf))];
+    for (const pair of wanted) {
+      const saved = await safeGet(d.kv, await pairKey(pair));
+      if (typeof saved === "string" && saved.length > 0) byPair[pair] = saved;
     }
-    if (byPair === null) {
-      byPair = {};
+    const missing = libraryProposals.filter((p, i, all) => byPair[pairOf(p)] === undefined && all.findIndex((q) => pairOf(q) === pairOf(p)) === i);
+    const savedCount = wanted.length - new Set(missing.map(pairOf)).size;
+    if (savedCount > 0) trace.push(step(iso(d), "model", `Writing the reasons for the swaps: used saved model wording for ${savedCount} of ${wanted.length}${missing.length > 0 ? `, so the model is asked only for the other ${missing.length}` : " (no model call)"}.`));
+    if (missing.length > 0) {
       // Opaque ids: the real ones contain the date, which the model has no business seeing.
-      const facts = libraryProposals.map((p, i) => ({ id: String(i + 1), planned: label(p.fromThemeId), proposed: label(p.toThemeId) }));
+      const facts = missing.map((p, i) => ({ id: String(i + 1), planned: label(p.fromThemeId), proposed: label(p.toThemeId) }));
       const reply = await runModel(
         d,
         "For each swap write ONE sentence of at most 22 words, in this shape: \"Fans here lean toward <proposed> more than <planned>, compared with this market's usual.\" Use only the two theme names given. No digits. Never mention sponsors, dates, tickets, sales, attendance or revenue. Reply with JSON only: [{\"id\": string, \"why\": string}].",
         JSON.stringify(facts),
         trace,
-        "Writing the reasons for the swaps",
+        missing.length === wanted.length ? "Writing the reasons for the swaps" : `Writing the reasons for ${missing.length} new swap${missing.length === 1 ? "" : "s"}`,
         300,
       );
       const parsed = jsonIn(reply);
       if (Array.isArray(parsed)) {
         for (const item of parsed as Array<{ id?: unknown; why?: unknown }>) {
           if (typeof item?.id !== "string" || typeof item.why !== "string") continue;
-          const p = libraryProposals[Number(item.id) - 1];
+          const p = missing[Number(item.id) - 1];
           const text = item.why.trim();
-          if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text)) byPair[pairOf(p)] = text;
-          else trace.push(step(iso(d), "model", `Dropped the model's reason for swap ${item.id}: it went beyond the taste comparison, so the template text is used.`));
+          if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text)) {
+            byPair[pairOf(p)] = text;
+            await safePut(d.kv, await pairKey(pairOf(p)), text, { expirationTtl: TTL });
+          } else trace.push(step(iso(d), "model", `Dropped the model's reason for swap ${item.id}: it went beyond the taste comparison, so the template text is used.`));
         }
       }
-      // Only a real reply is saved, good or not, so the same swaps never ask the model twice. A skipped call (no model, cap) is not.
-      if (reply !== null) await safePut(d.kv, key, JSON.stringify(byPair), { expirationTtl: TTL });
+      const stillMissing = new Set(missing.filter((p) => byPair[pairOf(p)] === undefined).map(pairOf)).size;
+      if (stillMissing > 0) trace.push(step(iso(d), "model", `Template text is used for ${stillMissing} swap${stillMissing === 1 ? "" : "s"}: the model gave no usable wording for ${stillMissing === 1 ? "it" : "them"}.`));
     }
     for (const p of libraryProposals) {
       const text = byPair[pairOf(p)];

@@ -689,7 +689,59 @@ describe("model answers are cached", () => {
     const second = (await (await route(post("/api/propose", { market: akronBody.market, nights: plan, allowDuplicates: false }), h.deps)).json()) as ProposeResponse;
     expect(swapCalls()).toBe(1);
     expect(second.proposals.map((p) => p.why)).toEqual(first.proposals.map((p) => p.why));
-    expect(second.trace.some((t) => /saved wording \(no model call\)/.test(t.text))).toBe(true);
+    expect(second.trace.some((t) => /used saved model wording for \d+ of \d+ \(no model call\)/.test(t.text))).toBe(true);
+  });
+});
+
+describe("saved reasons are only ever real model wording", () => {
+  const planFor = (out: AnalyzeResponse) => out.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
+  const GOOD = (proposed: string, planned: string): string => `Fans here lean toward ${proposed} more than ${planned}, compared with this market's usual.`;
+  const swapCalls = (h: Harness) => h.aiCalls.filter((c) => /swap/.test((c as { messages: Array<{ content: string }> }).messages[0]!.content)) as Array<{ messages: Array<{ content: string }> }>;
+  const factsOf = (c: { messages: Array<{ content: string }> }) => JSON.parse(c.messages[1]!.content) as Array<{ id: string; planned: string; proposed: string }>;
+  const goodAi: AiPort = {
+    run: async (_m, input) => {
+      const msgs = (input as { messages: Array<{ content: string }> }).messages;
+      if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
+      return { response: JSON.stringify((JSON.parse(msgs[1]!.content) as Array<{ id: string; planned: string; proposed: string }>).map((f) => ({ id: f.id, why: GOOD(f.proposed, f.planned) }))) };
+    },
+  };
+  const whyKeys = (h: Harness) => [...h.kv.data.keys()].filter((k) => k.startsWith("ai:why:"));
+
+  it("never saves template text, a failure or a rejected reply, so the next visit asks the model again", async () => {
+    for (const reply of [{}, { response: "not json at all" }, { response: JSON.stringify([{ id: "1", why: "But the sponsor does not stay." }]) }]) {
+      const h = harness({}, { run: async (_m, input) => ((input as { messages: Array<{ content: string }> }).messages[0]!.content.includes("swap") ? reply : { response: "{}" }) });
+      const out = await analyzeOk(h, akronBody);
+      const first = (await (await route(post("/api/propose", { market: akronBody.market, nights: planFor(out), allowDuplicates: false }), h.deps)).json()) as ProposeResponse;
+      expect(first.proposals.filter((x) => !x.discovered && !x.kind).every((x) => x.whySource === "template")).toBe(true);
+      expect(whyKeys(h)).toEqual([]);
+      expect(first.trace.some((t) => /Template text is used for \d+ swaps?: the model gave no usable wording/.test(t.text))).toBe(true);
+      expect(first.trace.some((t) => /used saved model wording/.test(t.text))).toBe(false);
+      await route(post("/api/propose", { market: akronBody.market, nights: planFor(out), allowDuplicates: false }), h.deps);
+      expect(swapCalls(h)).toHaveLength(2); // asked again, not served a stored template
+    }
+  });
+
+  it("saves each validated pair on its own, and a partial hit asks the model only for the missing pairs", async () => {
+    const h = harness({}, goodAi);
+    const out = await analyzeOk(h, akronBody);
+    const body = { market: akronBody.market, nights: planFor(out), allowDuplicates: false };
+    const first = (await (await route(post("/api/propose", body), h.deps)).json()) as ProposeResponse;
+    const modelPairs = first.proposals.filter((x) => x.whySource === "model").length;
+    expect(modelPairs).toBeGreaterThanOrEqual(3);
+    expect(whyKeys(h)).toHaveLength(modelPairs);
+    expect(first.trace.some((t) => /used saved model wording/.test(t.text))).toBe(false);
+    const askedFirst = factsOf(swapCalls(h)[0]!);
+    expect(askedFirst).toHaveLength(modelPairs);
+    // Forget one pair: only that one is asked about, the rest come from the saved wording.
+    h.kv.data.delete(whyKeys(h)[0]!);
+    const second = (await (await route(post("/api/propose", body), h.deps)).json()) as ProposeResponse;
+    expect(swapCalls(h)).toHaveLength(2);
+    expect(factsOf(swapCalls(h)[1]!)).toHaveLength(1);
+    expect(second.trace.some((t) => new RegExp(`used saved model wording for ${modelPairs - 1} of ${modelPairs}, so the model is asked only for the other 1`).test(t.text))).toBe(true);
+    // Every reason is still real model wording, and the third visit is free.
+    expect(second.proposals.filter((x) => !x.discovered && !x.kind).every((x) => x.whySource === "model" && /lean toward/.test(x.why))).toBe(true);
+    await route(post("/api/propose", body), h.deps);
+    expect(swapCalls(h)).toHaveLength(2);
   });
 });
 
@@ -797,7 +849,7 @@ describe("KV writes per visit (the free plan allows about 1,000 a day)", () => {
     h.deps.agent.kv.put = async (k, v, o) => (puts.push(k.split(":")[0]!), put(k, v, o));
     await visit(h);
     const cold = puts.length;
-    expect(cold).toBeLessThanOrEqual(10);
+    expect(cold).toBeLessThanOrEqual(16); // each reason pair is saved on its own, once
     puts.length = 0;
     await visit(h);
     expect(puts).toEqual([]); // everything is read from the saved answers: no scores, ideas or model calls to record
