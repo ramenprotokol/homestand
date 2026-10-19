@@ -1,24 +1,33 @@
 import { shortDate } from "../../app/dates";
-import { vsAverage } from "../../app/score";
+import { swapName } from "../../app/text";
+import { pullBand, vsAverage, vsMarketsWords } from "../../app/score";
 import { themeById } from "../../app/themes/library";
 import { openDrawer, syntheticBanner } from "../components";
-import { h, localizeDates, type Child } from "../dom";
+import { formatDateTime, h, localizeDates, type Child } from "../dom";
 import { ensureProposals, navigate } from "../flow";
 import { makeCard, setFlip, specForSwap, specOf, flipper, type CardSpec } from "../foil/cards";
 import { onCleanup, onMount, onResize, routeContext } from "../foil/lifecycle";
-import { fmt, gsap, reduced, sleep, tween } from "../foil/motion";
+import { fmt, gsap, reduced, sleep } from "../foil/motion";
 import { packEl } from "../foil/pack";
 import { setTally, tally } from "../foil/tally";
 import { icon } from "../icons";
 import type { ProposeResponse } from "../../app/api-types";
-import { kindWords } from "../../app/propose/propose";
+import { DISCOVERY_REFERENCE, standsOut } from "../../app/discovery";
+import type { Discovered } from "../../app/propose/propose";
 import { approvedSwaps, effective, state, ui, viewOf, type ShownProposal } from "../store";
 
 const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hashchange"));
 const label = (id: string): string => themeById(id)?.label ?? id;
 /** What the swap puts on the night: a library theme, or a title Qloo found. */
+const foundWordsOf = (f: { z?: number | null }): string => `${vsMarketsWords(f.z ?? null)}.`.replace(/^./, (c) => c.toUpperCase());
 const toLabel = (p: ShownProposal): string => p.discovered?.name ?? label(p.toThemeId);
 const ix = (z: number | null): string => (z === null ? "n/a" : fmt(z));
+/** "Well below": the local pull in words, for the big meter. The numbers stay small beside it. */
+const bandWord = (z: number | null): string => {
+  const b = pullBand(z);
+  const w = b === null ? "n/a" : b === "about" ? "about usual" : b;
+  return w.charAt(0).toUpperCase() + w.slice(1);
+};
 const TYPE_WORDS: Record<string, string> = { tv_show: "TV show", movie: "movie", artist: "artist", book: "book", brand: "brand" };
 
 /** Where the carousel is, kept across redraws so a re-render never tears the pack again. */
@@ -97,12 +106,12 @@ export function fixView(): HTMLElement {
   return h("div", { class: "page" }, section);
 }
 
-/** Up to six of Qloo's local family titles, movies and shows taking turns. */
-export function ideaTitles(d: { movies: Array<{ name: string }>; shows: Array<{ name: string }> }, max = 6): string[] {
-  const out: string[] = [];
-  for (let i = 0; out.length < max && i < Math.max(d.movies.length, d.shows.length); i++) for (const x of [d.movies[i], d.shows[i]]) if (x && out.length < max) out.push(x.name);
-  return out;
+/** The family titles that stand out most near this ballpark, best first, up to six. Only titles that clear the "Leans in" bar. */
+export function ideaTitles(d: { movies: Discovered[]; shows: Discovered[] }, max = 6): string[] {
+  return [...d.movies, ...d.shows].filter(standsOut).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max).map((x) => x.name);
 }
+
+const ideaPoolSize = (d: { movies: unknown[]; shows: unknown[] }): number => d.movies.length + d.shows.length;
 
 function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLElement | null {
   if (!d) return null;
@@ -112,11 +121,11 @@ function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLE
   const young = d.young.map((x) => x.name).filter((n) => !titles.includes(n)).slice(0, 3);
   return h(
     "section",
-    { class: "ideas", "data-testid": "ideas", "aria-label": `Fresh family ideas from Qloo for ${city}` },
-    h("h2", null, `Fresh family ideas from Qloo for ${city}`),
+    { class: "ideas", "data-testid": "ideas", "aria-label": `Family titles that stand out near ${city}` },
+    h("h2", null, `Family titles that stand out near ${city}`),
     h("ul", { class: "idea-chips" }, titles.map((t) => h("li", { class: "idea" }, t))),
-    young.length > 0 ? h("p", { class: "ideas-young", "data-testid": "ideas-young" }, `Under-25 fans here also lean toward: ${young.join(", ")}.`) : null,
-    h("p", { class: "small" }, "These come from Qloo's taste data for this area. They are ideas, not scores."),
+    young.length > 0 ? h("p", { class: "ideas-young", "data-testid": "ideas-young" }, `Top picks with under-25 fans here: ${young.join(", ")}.`) : null,
+    h("p", { class: "small" }, `Qloo scored ${ideaPoolSize(d)} family-friendly animated titles near ${city}. These stand out against ${DISCOVERY_REFERENCE.markets} ballpark markets. They come from Qloo's taste data for this area.${d.fetchedAt ? ` Pulled from Qloo ${formatDateTime(d.fetchedAt)}.` : ""}`),
   );
 }
 
@@ -269,7 +278,8 @@ class FixStage {
   private specs(top: ShownProposal): { front: CardSpec; alt: CardSpec } {
     const p = effective(top);
     const base = specOf(viewOf(state.analysis!.nights[p.index]!));
-    return { front: specForSwap(base, p.fromThemeId, label(p.fromThemeId), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, toLabel(p), p.to.label) };
+    const night = state.analysis!.nights[p.index]!;
+    return { front: specForSwap(base, p.fromThemeId, swapName(night.theme, label(p.fromThemeId)), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, swapName(night.theme, toLabel(p)), p.to.label) };
   }
 
   private buildSlides(): void {
@@ -360,9 +370,10 @@ class FixStage {
     const night = state.analysis!.nights[p.index]!;
     const d = state.decisions[p.id];
     const found = p.discovered;
-    const cited = found ? `Found by Qloo, not scored against the library, so no local-pull number. ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}` : `${label(p.toThemeId)}: ${vsAverage(p.to.z)} · ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}`;
+    const cited = found ? `Found by Qloo: ${foundWordsOf(found)} It is not scored against the library, so there is no local-pull number. ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}` : `${label(p.toThemeId)}: ${vsAverage(p.to.z)} · ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}`;
     const shown = d === "approved" ? p.to.z : p.from.z;
-    const sub = d === "approved" ? `Approved. Was ${ix(p.from.z)}.` : d === "rejected" ? "Rejected. Kept as planned." : found ? `now ${ix(p.from.z)} → found by Qloo` : `now ${ix(p.from.z)} → proposed ${ix(p.to.z)}`;
+    const foundWords = found ? vsMarketsWords(found.z ?? null) : "";
+    const sub = d === "approved" && found ? `Approved. Stands out here: ${foundWords}.` : d === "approved" ? `Approved. Was ${bandWord(p.from.z).toLowerCase()} (${ix(p.from.z)}).` : d === "rejected" ? "Rejected. Kept as planned." : found ? `now ${bandWord(p.from.z).toLowerCase()} (${ix(p.from.z)}) → found by Qloo, ${foundWords}` : `now ${bandWord(p.from.z).toLowerCase()} (${ix(p.from.z)}) → proposed ${bandWord(p.to.z).toLowerCase()} (${ix(p.to.z)})`;
 
     const takenElsewhere = new Set(this.swaps.filter((o) => o.id !== p.id).map((o) => effective(o).toThemeId));
     const pool = [top.toThemeId, ...top.alternates.map((a) => a.toThemeId)].filter((id) => id !== p.toThemeId);
@@ -397,13 +408,13 @@ class FixStage {
         "div",
         { class: "meta" },
         h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDate(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Date and sponsor stay")),
-        h("div", { class: "idx" }, h("span", { class: "k" }, "Local pull"), h("span", { class: `v ${(shown ?? 0) < 0 ? "neg" : "pos"}`, id: "idxV" }, found && d === "approved" ? "Found" : ix(shown)), h("div", { class: "pp" }, sub)),
+        h("div", { class: "idx" }, h("span", { class: "k" }, "Local pull"), h("span", { class: `v v--word ${(shown ?? 0) < 0 ? "neg" : "pos"}`, id: "idxV" }, found && d === "approved" ? "Found by Qloo" : bandWord(shown)), h("div", { class: "pp" }, sub)),
       ),
       h(
         "div",
         { class: "swap-card", "data-proposal": p.id, "data-decision": d ?? "open", "data-testid": "proposal" },
         // The new night, shown before approval: the big card above is the night as planned.
-        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : "Would be"), nowCard, found ? h("span", { class: "disc-badge", "data-testid": "disc-badge" }, "Discovered by Qloo") : null),
+        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : "Would be"), found ? h("span", { class: "disc-badge", "data-testid": "disc-badge" }, "Discovered by Qloo") : null, nowCard),
         h(
           "div",
           { class: "swap-body" },
@@ -471,11 +482,10 @@ class FixStage {
         .to(flipper(s.card), { rotationY: 180, duration: 0.95, ease: "power2.inOut" }, 0.05)
         .add(() => {
           const v = this.console.querySelector<HTMLElement>("#idxV");
-          if (v && p.discovered) v.textContent = "Found";
-          else if (v) tween(p.from.z ?? 0, p.to.z ?? 0, 1100, (x) => {
-            v.textContent = fmt(x);
-            v.className = `v ${x < 0 ? "neg" : "pos"}`;
-          });
+          if (v) {
+            v.textContent = p.discovered ? "Found by Qloo" : bandWord(p.to.z);
+            v.className = `v v--word ${(p.to.z ?? 1) < 0 ? "neg" : "pos"}`;
+          }
         }, 0.5)
         .to(s.lift, { y: 0, scale: 1, duration: 0.55, ease: "back.out(1.8)" }, 0.5);
     });
@@ -567,7 +577,7 @@ class FixStage {
     this.qloo(p.fromThemeId, "Taste lookup · the weak night", quick);
     await wait(520);
     if (!live()) return;
-    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, "Discovered by Qloo"), h("div", { class: "m" }, h("b", null, p.discovered.name), ` is among Qloo's top family ${kindWords(p.discovered.type)} for fans near ${state.analysis!.market.label.split(",")[0]!.replace(/ (sample )?club$/, "")}. No library theme leaned in for this night. It has no local-pull number: it was found, not scored.`))], quick);
+    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, "Discovered by Qloo"), h("div", { class: "m" }, h("b", null, p.discovered.name), ` stands out near ${state.analysis!.market.label.split(",")[0]!.replace(/ (sample )?club$/, "")}: ${vsMarketsWords(p.discovered.z ?? null)}. No library theme leaned in for this night. It has no local-pull number: it was found, not scored.`))], quick);
     else this.qloo(p.toThemeId, "Taste lookup · the better fit", quick);
     await wait(520);
     if (!live()) return;

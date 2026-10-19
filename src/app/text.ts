@@ -39,3 +39,12 @@ export function personalLine(call: "Yes" | "No" | "Not sure", verdict: "CONFIRME
   if (verdict === "OVERTURNED") return call === "No" ? "You said No. The data agrees, and then some: it pointed the other way." : call === "Yes" ? "You said Yes. The data pointed the other way." : "Fair: you weren't sure, and the data pointed the other way.";
   return call === "Yes" ? "You said Yes. The data didn't show it at this sample size." : call === "No" ? "You said No. That matches what we found." : "Fair: the data couldn't tell either.";
 }
+
+const NIGHT_SUFFIXES = ["Night", "Day", "Friday", "Giveaway", "Showdown"];
+
+/** The real night name for a swap: the new theme keeps the original's ending. "Barbie Day" with LEGO Movie is "LEGO Movie Day". */
+export function swapName(original: string, newLabel: string): string {
+  const w = original.trim().split(/\s+/);
+  const last = w[w.length - 1] ?? "";
+  return `${newLabel} ${w.length > 1 && NIGHT_SUFFIXES.includes(last) ? last : "Night"}`;
+}

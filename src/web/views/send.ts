@@ -10,9 +10,9 @@ import { Fireworks } from "../foil/fx";
 import { onCleanup, onMount, onResize, route, routeContext, whileVisible } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
 import { crowdBar } from "../foil/scenery";
-import { download, formatDate, h } from "../dom";
+import { download, formatDate, formatDateTime, h } from "../dom";
 import { navigate } from "../flow";
-import { localDay } from "../../app/text";
+import { localDay, swapName } from "../../app/text";
 import { icon } from "../icons";
 import { approvedSwaps, state, viewOf } from "../store";
 
@@ -21,7 +21,7 @@ function exportRows(): ExportRow[] {
   const a = state.analysis!;
   return a.nights.map((n) => {
     const v = viewOf(n);
-    return { date: n.date, theme: v.swappedFrom ? v.themeLabel : n.theme, sponsor: n.sponsor, locked: n.locked, notes: v.swappedFrom ? [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", discovered by Qloo" : ""})`].filter(Boolean).join(". ") : n.notes };
+    return { date: n.date, theme: v.swappedFrom ? swapName(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: v.swappedFrom ? [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", discovered by Qloo" : ""})`].filter(Boolean).join(". ") : n.notes };
   });
 }
 
@@ -35,14 +35,14 @@ function ideasOf(marketLabel: string): MemoData["ideas"] {
 function memoData(): MemoData {
   const a = state.analysis!;
   const swaps = approvedSwaps().map((p) => ({
-    date: p.date, weekday: p.weekday, from: themeById(p.fromThemeId)?.label ?? p.fromThemeId, to: p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId, sponsor: p.sponsor,
+    date: p.date, weekday: p.weekday, from: a.nights[p.index]!.theme, to: swapName(a.nights[p.index]!.theme, p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId), sponsor: p.sponsor,
     fromZ: p.from.z, toZ: p.to.z, fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
   }));
   return {
     club: a.market.label, generatedOn: localDay(), swaps,
     angles: (state.propose?.angles ?? []).map((x) => x.text), nights: a.nights.length, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
-    synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedOn: a.recordedAt ? localDay(new Date(a.recordedAt)) : a.recordedOn,
+    synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedLabel: a.recordedAt ? formatDateTime(a.recordedAt) : null,
   };
 }
 

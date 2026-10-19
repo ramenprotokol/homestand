@@ -20,7 +20,7 @@ export interface ParsedCalendar {
 }
 
 export const CSV_HEADER = "date,theme,sponsor,locked,notes";
-export const CSV_TEMPLATE = `${CSV_HEADER}\n2026-04-10,Bluey Night,Harbor Credit Union,no,Kids run the bases after the game\n2026-04-17,Fireworks Friday,,no,\n2026-05-02,Star Wars Night,Gulf Coast Dental,yes,Sponsor contract signed\n`;
+export const CSV_TEMPLATE = `${CSV_HEADER}\n2027-04-09,Bluey Night,Harbor Credit Union,no,Kids run the bases after the game\n2027-04-16,Fireworks Friday,,no,\n2027-05-07,Star Wars Night,Gulf Coast Dental,yes,Sponsor contract signed\n`;
 export const MAX_ROWS = 200;
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
@@ -139,6 +139,11 @@ export function parseCalendar(text: string): ParsedCalendar {
   }
   if (rows.length === 0 && errors.length === 0) errors.push({ line: 1, message: "No nights found under the header." });
   return { rows, errors };
+}
+
+/** Rows in date order (a stable sort, so two nights on one date keep the order they were typed in). */
+export function sortRowsByDate<T extends { date: string }>(rows: readonly T[]): T[] {
+  return rows.map((r, i) => [r, i] as const).sort((a, b) => a[0].date.localeCompare(b[0].date) || a[1] - b[1]).map(([r]) => r);
 }
 
 /** One CSV field, quoted when needed. */

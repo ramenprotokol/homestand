@@ -6,6 +6,7 @@ import { h } from "../dom";
 import { onCleanup, onResize } from "../foil/lifecycle";
 import { dpr, gsap, reduced, tween } from "../foil/motion";
 import { makeRand } from "../foil/rng";
+import { icon } from "../icons";
 import { bulbs } from "../foil/scenery";
 import { loadStudy, type PublishedResults } from "../study-data";
 
@@ -343,7 +344,8 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
     ),
   );
 
-  if (view.results === null) return [limits, links];
+  const end = h("div", { class: "page-end", "data-testid": "study-end" }, h("a", { class: "btn pri", href: "#/sample" }, "Try a sample club", icon("arrowRight")));
+  if (view.results === null) return [limits, links, end];
   const r = view.results;
   const banner = view.pending
     ? h("div", { class: "pending", "data-testid": "results-pending" }, h("h2", null, view.synthetic ? "Results pending: the numbers below are SYNTHETIC" : "Results pending"), h("p", null, "These are made-up placeholder numbers to show the layout. The real results replace them when the analysis has run."))
@@ -383,5 +385,6 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
     ),
     limits,
     links,
+    end,
   ];
 }

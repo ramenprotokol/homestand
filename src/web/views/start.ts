@@ -65,6 +65,7 @@ function teaseSection(): HTMLElement {
       h("h2", { class: "h2" }, "Three moves, ", h("em", null, "one season")),
       h("ol", { class: "how", "aria-label": "How it works" }, beats.map((b) => h("li", { class: "beat" }, h("div", { class: "beat-art" }, b.art), h("div", { class: "beat-copy" }, h("span", { class: "n" }, b.n), h("h3", null, b.name), h("p", null, b.text))))),
       teaser(),
+      h("div", { class: "page-end" }, h("a", { class: "btn pri", href: "#/sample", "data-testid": "end-try-sample" }, "Try a sample club", icon("arrowRight"))),
     ),
   );
   onMount(() => mountTease(section, cards, burst));

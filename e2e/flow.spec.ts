@@ -76,14 +76,18 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(why).toBeVisible();
   await expect(why).toContainText(/Against its own average/);
   await expect(why).toContainText("What Qloo looked at");
-  await expect(why.getByTestId("why-pull")).toContainText(/^Local pull: [+\u2212]\d\.\d, (well )?(below|above|about) this town's usual/);
-  await expect(why.locator(".bk-h")).toContainText("Taste match here");
+  await expect(why.getByTestId("why-pull")).toContainText(/^Local pull: (well )?(below|above|about) this town's usual\./);
+  await expect(why.getByTestId("why-vs")).toContainText(/here: (well )?(below|above|about typical for) (most )?ballpark markets/);
+  await expect(why.getByTestId("bk-vs")).toContainText(/here: (well )?(below|above|about typical for) (most )?ballpark markets/);
+  await expect(why.locator(".bk-h")).toContainText("What Qloo looked at");
+  // Plain words, not 0.99: the card back carries no raw taste number.
+  await expect(why.locator(".face.back")).not.toContainText(/\d\.\d\d/);
   await expect(why.locator(".bk-idx")).toContainText("Local pull");
   await expect(why).not.toContainText(/affinity|\bindex\b/i);
-  await expect(why.getByText("Index = z")).toHaveCount(0);
+  await expect(why.getByText("Local pull = z")).toHaveCount(0);
   await expect(why.getByText(/standard step/)).toHaveCount(0);
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Index = z - market average/)).toBeVisible();
+  await expect(why.getByText(/Local pull = z - market average/)).toBeVisible();
   await why.getByTestId("recheck").click();
   // One live re-check per theme and market per day: the first run asks Qloo, a repeat returns the saved answer.
   await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked with Qloo within the last day: same answer/);
@@ -135,7 +139,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   // The cited comparison replaces the repeated sentence; the why is not said twice.
   await expect(card.getByTestId("cited")).toContainText(/(above|below|in line with) this market's average \([+-]\d\.\d\)/);
   await expect(card).not.toContainText("leans toward");
-  await expect(page.locator(".idx")).toContainText(/now [+\u2212]\d\.\d\d \u2192 proposed [+\u2212]\d\.\d\d/);
+  await expect(page.locator(".idx")).toContainText(/now (well )?(below|above|about usual) \([+\u2212]\d\.\d\d\) \u2192 proposed (well )?(below|above|about usual) \([+\u2212]\d\.\d\d\)/);
   if ((await page.getByTestId("angle").count()) > 0) {
     const angle = await page.getByTestId("angle").first().innerText();
     expect(angle).toMatch(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Z][a-z]{2} \d{1,2}\b/);
@@ -318,11 +322,11 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   await page.getByTestId("to-fix").click();
   // The ideas panel: up to six titles, the under-25 line, and where they come from.
   const ideas = page.getByTestId("ideas");
-  await expect(ideas).toContainText("Fresh family ideas from Qloo for Akron");
+  await expect(ideas).toContainText("Family titles that stand out near Akron");
   expect(await ideas.locator(".idea").count()).toBeLessThanOrEqual(6);
   expect(await ideas.locator(".idea").count()).toBeGreaterThanOrEqual(4);
-  await expect(page.getByTestId("ideas-young")).toContainText("Under-25 fans here also lean toward:");
-  await expect(ideas).toContainText("These come from Qloo's taste data for this area");
+  await expect(page.getByTestId("ideas-young")).toContainText("Top picks with under-25 fans here:");
+  await expect(ideas).toContainText("They come from Qloo's taste data for this area");
   await page.getByRole("button", { name: /Open the pack/ }).focus();
   await page.keyboard.press("Enter");
   const now = page.getByTestId("now-card");
@@ -339,9 +343,9 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   await page.getByTestId("to-send").click();
   await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
   const memo = page.getByTestId("memo");
-  await expect(memo).toContainText("Moonpie Pirates (made up) (Discovered by Qloo)");
+  await expect(memo).toContainText(/Moonpie Pirates \(made up\) (Day|Night|Friday|Giveaway|Showdown) \(Discovered by Qloo\)/);
   await expect(memo).toContainText("Found by Qloo");
-  await expect(memo).toContainText("Fresh family ideas from Qloo for Akron");
+  await expect(memo).toContainText("Family titles that stand out near Akron");
   await expect(memo).toContainText("These come from Qloo's taste data for this area");
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-csv").click()]);
   const csvText = await readFile((await csv.path())!, "utf8");
@@ -360,8 +364,7 @@ test("the step log shows the discovery calls to Qloo", async ({ page }) => {
   await page.getByTestId("open-trace").click();
   const log = page.getByRole("dialog");
   // The first Akron run in this server asks Qloo; later ones show the recorded answers. Either way the three calls are named.
-  await expect(log).toContainText(/Asked Qloo for top family movies near Akron|Used the recorded top family movies, top family shows and under-25 picks near Akron/);
-  await expect(log).toContainText(/Asked Qloo for top family shows near Akron|Used the recorded top family movies/);
+  await expect(log).toContainText(/Asked Qloo how \d+ family-friendly animated movies score near Akron|Used the recorded family-title scores and under-25 picks near Akron/);
 });
 
 test("the production CSP and security headers break nothing on any screen", async ({ page }) => {

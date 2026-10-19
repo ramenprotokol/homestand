@@ -1,7 +1,8 @@
-import { FIT_WORDS, pullWords, type FitLabel } from "../../app/score";
+import { FIT_WORDS, pullWords, vsMarketsWords, type FitLabel } from "../../app/score";
+import { swapName } from "../../app/text";
 import { themeById } from "../../app/themes/library";
 import { h } from "../dom";
-import { canHover, fmt1, gsap, reduced } from "./motion";
+import { canHover, gsap, reduced } from "./motion";
 import { emblemFor } from "./emblems";
 import type { NightView } from "../store";
 
@@ -38,6 +39,10 @@ export interface BackSpec {
   dateLine: string;
   rows: BackRow[];
   index: number | null;
+  /** The theme's z against the 40 reference ballpark markets. */
+  z: number | null;
+  /** The theme's own name ("Star Wars"), for the sentence comparing it with other markets. */
+  themeName: string;
   fit: CardFit;
   /** Shown instead of the stat table when a night has no scores. */
   reason: string | null;
@@ -90,7 +95,7 @@ function parts(iso: string): { month: string; day: number } {
 export function specOf(v: NightView): CardSpec {
   const n = v.night;
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
-  const title = v.swappedFrom ? v.themeLabel : n.theme;
+  const title = v.swappedFrom ? swapName(n.theme, v.themeLabel) : n.theme;
   const category = v.themeId ? (themeById(v.themeId)?.category ?? null) : null;
   const { month, day } = parts(n.date);
   const words = FIT_NAME[fit];
@@ -151,22 +156,16 @@ const WHY_TEXT: Partial<Record<CardFit, string>> = {
 /** The cardboard stat back: taste match per item, the local pull, and the plain-words reason. */
 function backFace(b: BackSpec): HTMLElement {
   const pad = (n: number): string => String(n).padStart(2, "0");
-  const rows = b.rows.slice(0, 3).map((e) => {
-    const a = e.affinity;
-    return h(
-      "div",
-      { class: "bk-r" },
-      h("span", null, e.name, h("small", null, TYPE_WORDS[e.type] ?? e.type.replace("_", " ")), h("div", { class: "bk-bar" }, h("i", { style: `width:${a === null ? 0 : Math.round(Math.max(0, Math.min(1, a)) * 100)}%` }))),
-      h("em", null, a === null ? "n/a" : a.toFixed(2)),
-    );
-  });
+  // Names only: the raw readings sit behind "Show the numbers", and a plain-words comparison with other markets replaces them here.
+  const rows = b.rows.slice(0, 3).map((e) => h("div", { class: "bk-r bk-r--name" }, h("span", null, e.name, h("small", null, TYPE_WORDS[e.type] ?? e.type.replace("_", " ")))));
   const scored = b.rows.length > 0 || b.index !== null;
   const ix = b.index;
   const body: Node[] = [];
   if (scored && ix !== null) {
     body.push(
-      h("div", { class: "bk-tbl" }, h("div", { class: "bk-h" }, h("span", null, "What Qloo looked at"), h("span", { style: "text-align:right" }, "Taste match here")), ...rows),
-      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : "pos"}` }, fmt1(ix)), h("div", { class: "t" }, "Local pull", h("b", null, pullWords(ix)))),
+      h("div", { class: "bk-tbl" }, h("div", { class: "bk-h" }, h("span", null, "What Qloo looked at")), ...rows),
+      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Local pull", h("b", null, pullWords(ix)))),
+      h("div", { class: "bk-vs", "data-testid": "bk-vs" }, `${b.themeName} here: ${vsMarketsWords(b.z)}`),
       h("div", { class: "bk-why" }, h("b", null, whyHead(b.fit, b.city)), WHY_TEXT[b.fit] ?? ""),
     );
   } else {

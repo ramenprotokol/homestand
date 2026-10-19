@@ -1,4 +1,4 @@
-import { AUDIT_LINE, METHOD_WORDS } from "../score";
+import { METHOD_WORDS } from "../score";
 import { longDate } from "../text";
 
 export interface MemoSwap {
@@ -26,9 +26,8 @@ export interface MemoData {
   nights: number;
   classic: number;
   synthetic: boolean;
-  recordedOn: string | null;
-  /** Full timestamp of the saved scores, when the scores were a saved result. */
-  recordedAt?: string | null;
+  /** When the scores were pulled from Qloo, already formatted in the viewer's time zone. */
+  recordedLabel: string | null;
   /** Qloo's local family ideas for this area, when they were available. */
   ideas?: { city: string; titles: string[]; young: string[] };
 }
@@ -51,7 +50,7 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps">): stri
 export function buildMemoHtml(d: MemoData): string {
   const rows = d.swaps
     .map(
-      (s) => `<tr><td>${escapeHtml(s.weekday)} ${escapeHtml(longDate(s.date))}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}${s.discovered ? " <em>(Discovered by Qloo)</em>" : ""}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
+      (s) => `<tr><td>${escapeHtml(s.weekday.slice(0, 3))} ${escapeHtml(longDate(s.date).replace(/^(\w{3})\w*/, "$1"))}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}${s.discovered ? " <em>(Discovered by Qloo)</em>" : ""}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
         `<td>${s.discovered ? `${signed(s.fromZ)} to Found by Qloo` : `${signed(s.fromZ)} to ${signed(s.toZ)}`}</td></tr>`,
     )
     .join("");
@@ -65,11 +64,11 @@ export function buildMemoHtml(d: MemoData): string {
       })
       .join("") + (collapse ? `<li>For the library themes, the new theme stands out above this market's own average and the planned one stands out below it. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>` : "");
   const ideas = d.ideas && d.ideas.titles.length > 0
-    ? `<h2>Fresh family ideas from Qloo for ${escapeHtml(d.ideas.city)}</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}.${d.ideas.young.length ? ` Under-25 fans here also lean toward: ${d.ideas.young.map(escapeHtml).join(", ")}.` : ""} These come from Qloo's taste data for this area. They are ideas, not scores.</p>`
+    ? `<h2>Family titles that stand out near ${escapeHtml(d.ideas.city)}</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}.${d.ideas.young.length ? ` Top picks with under-25 fans here: ${d.ideas.young.map(escapeHtml).join(", ")}.` : ""} These come from Qloo's taste data for this area, compared with 40 ballpark markets.</p>`
     : "";
   const angles = d.angles.map((a) => `<li>${escapeHtml(a)}</li>`).join("");
   const banner = d.synthetic ? `<p class="warn">SYNTHETIC DEMO DATA. These numbers are made up for testing, not from Qloo.</p>` : "";
-  const recorded = d.recordedOn ? ` Scores were pulled from Qloo on ${escapeHtml(longDate(d.recordedOn))}.` : "";
+  const recorded = d.recordedLabel ? ` Scores were pulled from Qloo on ${escapeHtml(d.recordedLabel)}.` : "";
   return `<article class="memo">
 <h1>Theme-night rationale: ${escapeHtml(d.club)}</h1>
 <p class="meta">Prepared ${escapeHtml(longDate(d.generatedOn))} with Homestand.${recorded}</p>
@@ -82,7 +81,7 @@ ${ideas}
 ${d.angles.length ? `<h2>Locked nights: sponsor-friendly angles</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
 <p>${escapeHtml(METHOD_WORDS)}</p>
-<p>${escapeHtml(AUDIT_LINE)}</p>
+<p>This describes local taste, not an attendance forecast.</p>
 <p>${d.nights} nights were reviewed; ${d.classic} classic ${d.classic === 1 ? "night" : "nights"} (fireworks, giveaways, heritage and similar) ${d.classic === 1 ? "was" : "were"} left as planned because they are not a pop-culture taste. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
 </article>`;
 }

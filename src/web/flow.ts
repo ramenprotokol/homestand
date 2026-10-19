@@ -1,6 +1,6 @@
 import type { MarketIn } from "../app/api-types";
 import type { CalendarRow, RowError } from "../app/calendar/csv";
-import { parseCalendar } from "../app/calendar/csv";
+import { parseCalendar, sortRowsByDate } from "../app/calendar/csv";
 import { sampleById } from "../app/markets";
 import { sampleCsv } from "../app/samples";
 import { api, ApiFailure } from "./api";
@@ -64,7 +64,8 @@ export function resumeClub(): void {
 }
 
 /** Step 1 of 3, Check: parse is done by the caller; this asks the Worker to resolve, score and flag. */
-export async function startCheck(market: MarketIn, rows: CalendarRow[], parseErrors: RowError[], sampleId: string | null, go = true): Promise<void> {
+export async function startCheck(market: MarketIn, rowsIn: CalendarRow[], parseErrors: RowError[], sampleId: string | null, go = true): Promise<void> {
+  const rows = sortRowsByDate(rowsIn);
   reset();
   Object.assign(state, { market, rows, parseErrors, sampleId });
   saveClub({ market, rows, parseErrors, sampleId });

@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { parseCalendar } from "../../src/app/calendar/csv";
 import { placeLabel } from "../../src/app/geo";
 import { exampleCsv } from "../../src/app/samples";
-import { personalLine, checkResultLine, fitSummary, localDay, lockedLine, longDate, plural } from "../../src/app/text";
+import { sortRowsByDate } from "../../src/app/calendar/csv";
+import { swapName, personalLine, checkResultLine, fitSummary, localDay, lockedLine, longDate, plural } from "../../src/app/text";
 import { resolveTheme } from "../../src/app/calendar/resolve";
 import { THEME_LIBRARY } from "../../src/app/themes/library";
 
@@ -50,7 +51,7 @@ describe("the own-calendar example", () => {
     expect(rows.filter((r) => r.locked && r.sponsor)).toHaveLength(1);
     const themeIds = res.flatMap((r) => (r.kind === "theme" ? [r.themeId] : []));
     const auds = new Set(themeIds.map((id) => THEME_LIBRARY.find((t) => t.id === id)!.audience));
-    expect(auds).toEqual(new Set(["kids", "family", "adult"]));
+    expect([...auds].sort()).toEqual(["adult", "family", "kids", "teen"]);
     expect(new Set(themeIds).size).toBe(themeIds.length);
   });
 });
@@ -63,5 +64,24 @@ describe("the Study's personal line", () => {
   });
   it("has wording for the other verdicts too, and says 'You said' at most once", () => {
     for (const v of ["CONFIRMED", "OVERTURNED"] as const) for (const c of ["Yes", "No", "Not sure"] as const) expect(personalLine(c, v).match(/You said/g)?.length ?? 0).toBeLessThanOrEqual(1);
+  });
+});
+
+describe("real night names for swaps", () => {
+  it("keeps the original ending: Barbie Day becomes LEGO Movie Day, Star Wars Night becomes Pro Wrestling Night", () => {
+    expect(swapName("Barbie Day", "LEGO Movie")).toBe("LEGO Movie Day");
+    expect(swapName("Star Wars Night", "Pro wrestling")).toBe("Pro wrestling Night");
+    expect(swapName("Fireworks Friday", "Batman")).toBe("Batman Friday");
+    expect(swapName("Hot Sauce Showdown", "Garth Brooks")).toBe("Garth Brooks Showdown");
+    expect(swapName("Dinosaurs & Superheroes", "Marvel")).toBe("Marvel Night");
+    expect(swapName("Day", "Marvel")).toBe("Marvel Night");
+  });
+});
+
+describe("rows in date order", () => {
+  it("sorts by date and keeps typed order for the same date", () => {
+    const rows = [{ date: "2027-05-02", theme: "b" }, { date: "2027-04-01", theme: "a" }, { date: "2027-05-02", theme: "c" }, { date: "2027-04-30", theme: "d" }];
+    expect(sortRowsByDate(rows).map((r) => r.theme)).toEqual(["a", "d", "b", "c"]);
+    expect(rows[0]!.theme).toBe("b"); // the input is not changed
   });
 });

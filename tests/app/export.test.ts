@@ -80,7 +80,7 @@ describe("memo", () => {
   const data: MemoData = {
     club: "Akron, OH sample club <b>", generatedOn: "2026-10-15",
     swaps: [{ date: "2026-07-03", weekday: "Friday", from: "Elvis", to: "Grateful Dead", sponsor: "Tallmadge & Sons", fromZ: -1.24, toZ: 1.91, fromScore: 0.512, toScore: 0.731, why: "Closer to local taste." }],
-    angles: ["Keep it."], nights: 24, classic: 3, synthetic: true, recordedOn: null,
+    angles: ["Keep it."], nights: 24, classic: 3, synthetic: true, recordedLabel: null,
   };
   it("escapes everything and cites the local pull, not raw affinities or the bundle score", () => {
     const html = buildMemoHtml(data);
@@ -107,9 +107,9 @@ describe("memo", () => {
     const html = buildMemoHtml(d);
     expect(html).toContain("DC League of Super-Pets <em>(Discovered by Qloo)</em>");
     expect(html).toContain("-2.1 to Found by Qloo");
-    expect(html).toContain("Fresh family ideas from Qloo for Tulsa");
+    expect(html).toContain("Family titles that stand out near Tulsa");
     expect(html).toContain("Fuller House, Sing 2.");
-    expect(html).toContain("Under-25 fans here also lean toward: All That.");
+    expect(html).toContain("Top picks with under-25 fans here: All That.");
     expect(html).toContain("These come from Qloo's taste data for this area");
     expect(html).not.toContain("n/a");
   });

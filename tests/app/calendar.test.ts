@@ -10,7 +10,7 @@ describe("CSV parser", () => {
     const { rows, errors } = parseCalendar(CSV_TEMPLATE);
     expect(errors).toEqual([]);
     expect(rows).toHaveLength(3);
-    expect(rows[2]).toMatchObject({ date: "2026-05-02", theme: "Star Wars Night", sponsor: "Gulf Coast Dental", locked: true });
+    expect(rows[2]).toMatchObject({ date: "2027-05-07", theme: "Star Wars Night", sponsor: "Gulf Coast Dental", locked: true });
   });
 
   it("handles quotes, commas, doubled quotes, CRLF and a BOM", () => {
@@ -45,7 +45,7 @@ describe("CSV parser", () => {
     expect(weekdayName("2026-04-11")).toBe("Saturday");
   });
 
-  it("reads all four sample calendars cleanly, 20 to 28 nights, April to September 2026", () => {
+  it("reads all four sample calendars cleanly, 20 to 28 nights, April to September 2027", () => {
     expect(SAMPLE_CALENDAR_IDS).toHaveLength(4);
     for (const id of SAMPLE_CALENDAR_IDS) {
       const { rows, errors } = parseCalendar(sampleCsv(id));
@@ -53,7 +53,7 @@ describe("CSV parser", () => {
       expect(rows.length).toBeGreaterThanOrEqual(20);
       expect(rows.length).toBeLessThanOrEqual(28);
       for (const r of rows) {
-        expect(r.date >= "2026-04-01" && r.date <= "2026-09-30").toBe(true);
+        expect(r.date >= "2027-04-01" && r.date <= "2027-09-30").toBe(true);
         expect(r.sponsor).not.toMatch(/MLB|Pirates of Pittsburgh/i);
       }
       expect(rows.filter((r) => r.locked).length).toBeGreaterThanOrEqual(2);

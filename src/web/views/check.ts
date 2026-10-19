@@ -1,7 +1,7 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS, pullWords } from "../../app/score";
+import { CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS, NEAR_TOP_NOTE, pullWords, vsMarketsWords } from "../../app/score";
 import { themeById } from "../../app/themes/library";
-import { checkResultLine, fitSummary, lockedLine } from "../../app/text";
+import { checkResultLine, fitSummary, lockedLine, swapName } from "../../app/text";
 import { ApiFailure } from "../api";
 import { fitChip, syntheticBanner } from "../components";
 import { formatDate, formatDateTime, h, type Child } from "../dom";
@@ -9,12 +9,13 @@ import { recheckTheme, navigate } from "../flow";
 import { bindTilt, FIT_NAME, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
 import { tally } from "../foil/tally";
 import { onCleanup, onMount, route, routeContext } from "../foil/lifecycle";
-import { fmt1, gsap, reduced } from "../foil/motion";
+import { gsap, reduced } from "../foil/motion";
 import { rand } from "../foil/rng";
 import { bokeh, garland, lamp, ridge } from "../foil/scenery";
 import { openWhy, refreshWhy } from "../foil/why";
 import { icon } from "../icons";
-import { state, ui, viewOf, type NightView } from "../store";
+import { step } from "../../app/trace";
+import { addTrace, state, ui, viewOf, type NightView } from "../store";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const LEGEND: ReadonlyArray<readonly [CardFit, string, string]> = [
@@ -26,6 +27,13 @@ const LEGEND: ReadonlyArray<readonly [CardFit, string, string]> = [
 ];
 
 const city = (): string => (state.analysis?.market.label ?? "").split(",")[0]!.replace(/ (sample )?club$/, "");
+
+/** The step log keeps its old counts after a pick, so the pick adds its own line with the new ones. */
+function logChoice(night: string, theme: string): void {
+  const vs = state.analysis!.nights.map(viewOf);
+  const n = (f: NightView["fit"]): number => vs.filter((x) => x.fit === f).length;
+  addTrace("Check: your choice", [step(new Date().toISOString(), "note", `Director chose ${theme} for "${night}": now ${fitSummary({ in: n("leans-in"), average: n("average"), away: n("leans-away"), notScored: n("not-scored"), classic: n("classic"), found: n("found") })}`)]);
+}
 
 /** Sponsor and lock, in words under the card: the card art is too small to carry them. */
 function slotNote(v: NightView): HTMLElement | null {
@@ -67,7 +75,10 @@ export function checkView(): HTMLElement {
       ),
     );
   }
-  if (a.recordedAt) notices.push(h("div", { class: "notice", role: "note", "data-testid": "recorded" }, icon("clock"), h("span", null, `These scores were pulled from Qloo on ${formatDateTime(a.recordedAt)} and saved. "Re-check live" on any night asks Qloo again.`)));
+  if (a.recordedAt) {
+    const when = formatDateTime(a.recordedAt);
+    notices.push(h("div", { class: "notice", role: "note", "data-testid": "recorded" }, icon("clock"), h("span", null, a.recordedOn ? `These scores were pulled from Qloo on ${when} and saved. "Re-check live" on any night asks Qloo again.` : `These scores were just pulled from Qloo (${when}). "Re-check live" on any night asks Qloo again.`)));
+  }
 
   const months = new Map<string, NightView[]>();
   for (const v of views) {
@@ -89,7 +100,7 @@ export function checkView(): HTMLElement {
         "div",
         { class: "ask-b" },
         v.night.candidates.map((id) =>
-          h("button", { type: "button", class: "btn ghost sm", onclick: () => { state.choices[v.night.index] = id; window.dispatchEvent(new HashChangeEvent("hashchange")); } }, themeById(id)?.label ?? id),
+          h("button", { type: "button", class: "btn ghost sm", onclick: () => { state.choices[v.night.index] = id; logChoice(v.night.theme, themeById(id)?.label ?? id); window.dispatchEvent(new HashChangeEvent("hashchange")); } }, themeById(id)?.label ?? id),
         ),
       ),
     ),
@@ -234,10 +245,12 @@ function backOf(v: NightView): BackSpec {
     no: n.index + 1,
     total: state.analysis!.nights.length,
     city: city(),
-    title: v.swappedFrom ? v.themeLabel : n.theme,
+    title: v.swappedFrom ? swapName(n.theme, v.themeLabel) : n.theme,
     dateLine: `${formatDate(n.date)} · ${n.weekday}`,
     rows: scored ? s.entities.map((e) => ({ name: e.name, type: e.type, affinity: e.affinity })) : [],
     index: scored ? s.index : null,
+    z: scored ? s.z : null,
+    themeName: v.themeId ? (themeById(v.themeId)?.label ?? n.theme) : n.theme,
     fit,
     reason,
   };
@@ -266,7 +279,7 @@ function whyInfo(index: number): Child {
   const a = state.analysis!;
   const v = viewOf(a.nights[index]!);
   const n = v.night;
-  const title = v.swappedFrom ? v.themeLabel : n.theme;
+  const title = v.swappedFrom ? swapName(n.theme, v.themeLabel) : n.theme;
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
   const out: Child[] = [
     h("div", { class: "eyebrow" }, `No. ${String(n.index + 1).padStart(2, "0")} / ${String(a.nights.length).padStart(2, "0")} · ${n.weekday} ${formatDate(n.date)}${n.locked ? " · Locked" : ""}`),
@@ -297,8 +310,15 @@ function whyInfo(index: number): Child {
     out.push(h("p", { class: "panel-box" }, s.reason ?? "Not scored."));
   } else {
     out.push(
-      h("p", { class: "why-index", "data-testid": "why-pull" }, h("b", null, `Local pull: ${fmt1(s.index)}`), `, ${pullWords(s.index)}. ${FIT_NAME[fit]}.`),
-      h("div", { class: "panel-box" }, h("p", null, marketLevelSentence(s.marketMeanZ)), h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label))),
+      h("p", { class: "why-index", "data-testid": "why-pull" }, h("b", null, "Local pull:"), ` ${pullWords(s.index)}. ${FIT_NAME[fit]}.`),
+      h(
+        "div",
+        { class: "panel-box" },
+        h("p", { "data-testid": "why-vs" }, h("b", null, `${theme.label} here:`), ` ${vsMarketsWords(s.z)}.`),
+        s.score !== null && s.score >= 0.9 ? h("p", { class: "small" }, NEAR_TOP_NOTE) : null,
+        h("p", null, marketLevelSentence(s.marketMeanZ)),
+        h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label)),
+      ),
     );
   }
   out.push(
@@ -323,7 +343,7 @@ function whyInfo(index: number): Child {
           h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
           h("dt", null, "z = (score - typical) / spread"), h("dd", null, rel(s.z)),
           h("dt", null, `This market's average z across ${s.scoredThemes} themes`), h("dd", null, rel(s.marketMeanZ)),
-          h("dt", null, "Index = z - market average"), h("dd", null, rel(s.index)),
+          h("dt", null, "Local pull = z - market average"), h("dd", null, rel(s.index)),
           h("dt", null, "Cut-offs for the index"), h("dd", null, "+0.50 / -0.50"),
         ),
         a.reference.synthetic ? h("p", { class: "small" }, "The typical-market numbers are a synthetic placeholder until the reference set is pulled.") : null,

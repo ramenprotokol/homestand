@@ -50,7 +50,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Index = z - market average/)).toBeVisible();
+  await expect(why.getByText(/Local pull = z - market average/)).toBeVisible();
   await expect(why).toContainText(/Compared with other ballpark markets, this market scores/);
   await expect(why.getByTestId("why-footer")).toContainText("See how we tested this");
   await expect(why).not.toContainText("coin flip");
@@ -139,16 +139,16 @@ test("real data: Tulsa with the example calendar gets a swap, with Discovered by
   await page.getByTestId("to-fix").click();
   const pack = page.getByRole("button", { name: /Open the pack/ });
   await expect(pack).toBeVisible({ timeout: 40_000 });
-  await expect(page.getByTestId("ideas")).toContainText("Fresh family ideas from Qloo for Tulsa");
-  await expect(page.getByTestId("ideas-young")).toContainText("Under-25 fans here also lean toward:");
+  await expect(page.getByTestId("ideas")).toContainText("Family titles that stand out near Tulsa");
+  await expect(page.getByTestId("ideas-young")).toContainText("Top picks with under-25 fans here:");
   await pack.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("proposal")).toBeVisible();
   await expect(page.getByTestId("disc-badge")).toHaveText("Discovered by Qloo");
-  await expect(page.locator(".swap-why")).toContainText(/^Qloo ranks .+ among the top family (movies|shows) for fans near Tulsa\.$/);
+  await expect(page.locator(".swap-why")).toContainText(/^.+ stands out near Tulsa: fans here like it more than at most of the 40 ballpark markets we compare against\.$/);
   await shot(page, info, "tulsa-discovered");
   await page.getByTestId("open-trace").click();
-  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo for top family movies near Tulsa|Used the recorded top family movies, top family shows and under-25 picks near Tulsa/);
+  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo how \d+ family-friendly animated movies score near Tulsa|Used the recorded family-title scores and under-25 picks near Tulsa/);
 });
 
 test("real data: a recognised theme with no Qloo scores is not called unknown", async ({ page }) => {

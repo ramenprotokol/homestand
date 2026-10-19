@@ -133,12 +133,31 @@ export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qlo
  */
 export const AUDIT_LINE = "It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.";
 
+/** How a score compares with the 40 reference ballpark markets, from its z, in plain words. */
+export function vsMarketsWords(z: number | null): string {
+  if (z === null) return "not compared";
+  if (z <= -2 * Z_CUT) return "well below most ballpark markets";
+  if (z <= -Z_CUT) return "below most ballpark markets";
+  if (z < Z_CUT) return "about typical for ballpark markets";
+  if (z < 2 * Z_CUT) return "above most ballpark markets";
+  return "well above most ballpark markets";
+}
+
+/** Why a theme everyone scores near the top can still sit below average: the small gaps between markets are what is compared. */
+export const NEAR_TOP_NOTE = "Nearly every market scores this near the top, so the small differences between markets are what matter.";
+
 /** "Local pull" in plain words from the sign and size of the index (z against the market's own average). */
 export function pullWords(index: number | null): string {
-  if (index === null) return "not compared";
-  if (index <= -2 * Z_CUT) return "well below this town's usual";
-  if (index <= -Z_CUT) return "below this town's usual";
-  if (index < Z_CUT) return "about this town's usual";
-  if (index < 2 * Z_CUT) return "above this town's usual";
-  return "well above this town's usual";
+  const band = pullBand(index);
+  return band === null ? "not compared" : band === "about" ? "about this town's usual" : `${band} this town's usual`;
+}
+
+/** The band alone: "well below", "below", "about", "above" or "well above". */
+export function pullBand(index: number | null): "well below" | "below" | "about" | "above" | "well above" | null {
+  if (index === null) return null;
+  if (index <= -2 * Z_CUT) return "well below";
+  if (index <= -Z_CUT) return "below";
+  if (index < Z_CUT) return "about";
+  if (index < 2 * Z_CUT) return "above";
+  return "well above";
 }
