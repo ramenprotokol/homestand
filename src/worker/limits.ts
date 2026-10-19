@@ -33,6 +33,6 @@ export function ipBucket(ip: string): string {
   return groups.slice(0, 4).map((g) => g.toLowerCase().padStart(4, "0")).join(":") + "::/64";
 }
 
-export type QuotaKind = "pull" | "recheck" | "model";
+export type QuotaKind = "pull" | "recheck" | "model" | "taste";
 /** Per client, per UTC day. Generous enough for a judge exploring; far too small to drain the shared caps. */
-export const DAILY_QUOTA: Record<QuotaKind, number> = { pull: 6, recheck: 10, model: 30 };
+export const DAILY_QUOTA: Record<QuotaKind, number> = { pull: 6, recheck: 10, model: 30, taste: 20 };

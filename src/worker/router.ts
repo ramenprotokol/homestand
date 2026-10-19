@@ -4,7 +4,6 @@ import { analyze, capsOf, CappedError, forKind, proposeSwaps, QuotaError, rechec
 import { kindOf } from "../app/kind";
 import { placeLabel } from "../app/geo";
 import { DAILY_QUOTA, type Limiter, type QuotaKind } from "./limits";
-import { safeGet, safePut } from "./safe";
 import { isSampleMarket, marketAllowed, signMarket } from "./sign";
 
 export interface RouterDeps {
@@ -76,10 +75,16 @@ function gateFor(deps: RouterDeps, req: Request, m: MarketIn): Gate {
       if (kind === "pull" && isSampleMarket(m)) return true;
       const id = await deps.clientId(req);
       const key = `q:v1:${kind}:${id}:${deps.agent.now().toISOString().slice(0, 10)}`;
-      const n = Number((await safeGet(deps.agent.kv, key)) ?? "0") || 0;
-      if (n >= DAILY_QUOTA[kind]) return false;
-      await safePut(deps.agent.kv, key, String(n + 1), { expirationTtl: 2 * 24 * 3600 });
-      return true;
+      // Fail closed: if this client's counter cannot be read or written, the live call is refused (recorded results are still served).
+      try {
+        const n = Number((await deps.agent.kv.get(key)) ?? "0") || 0;
+        if (n >= DAILY_QUOTA[kind]) return false;
+        await deps.agent.kv.put(key, String(n + 1), { expirationTtl: 2 * 24 * 3600 });
+        return true;
+      } catch (err) {
+        console.error("quota counter failed", kind, err instanceof Error ? err.message : String(err));
+        return false;
+      }
     },
   };
 }
@@ -88,6 +93,7 @@ const QUOTA_MESSAGES: Record<QuotaKind, string> = {
   pull: "You've looked up as many new cities as are allowed today. The four sample clubs still work, and so do cities you've already checked.",
   recheck: "You've used today's live re-checks. The saved results are still good, and the sample clubs still work.",
   model: "",
+  taste: "You've used today's live taste-graph lookups. The saved ideas are still good, and the sample calendars still work.",
 };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -241,6 +247,9 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
     return fail(404, "not-found", "No such route.", headers);
   } catch (err) {
     if (err instanceof QuotaError) return fail(429, "quota", QUOTA_MESSAGES[err.kind], headers);
+    if (err instanceof CappedError && err.countersDown) {
+      return fail(503, "counters", "Live lookups are paused because the usage counters are unavailable. Recorded results still work; try again shortly.", headers);
+    }
     if (err instanceof CappedError) {
       return fail(429, "capped", "Today's live Qloo allowance is used up, and this market has no recorded result yet. The four sample clubs still work.", headers);
     }

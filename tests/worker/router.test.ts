@@ -820,13 +820,33 @@ describe("closed doors", () => {
     expect(text).toContain("were not available right now");
   });
 
-  it("serves the request even when KV writes fail", async () => {
+  it("fails closed when the usage counters cannot be written: no live Qloo call, and an honest answer", async () => {
     const h = harness();
     h.deps.agent.kv.put = async () => {
       throw new Error("KV put() limit exceeded for the day");
     };
     const res = await route(post("/api/analyze", analyzeBody), h.deps);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as ApiError).error).toBe("counters");
+    expect(h.qlooUrls).toHaveLength(0);
+  });
+
+  it("fails closed when the counters cannot be read, and still serves what is recorded", async () => {
+    const h = harness();
+    await analyzeOk(h); // records the scores
+    const get = h.deps.agent.kv.get.bind(h.deps.agent.kv);
+    h.deps.agent.kv.get = async (k: string) => {
+      if (k.startsWith("cap:") || k.startsWith("q:v1:")) throw new Error("KV get failed");
+      return get(k);
+    };
+    h.qlooUrls.length = 0;
+    const out = await analyzeOk(h); // served from the recorded scores, no live call
+    expect(out.caps.qlooRemaining).toBe(0);
+    expect(h.qlooUrls).toHaveLength(0);
+    // A market with nothing recorded gets no live call either.
+    const cold = await route(post("/api/analyze", akronBody), h.deps);
+    expect(cold.status).toBe(503);
+    expect(h.qlooUrls).toHaveLength(0);
   });
 });
 
@@ -885,7 +905,8 @@ describe("taste graph angles for locked nights", () => {
     expect(withInterests[0]!.searchParams.get("signal.location")).toMatch(/^POINT\(/);
     const cands = withInterests[0]!.searchParams.get("filter.results.entities")!.split(",");
     expect(cands).not.toContain("SYN-star-trek:film");
-    expect(cands).not.toContain("SYN-star-wars:film"); // a family theme: not the same audience band as Star Trek
+    expect(cands).toContain("SYN-star-wars:film"); // the asked set is fixed (every movie theme); the audience band is applied to the answer afterwards
+    expect(p.angles[0]!.options!.some((o) => o.toThemeId === "star-wars")).toBe(false);
     expect(p.angles).toHaveLength(1);
     expect(p.angles[0]!.toThemeId).toBe("batman");
     expect(p.angles[0]!.text).toContain("Fans of Star Trek near Akron also lean toward Batman, so if Harbor Credit Union is open to it, a small Batman touch");
@@ -921,7 +942,7 @@ describe("taste graph angles for locked nights", () => {
     expect(call[0]!.searchParams.get("filter.results.entities")).toBe("SYN-barbie:film"); // one candidate, from the toys category, same young audience
     expect(p.angles[0]!.toThemeId).toBe("barbie");
     expect(p.angles[0]!.text).toContain("Fans of Marvel near Akron also lean toward Barbie, so if Summit Savings is open to it");
-    expect(p.trace.some((s) => /among 1 theme for the same audience/.test(s.text))).toBe(true);
+    expect(p.trace.some((s) => /among 1 theme/.test(s.text))).toBe(true);
   });
 
   it("falls back to the plain angle when the taste graph call fails, without leaking the upstream text", async () => {

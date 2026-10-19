@@ -39,6 +39,8 @@ export interface Deps {
   aiTimeoutMs?: number;
   /** The title pool and its reference spread. Defaults to the committed one; synthetic mode and tests pass their own. */
   discoveryRef?: DiscoveryReference;
+  /** Set during a request when a usage counter could not be read or written: no live call is made after that. */
+  countersDown?: boolean;
   /** "venue" for a concert venue run (see forKind). Anything else is a club run, exactly as before venue mode existed. */
   kind?: Kind;
   /** The library a venue run scores: the music themes plus the artist themes. */
@@ -63,8 +65,8 @@ export class QuotaError extends Error {
 
 /** Thrown when a live Qloo call is needed and today's cap is spent. */
 export class CappedError extends Error {
-  constructor() {
-    super("Today's live Qloo allowance is used up.");
+  constructor(readonly countersDown = false) {
+    super(countersDown ? "The usage counters are unavailable." : "Today's live Qloo allowance is used up.");
   }
 }
 
@@ -80,28 +82,60 @@ const today = (d: Deps): string => iso(d).slice(0, 10);
 
 // ---------- daily counters ----------
 
+/** A usage counter could not be read or written (KV outage, or the daily write limit on a free plan). */
+export class CounterError extends Error {}
+
+/**
+ * The counters are what keep the shared Qloo and model caps honest, so they fail CLOSED: when one cannot be read or written, no further live
+ * Qloo or model call is made for the request, and the answer comes from recorded results or template text. (Content caches stay fail-open.)
+ */
 async function counter(d: Deps, name: string): Promise<number> {
-  const raw = await safeGet(d.kv, `cap:${name}:${today(d)}`);
+  let raw: string | null;
+  try {
+    raw = await d.kv.get(`cap:${name}:${today(d)}`);
+  } catch (err) {
+    console.error("counter read failed", name, err instanceof Error ? err.message : String(err));
+    throw new CounterError();
+  }
   const n = raw === null ? 0 : Number(raw);
   return Number.isFinite(n) ? n : 0;
 }
 
 async function bump(d: Deps, name: string, by: number): Promise<void> {
-  await safePut(d.kv, `cap:${name}:${today(d)}`, String((await counter(d, name)) + by), { expirationTtl: 2 * 24 * 3600 });
+  const next = String((await counter(d, name)) + by);
+  try {
+    await d.kv.put(`cap:${name}:${today(d)}`, next, { expirationTtl: 2 * 24 * 3600 });
+  } catch (err) {
+    console.error("counter write failed", name, err instanceof Error ? err.message : String(err));
+    throw new CounterError();
+  }
 }
 
 export async function capsOf(d: Deps): Promise<Caps> {
-  const used = await counter(d, "qloo");
-  const qlooRemaining = Math.max(0, d.qlooDailyCap - used);
-  const aiUsed = await counter(d, "ai");
-  return { qlooRemaining, qlooCap: d.qlooDailyCap, recheckDisabled: d.mode === "live" && qlooRemaining < 3, aiRemaining: d.ai ? Math.max(0, d.aiDailyCap - aiUsed) : 0 };
+  try {
+    const used = await counter(d, "qloo");
+    const qlooRemaining = Math.max(0, d.qlooDailyCap - used);
+    const aiUsed = await counter(d, "ai");
+    return { qlooRemaining, qlooCap: d.qlooDailyCap, recheckDisabled: d.mode === "live" && qlooRemaining < 3, aiRemaining: d.ai ? Math.max(0, d.aiDailyCap - aiUsed) : 0 };
+  } catch (err) {
+    if (!(err instanceof CounterError)) throw err;
+    return { qlooRemaining: 0, qlooCap: d.qlooDailyCap, recheckDisabled: d.mode === "live", aiRemaining: 0 };
+  }
 }
 
-async function reserveQloo(d: Deps, n: number): Promise<boolean> {
+/** Reserves `n` live Qloo calls against the shared cap. False when the cap is spent or when the counters cannot be trusted (then `d.countersDown` is set). */
+async function reserveQloo(d: Deps, n: number, trace?: TraceStep[]): Promise<boolean> {
   if (d.mode === "synthetic") return true;
-  if ((await counter(d, "qloo")) + n > d.qlooDailyCap) return false;
-  await bump(d, "qloo", n);
-  return true;
+  try {
+    if ((await counter(d, "qloo")) + n > d.qlooDailyCap) return false;
+    await bump(d, "qloo", n);
+    return true;
+  } catch (err) {
+    if (!(err instanceof CounterError)) throw err;
+    d.countersDown = true;
+    trace?.push(step(iso(d), "qloo", "The usage counters are unavailable right now, so no live Qloo request is made. Recorded results are used where there are any."));
+    return false;
+  }
 }
 
 // ---------- scores: cache, then Qloo ----------
@@ -181,7 +215,7 @@ export async function getScores(d: Deps, m: MarketIn, trace: TraceStep[]): Promi
   }
   const need = new Set(d.library.flatMap((t) => t.entities.map((e) => e.type))).size;
   if (d.gate && !(await d.gate.allow("pull"))) throw new QuotaError("pull");
-  if (!(await reserveQloo(d, need))) throw new CappedError();
+  if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
   const themes = await askQloo(d, m, d.library, trace);
   const stored: StoredLibrary = { v: 1, fetchedAt: iso(d), themes };
   await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
@@ -224,23 +258,89 @@ function allOut(d: Deps, s: Scores): Record<string, ThemeScoreOut> {
 // ---------- taste graph: what fans of a locked night's theme near the ballpark also lean toward ----------
 
 interface StoredTaste {
-  v: 1;
+  v: 2;
   fetchedAt: string;
-  /** Candidate theme ids with their affinity among fans of the locked theme here, best first. */
+  /** Candidate ids with their affinity among fans of the locked theme here, best first. */
   ranked: Array<{ themeId: string; affinity: number }>;
 }
 
+/** One request makes at most this many live taste-graph lookups; the rest use recorded answers or the generic wording. A client also has a daily quota (`taste`). */
+export const MAX_LIVE_TASTE = 5;
+
+interface TasteRun {
+  live: number;
+  /** Lookups already settled in this request, by cache key: the same headliner on two nights is one lookup. */
+  memo: Map<string, StoredTaste | null>;
+}
+
+interface TasteSpec {
+  /** Depends only on the market, the headliner (theme) and the kind of run, never on the calendar. */
+  key: string;
+  label: string;
+  city: string;
+  type: QlooType;
+  /** A fixed candidate set for this headliner, at most 50. Calendar-dependent filtering happens after the answer is read. */
+  cands: Array<{ ref: string; id: string }>;
+  interestIds: string[];
+  what: string;
+}
+
+async function tasteRanked(d: Deps, m: MarketIn, run: TasteRun, trace: TraceStep[], spec: TasteSpec): Promise<StoredTaste | null> {
+  const settle = (v: StoredTaste | null): StoredTaste | null => (run.memo.set(spec.key, v), v);
+  if (run.memo.has(spec.key)) return run.memo.get(spec.key) ?? null;
+  const hit = await safeGet(d.kv, spec.key);
+  if (hit) {
+    try {
+      const s = JSON.parse(hit) as StoredTaste;
+      if (s.v === 2) {
+        trace.push(step(iso(d), "qloo", `Used the recorded taste graph for fans of ${spec.label} near ${spec.city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        return settle(s);
+      }
+    } catch {
+      /* fall through to a live lookup */
+    }
+  }
+  if (run.live >= MAX_LIVE_TASTE) {
+    trace.push(step(iso(d), "qloo", `Skipped the taste graph for ${spec.label}: at most ${MAX_LIVE_TASTE} live taste lookups are made per request, so the wording stays generic until it is recorded.`));
+    return settle(null);
+  }
+  if ((d.gate && !(await d.gate.allow("taste"))) || !(await reserveQloo(d, 1, trace))) {
+    trace.push(step(iso(d), "qloo", `Skipped the taste graph for ${spec.label}: the daily allowance is used up or could not be checked, so the wording stays generic.`));
+    return settle(null);
+  }
+  try {
+    const client = createQlooClient({ baseUrl: d.qlooBase, apiKey: d.qlooKey, fetchImpl: d.qlooFetch, delayMs: d.qlooDelayMs, maxTries: 3, sleep: d.qlooDelayMs === 0 ? async () => undefined : undefined });
+    run.live++;
+    const rows = await client.localAffinity({ type: spec.type, entityIds: spec.cands.map((c) => c.id), interestIds: spec.interestIds, lon: m.lon, lat: m.lat, radiusM: RADIUS_M, take: spec.cands.length, ...(spec.type === "movie" ? { releaseYearMin: 1900 } : {}) });
+    const byId = new Map(rows.map((r) => [r.entityId, r.affinity]));
+    const ranked = spec.cands.flatMap((c) => {
+      const a = byId.get(c.id);
+      return typeof a === "number" ? [{ themeId: c.ref, affinity: a }] : [];
+    }).sort((x, y) => y.affinity - x.affinity || x.themeId.localeCompare(y.themeId));
+    const stored: StoredTaste = { v: 2, fetchedAt: iso(d), ranked };
+    await safePut(d.kv, spec.key, JSON.stringify(stored), { expirationTtl: TTL });
+    trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${spec.label} near ${spec.city} also lean toward, among ${spec.cands.length} ${spec.what} (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    return settle(stored);
+  } catch (err) {
+    console.error("taste graph failed", err instanceof Error ? err.message : String(err));
+    trace.push(step(iso(d), "qloo", `The taste graph for ${spec.label} was not available right now, so the wording stays generic.`));
+    return settle(null);
+  }
+}
+
 /**
- * A locked night cannot change, so it gets a sponsor-friendly touch. The touch is chosen with one Qloo call per locked night:
- * the affinities of same-kind, audience-ok, unused library themes among fans of the locked theme near the ballpark
- * (signal.interests.entities). With nothing to compare, or when Qloo is unavailable, the angle keeps the local-lean choice.
+ * A locked night cannot change, so it gets a sponsor-friendly touch chosen with Qloo's taste graph: what fans of the locked theme near the ballpark
+ * also lean toward (signal.interests.entities). The lookup is keyed on the market and the theme only and asks about a FIXED set (every library theme
+ * with an entity of the same type), so changing something else on the calendar never makes a new live call. The calendar's rules (themes already on
+ * it, the date window, the audience, same kind first) are applied to the stored answer afterwards. Without an answer, the generic angle stays.
  */
 async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights: PlanNight[], trace: TraceStep[]): Promise<SponsorAngle[]> {
   if (angles.length === 0) return angles;
   const city = m.label.split(",")[0]!.replace(/ (sample )?club$/, "");
   const used = new Set(nights.map((n) => n.themeId).filter((x): x is string => x !== null));
+  const sig = signature(d.library);
+  const run: TasteRun = { live: 0, memo: new Map() };
   const out: SponsorAngle[] = [];
-  let client: ReturnType<typeof createQlooClient> | null = null;
   for (const angle of angles) {
     const original = d.library.find((t) => t.id === angle.themeId);
     const night = nights.find((n) => n.index === angle.index);
@@ -249,62 +349,34 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
       out.push(angle);
       continue;
     }
-    const slot = { date: night.date, notes: night.notes };
-    const usable = (t: (typeof d.library)[number]): boolean => t.id !== original.id && !used.has(t.id) && audienceBand(t.audience) === audienceBand(original.audience) && audienceFit(original, t, slot) && inWindow(night.date, t.window) && t.entities.some((e) => e.type === type);
-    // Same kind of theme first; if there is none, any theme for the same audience; one candidate is enough to ask.
-    let cands = d.library.filter((t) => usable(t) && categoryGroup(t.category) === categoryGroup(original.category));
-    if (cands.length === 0) cands = d.library.filter(usable);
-    if (cands.length < 1) {
+    const all = d.library.filter((t) => t.id !== original.id && t.entities.some((e) => e.type === type)).slice(0, 50);
+    if (all.length < 1) {
       out.push(angle);
       continue;
     }
-    const candIds = cands.map((t) => t.entities.find((e) => e.type === type)!.id);
-    const key = `tg:v1:${marketKey(m)}:${original.id}:${await sha256Hex(candIds.slice().sort().join(","))}`;
-    let stored: StoredTaste | null = null;
-    const hit = await safeGet(d.kv, key);
-    if (hit) {
-      try {
-        const s = JSON.parse(hit) as StoredTaste;
-        if (s.v === 1) stored = s;
-      } catch {
-        stored = null;
-      }
-    }
-    if (stored) trace.push(step(iso(d), "qloo", `Used the recorded taste graph for fans of ${original.label} near ${city} (no new Qloo call).`, `Cached, recorded ${stored.fetchedAt}.`));
-    else {
-      if ((d.gate && !(await d.gate.allow("pull"))) || !(await reserveQloo(d, 1))) {
-        trace.push(step(iso(d), "qloo", `Skipped the taste graph for ${original.label}: today's allowance is used up, so the angle uses the local lean.`));
-        out.push(angle);
-        continue;
-      }
-      try {
-        client ??= createQlooClient({ baseUrl: d.qlooBase, apiKey: d.qlooKey, fetchImpl: d.qlooFetch, delayMs: d.qlooDelayMs, maxTries: 3, sleep: d.qlooDelayMs === 0 ? async () => undefined : undefined });
-        const rows = await client.localAffinity({ type, entityIds: candIds, interestIds: original.entities.map((e) => e.id), lon: m.lon, lat: m.lat, radiusM: RADIUS_M, take: candIds.length, ...(type === "movie" ? { releaseYearMin: 1900 } : {}) });
-        const byId = new Map(rows.map((r) => [r.entityId, r.affinity]));
-        const ranked = cands.flatMap((t) => {
-          const a = byId.get(t.entities.find((e) => e.type === type)!.id);
-          return typeof a === "number" ? [{ themeId: t.id, affinity: a }] : [];
-        }).sort((x, y) => y.affinity - x.affinity || x.themeId.localeCompare(y.themeId));
-        stored = { v: 1, fetchedAt: iso(d), ranked };
-        await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
-        trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${original.label} near ${city} also lean toward, among ${cands.length} ${cands.length === 1 ? "theme" : "themes"} for the same audience (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
-      } catch (err) {
-        console.error("taste graph failed", err instanceof Error ? err.message : String(err));
-        trace.push(step(iso(d), "qloo", `The taste graph for ${original.label} was not available right now, so the angle uses the local lean.`));
-        out.push(angle);
-        continue;
-      }
-    }
-    const who = angle.sponsor || "the sponsor";
-    const options: AngleOption[] = stored.ranked.slice(0, 10).flatMap((r) => {
-      const t = d.library.find((x) => x.id === r.themeId);
-      return t ? [{ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${t.label}, so if ${who} is open to it, a small ${t.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` }] : [];
+    const stored = await tasteRanked(d, m, run, trace, {
+      key: `tg:v2:club:${sig}:${marketKey(m)}:${original.id}`, label: original.label, city, type, what: all.length === 1 ? "theme" : "themes",
+      cands: all.map((t) => ({ ref: t.id, id: t.entities.find((e) => e.type === type)!.id })), interestIds: original.entities.map((e) => e.id),
     });
+    if (!stored) {
+      out.push(angle);
+      continue;
+    }
+    const slot = { date: night.date, notes: night.notes };
+    const usable = (t: (typeof d.library)[number]): boolean => !used.has(t.id) && audienceBand(t.audience) === audienceBand(original.audience) && audienceFit(original, t, slot) && inWindow(night.date, t.window);
+    // Same kind of theme first; if there is none, any theme for the same audience.
+    const ranked = stored.ranked.flatMap((r) => {
+      const t = d.library.find((x) => x.id === r.themeId);
+      return t && usable(t) ? [t] : [];
+    });
+    const sameKind = ranked.filter((t) => categoryGroup(t.category) === categoryGroup(original.category));
+    const who = angle.sponsor || "the sponsor";
+    const options: AngleOption[] = (sameKind.length > 0 ? sameKind : ranked).slice(0, 10).map((t) => ({ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${t.label}, so if ${who} is open to it, a small ${t.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` }));
     if (options.length === 0) {
       out.push(angle);
       continue;
     }
-    out.push({ ...angle, toThemeId: options[0]!.toThemeId, text: options[0]!.text, options, generic: angleText(nights.find((n) => n.index === angle.index)!, original, null) });
+    out.push({ ...angle, toThemeId: options[0]!.toThemeId, text: options[0]!.text, options, generic: angleText(night, original, null) });
   }
   return out;
 }
@@ -352,7 +424,7 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
       /* fall through to a fresh pull */
     }
   }
-  if (!(await reserveQloo(d, 2))) {
+  if (!(await reserveQloo(d, 2, trace))) {
     trace.push(step(iso(d), "qloo", `Skipped the family titles near ${city}: today's Qloo allowance is used up.`));
     return null;
   }
@@ -436,7 +508,7 @@ export async function discoverActs(d: Deps, m: MarketIn, trace: TraceStep[]): Pr
     }
   }
   const batches = actBatches(ref.pool);
-  if (!(await reserveQloo(d, batches.length))) {
+  if (!(await reserveQloo(d, batches.length, trace))) {
     trace.push(step(iso(d), "qloo", `Skipped the touring acts near ${city}: today's Qloo allowance is used up.`));
     return null;
   }
@@ -471,20 +543,23 @@ interface ActCandidate {
 }
 
 /**
- * A locked headliner cannot change, so it gets a support-act idea from one Qloo call: the affinities of candidate acts (unused library
- * artists and the touring-act pool) among fans of the headliner near the venue (signal.interests.entities). A support act must still tour
- * and sit at least one declared booking tier below the headliner. Candidates in the headliner's own genre are asked about first (50 at most);
- * with fewer than four of those, other genres fill the list. When no act qualifies as support, the same call still finds what the fans
- * lean toward, and it is worded as a promo tie-in, never as a support act. Without an answer, the generic sponsor angle stays.
+ * A locked headliner cannot change, so it gets a support-act idea from the taste graph: the affinities of candidate acts among fans of the headliner
+ * near the venue (signal.interests.entities). A support act must still tour and sit at least one declared booking tier below the headliner. The lookup
+ * is keyed on the market and the headliner only and asks about a FIXED candidate set (the headliner's own genre first, 50 at most), never one that
+ * depends on the calendar: acts already on the calendar or already a proposed swap are removed from the stored answer afterwards. When no act
+ * qualifies as support, the same kind of call still finds what the fans lean toward, worded as a promo tie-in, never as a support act. Without an
+ * answer, the generic sponsor angle stays.
  */
 async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights: PlanNight[], trace: TraceStep[]): Promise<SponsorAngle[]> {
   if (angles.length === 0) return angles;
   const city = cityOfLabel(m.label);
-  const pool = (d.actsRef ?? ACTS_REFERENCE).pool;
+  const ref = d.actsRef ?? ACTS_REFERENCE;
+  const pool = ref.pool;
   const used = new Set(nights.map((n) => n.themeId).filter((x): x is string => x !== null));
   const libraryIds = new Set(d.library.flatMap((t) => t.entities.map((e) => e.id)));
+  const sig = signature(d.library);
+  const run: TasteRun = { live: 0, memo: new Map() };
   const out: SponsorAngle[] = [];
-  let client: ReturnType<typeof createQlooClient> | null = null;
   for (const angle of angles) {
     const original = d.library.find((t) => t.id === angle.themeId);
     if (!original) {
@@ -494,7 +569,7 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
     const headIds = new Set(original.entities.map((e) => e.id));
     const headTier = original.tier;
     const everyone: ActCandidate[] = [
-      ...d.library.filter((t) => t.id !== original.id && !used.has(t.id) && t.entities.length === 1 && t.entities[0]!.type === "artist" && !headIds.has(t.entities[0]!.id)).map((t) => ({ ref: t.id, id: t.entities[0]!.id, label: t.label, genre: t.genre, discovered: false, touring: t.touring !== false, tier: t.tier })),
+      ...d.library.filter((t) => t.id !== original.id && t.entities.length === 1 && t.entities[0]!.type === "artist" && !headIds.has(t.entities[0]!.id)).map((t) => ({ ref: t.id, id: t.entities[0]!.id, label: t.label, genre: t.genre, discovered: false, touring: t.touring !== false, tier: t.tier })),
       ...pool.filter((p) => !libraryIds.has(p.entityId) && !headIds.has(p.entityId)).map((p) => ({ ref: `qloo:${p.entityId}`, id: p.entityId, label: p.name, genre: p.genre as Genre | undefined, discovered: true, touring: true, tier: p.tier })),
     ];
     const support = everyone.filter((c) => c.touring && (headTier !== undefined && c.tier !== undefined && TIER_RANK[c.tier] <= TIER_RANK[headTier] - 1));
@@ -506,52 +581,23 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
       out.push(angle);
       continue;
     }
-    const candIds = cands.map((c) => c.id);
-    const key = `tg:v1:${marketKey(m)}:${original.id}:${await sha256Hex(candIds.slice().sort().join(","))}`;
-    let stored: StoredTaste | null = null;
-    const hit = await safeGet(d.kv, key);
-    if (hit) {
-      try {
-        const s = JSON.parse(hit) as StoredTaste;
-        if (s.v === 1) stored = s;
-      } catch {
-        stored = null;
-      }
-    }
-    if (stored) trace.push(step(iso(d), "qloo", `Used the recorded taste graph for fans of ${original.label} near ${city} (no new Qloo call).`, `Cached, recorded ${stored.fetchedAt}.`));
-    else {
-      if ((d.gate && !(await d.gate.allow("pull"))) || !(await reserveQloo(d, 1))) {
-        trace.push(step(iso(d), "qloo", `Skipped the taste graph for ${original.label}: today's allowance is used up, so the angle stays generic.`));
-        out.push(angle);
-        continue;
-      }
-      try {
-        client ??= createQlooClient({ baseUrl: d.qlooBase, apiKey: d.qlooKey, fetchImpl: d.qlooFetch, delayMs: d.qlooDelayMs, maxTries: 3, sleep: d.qlooDelayMs === 0 ? async () => undefined : undefined });
-        const rows = await client.localAffinity({ type: "artist", entityIds: candIds, interestIds: original.entities.map((e) => e.id), lon: m.lon, lat: m.lat, radiusM: RADIUS_M, take: candIds.length });
-        const byId = new Map(rows.map((r) => [r.entityId, r.affinity]));
-        const ranked = cands.flatMap((c) => {
-          const a = byId.get(c.id);
-          return typeof a === "number" ? [{ themeId: c.ref, affinity: a }] : [];
-        }).sort((x, y) => y.affinity - x.affinity || x.themeId.localeCompare(y.themeId));
-        stored = { v: 1, fetchedAt: iso(d), ranked };
-        await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
-        trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${original.label} near ${city} also lean toward, among ${cands.length} acts${same.length >= 4 ? ` in the same genre` : ""} (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
-      } catch (err) {
-        console.error("taste graph failed", err instanceof Error ? err.message : String(err));
-        trace.push(step(iso(d), "qloo", `The taste graph for ${original.label} was not available right now, so the angle stays generic.`));
-        out.push(angle);
-        continue;
-      }
+    const stored = await tasteRanked(d, m, run, trace, {
+      key: `tg:v2:venue:${sig}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${marketKey(m)}:${original.id}`, label: original.label, city, type: "artist",
+      what: `acts${same.length >= 4 ? " in the same genre" : ""}`, cands: cands.map((c) => ({ ref: c.ref, id: c.id })), interestIds: original.entities.map((e) => e.id),
+    });
+    if (!stored) {
+      out.push(angle);
+      continue;
     }
     const who = angle.sponsor || "the sponsor";
-    const options: AngleOption[] = stored.ranked.slice(0, 10).flatMap((r) => {
+    const options: AngleOption[] = stored.ranked.flatMap((r) => {
       const c = all.find((x) => x.ref === r.themeId);
-      if (!c) return [];
+      if (!c || used.has(c.ref)) return []; // an act already on the calendar cannot open for another date
       const text = promo
         ? `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${c.label}, so a pre-show playlist or promo tie-in could work for ${who}.`
         : `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Support act idea: fans of ${original.label} near ${city} also lean toward ${c.label}, so an act like ${c.label} could fit the opening slot.`;
       return [{ toThemeId: c.ref, text, act: { name: c.label, discovered: c.discovered } }];
-    });
+    }).slice(0, 10);
     if (options.length === 0) {
       out.push(angle);
       continue;
@@ -585,15 +631,27 @@ export async function runModel(d: Deps, system: string, user: string, trace: Tra
     trace.push(step(iso(d), "model", `${what}: no model attached here, so ${fallback}.`));
     return null;
   }
-  if ((await counter(d, "ai")) >= d.aiDailyCap) {
-    trace.push(step(iso(d), "model", `${what}: today's shared model budget is spent, so ${fallback}.`));
+  try {
+    if ((await counter(d, "ai")) >= d.aiDailyCap) {
+      trace.push(step(iso(d), "model", `${what}: today's shared model budget is spent, so ${fallback}.`));
+      return null;
+    }
+  } catch (err) {
+    if (!(err instanceof CounterError)) throw err;
+    trace.push(step(iso(d), "model", `${what}: the usage counters are unavailable, so ${fallback}.`));
     return null;
   }
   if (d.gate && !(await d.gate.allow("model"))) {
     trace.push(step(iso(d), "model", `${what}: your daily limit of model calls is spent, so ${fallback}.`));
     return null;
   }
-  await bump(d, "ai", 1);
+  try {
+    await bump(d, "ai", 1);
+  } catch (err) {
+    if (!(err instanceof CounterError)) throw err;
+    trace.push(step(iso(d), "model", `${what}: the usage counters are unavailable, so ${fallback}.`));
+    return null;
+  }
   const limit = d.aiTimeoutMs ?? 6000;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -666,7 +724,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     // Same unknown names, same answer: the reply is cached by the sorted, normalised texts, so a repeat costs no model call.
     const norm1 = (t: string): string => t.toLowerCase().replace(/\s+/g, " ").trim();
     const texts = [...new Set(unknownIdx.map((i) => norm1(input.rows[i]!.theme)))].sort();
-    const key = `ai:res:v1:${await sha256Hex(texts.join("\n"))}`;
+    const key = `ai:res:v1:${venue ? "venue:" : ""}${await sha256Hex(texts.join("\n"))}`;
     let reply = await safeGet(d.kv, key);
     if (reply !== null) trace.push(step(iso(d), "model", "Matching unrecognised theme names: used the saved answer (no model call)."));
     else {
@@ -828,7 +886,7 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   const theme = d.library.find((t) => t.id === input.themeId);
   if (!theme) throw new Error(`Unknown theme ${input.themeId}`);
   // One live re-check per market and theme per day: a repeat returns the answer already on file.
-  const rcKey = `rc:v1:${marketKey(input.market)}:${theme.id}`;
+  const rcKey = `rc:v1:${d.kind === "venue" ? "venue:" : ""}${marketKey(input.market)}:${theme.id}`;
   if ((await safeGet(d.kv, rcKey)) !== null) {
     const scores = await getScores(d, input.market, trace);
     const all = allOut(d, scores);
@@ -837,7 +895,7 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   }
   if (d.gate && !(await d.gate.allow("recheck"))) throw new QuotaError("recheck");
   const need = new Set(theme.entities.map((e) => e.type)).size;
-  if (!(await reserveQloo(d, need))) throw new CappedError();
+  if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
   trace.push(step(iso(d), "note", `Re-checking ${theme.label} live, ignoring the recorded result.`));
   const fresh = (await askQloo(d, input.market, [theme], trace))[theme.id]!;
   // The market's own average moves when one theme is re-read, so every index is recomputed from the updated record.
