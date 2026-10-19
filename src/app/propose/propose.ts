@@ -109,6 +109,16 @@ export function pickAngle(angle: SponsorAngle, taken: ReadonlySet<string>): Spon
   return hit ? { ...rest, toThemeId: hit.toThemeId, text: hit.text, ...(hit.act ? { act: hit.act } : {}) } : { ...rest, toThemeId: angle.themeId, text: angle.generic ?? angle.text };
 }
 
+/** All the locked nights' ideas at once: none repeats a swap, and no two locked nights get the same add-on or support act (first night first). */
+export function pickAngles(angles: readonly SponsorAngle[], taken: ReadonlySet<string>): SponsorAngle[] {
+  const used = new Set(taken);
+  return angles.map((a) => {
+    const picked = pickAngle(a, used);
+    if (picked.toThemeId !== picked.themeId) used.add(picked.toThemeId);
+    return picked;
+  });
+}
+
 export interface SponsorAngle {
   /** The ranked candidates (best first) the taste graph returned, each with its finished sentence. */
   options?: AngleOption[];

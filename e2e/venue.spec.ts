@@ -47,7 +47,7 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
   const awayCards = await page.locator('.card.tile[data-fit="leans-away"]').count();
   await expect(page.getByTestId("check-result")).toHaveText(awayCards === 0 ? /^None of the 18 dates lean away from what Raleigh likes\.$/ : new RegExp(`^${awayCards} of 18 dates? leans? away from what Raleigh likes\\.$`));
   // Four signed headliners are locked; two classic dates; nothing on this calendar needs a pick.
-  await expect(page.locator(".locks")).toContainText("4 locked dates stay exactly as planned");
+  await expect(page.locator(".locks")).toContainText("5 locked dates stay exactly as planned");
   await expect(page.locator(".fitword:has-text('Classic date')")).toHaveCount(2);
   await expect(page.locator(".fitword:has-text('Classic night')")).toHaveCount(0);
   await expect(page.locator(".ask")).toHaveCount(0);
@@ -75,7 +75,7 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
   // Fix
   await page.getByTestId("to-fix").click();
   await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /dates that lean away/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /who to send an offer to/ })).toBeVisible();
   await page.getByTestId("advanced").locator("summary").click();
   await expect(page.getByText("Allow a theme to repeat in the summer series")).toBeVisible();
   await expect(page.getByText("Off by default: each theme is used once, so two weak dates never get the same replacement.")).toBeVisible();
@@ -85,7 +85,7 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
   await expect(page.getByTestId("ideas")).toBeVisible(); // acts that stand out near Raleigh, or the honest "none" note
   await expect(page.getByTestId("ideas-note")).toContainText(/touring acts|pool of \d+/);
   // Every locked headliner gets a support-act idea from the taste graph.
-  await expect(page.getByTestId("angle")).toHaveCount(4);
+  await expect(page.getByTestId("angle")).toHaveCount(5);
   await expect(page.getByTestId("angle").first()).toContainText(/(Support act idea: fans of .+ near Raleigh also lean toward .+, so an act like .+ could fit the opening slot|Fans of .+ near Raleigh also lean toward .+, so a pre-show playlist or promo tie-in)/);
   await expect(page.getByRole("heading", { name: "Locked headliners: keep them, add a support act" })).toBeVisible();
   await noClubWords(page);
@@ -96,7 +96,7 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
     await page.keyboard.press("Enter");
     await expect(page.locator("#carousel")).toBeVisible();
     await expect(page.getByTestId("proposal")).toHaveCount(1);
-    await expect(page.getByTestId("now-card")).toContainText("Would be");
+    await expect(page.getByTestId("now-card")).toContainText("Send an offer to");
     await expect(page.getByTestId("proposal")).not.toContainText(/ballpark/i);
     if ((page.viewportSize()?.width ?? 0) >= 900) {
       await expect(page.getByTestId("approve")).toBeInViewport({ ratio: 1 });

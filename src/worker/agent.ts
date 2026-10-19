@@ -6,7 +6,7 @@ import { claimsOutcome, numbersAreGrounded } from "../app/guard";
 import type { QuotaKind } from "./limits";
 import { safeGet, safePut, sha256Hex } from "./safe";
 import { marketKey } from "../app/markets";
-import { angleText, categoryGroup, pickAngle, propose, type AngleOption, type Discovered, type PlanNight, type SponsorAngle, type ThemeFit } from "../app/propose/propose";
+import { angleText, categoryGroup, pickAngles, propose, type AngleOption, type Discovered, type PlanNight, type SponsorAngle, type ThemeFit } from "../app/propose/propose";
 import { audienceBand, audienceFit, inWindow } from "../app/propose/rules";
 import { shortDate } from "../app/dates";
 import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
@@ -299,7 +299,7 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
       }
     }
     const who = angle.sponsor || "the sponsor";
-    const options: AngleOption[] = stored.ranked.slice(0, 6).flatMap((r) => {
+    const options: AngleOption[] = stored.ranked.slice(0, 10).flatMap((r) => {
       const t = d.library.find((x) => x.id === r.themeId);
       return t ? [{ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${t.label}, so if ${who} is open to it, a small ${t.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` }] : [];
     });
@@ -551,7 +551,7 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
       }
     }
     const who = angle.sponsor || "the sponsor";
-    const options: AngleOption[] = stored.ranked.slice(0, 6).flatMap((r) => {
+    const options: AngleOption[] = stored.ranked.slice(0, 10).flatMap((r) => {
       const c = all.find((x) => x.ref === r.themeId);
       if (!c) return [];
       const text = promo
@@ -824,7 +824,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   }
   return {
     proposals: res.proposals.map((p) => ({ ...p, why: whys.get(p.id) ?? p.why, whySource: whys.has(p.id) ? "model" : "template" })),
-    discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: (venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace)).map((x) => pickAngle(x, new Set(res.proposals.map((p) => p.toThemeId)))), unfixed: res.unfixed, trace, caps: await capsOf(d),
+    discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: pickAngles(venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace), new Set(res.proposals.map((p) => p.toThemeId))), unfixed: res.unfixed, trace, caps: await capsOf(d),
   };
 }
 

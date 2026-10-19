@@ -66,6 +66,8 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "sugg
 
 /** One printable page. Cites the local pull (index) behind each swap; never the per-entity Qloo values. */
 export function buildMemoHtml(d: MemoData): string {
+  const C = copyFor(d.kind);
+  const venue = d.kind === "venue";
   const rows = d.swaps
     .map(
       (s) => `<tr><td>${escapeHtml(s.weekday.slice(0, 3))} ${escapeHtml(longDate(s.date).replace(/^(\w{3})\w*/, "$1"))}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}${s.discovered ? " <em>(Discovered by Qloo)</em>" : ""}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
@@ -87,8 +89,6 @@ export function buildMemoHtml(d: MemoData): string {
   const ideas = d.ideas && d.ideas.titles.length > 0
     ? `<h2>Family titles that stand out near ${escapeHtml(d.ideas.city)}</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}. Qloo had local data for ${d.ideas.scored} of our ${d.ideas.poolSize} family titles here; these stand out against 40 ballpark markets. They come from Qloo's taste data for this area.</p>`
     : "";
-  const C = copyFor(d.kind);
-  const venue = d.kind === "venue";
   const acts = d.acts && d.acts.names.length > 0
     ? `<h2>Acts that stand out near ${escapeHtml(d.acts.city)}</h2><p>${d.acts.names.map(escapeHtml).join(", ")}. Qloo had local data for ${d.acts.scored} of our ${d.acts.poolSize} touring acts here; these stand out against 40 reference markets. They come from Qloo's taste data for this area.</p>`
     : "";

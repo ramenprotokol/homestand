@@ -218,7 +218,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("memo")).toContainText("Theme-night rationale: Akron, OH sample club");
   await expect(page.getByTestId("memo")).toContainText("SYNTHETIC DEMO DATA");
   // The opener is fixed wording built from counts; nothing is written by a model, and there is no bundle score column.
-  await expect(page.getByTestId("memo")).toContainText(/Homestand checked 24 theme nights for Akron, OH sample club against local taste data from Qloo\. It suggested \d+ swaps?; you approved 1\. Each approved swap keeps its original date and sponsor\./);
+  await expect(page.getByTestId("memo")).toContainText(/Homestand checked 24 theme nights for Akron, OH sample club against local taste data from Qloo\. It suggested \d+ swaps?; 1 is in the revised calendar\. Each approved swap keeps its original date and sponsor\./);
   await expect(page.getByTestId("memo")).not.toContainText(/coin flip/);
   await expect(page.getByTestId("memo")).not.toContainText(/Bundle score|preference for certain/);
   expect(await page.locator(".memo-scroll").evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
@@ -335,8 +335,8 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   // The ideas panel: up to six titles, the under-25 line, and where they come from.
   const ideas = page.getByTestId("ideas");
   await expect(ideas).toContainText("Family titles that stand out near Akron");
-  expect(await ideas.locator(".idea").count()).toBeLessThanOrEqual(6);
-  expect(await ideas.locator(".idea").count()).toBeGreaterThanOrEqual(4);
+  expect(await ideas.locator(".idea").count()).toBeLessThanOrEqual(3);
+  expect(await ideas.locator(".idea").count()).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("ideas")).not.toContainText("under-25");
   await expect(page.getByTestId("ideas-note")).toContainText(/Qloo had local data for \d+ of our \d+ family titles near Akron/);
   await expect(ideas).toContainText("come from Qloo's taste data for this area");

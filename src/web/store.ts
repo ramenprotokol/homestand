@@ -3,7 +3,7 @@ import type { CalendarRow, RowError } from "../app/calendar/csv";
 import type { Kind } from "../app/kind";
 import type { FitLabel } from "../app/score";
 import type { TraceStep } from "../app/trace";
-import { pickAngle, templateWhy, type Proposal, type SponsorAngle } from "../app/propose/propose";
+import { pickAngles, templateWhy, type Proposal, type SponsorAngle } from "../app/propose/propose";
 import { copyFor, type Copy } from "../app/kind";
 import type { Genre } from "../app/themes/library";
 import { swapName } from "../app/text";
@@ -171,7 +171,7 @@ export function shownAngles(): SponsorAngle[] {
   const p = state.propose;
   if (!p) return [];
   const taken = new Set(p.proposals.map((x) => effective(x).toThemeId));
-  return p.angles.map((a) => pickAngle(a, taken));
+  return pickAngles(p.angles, taken);
 }
 
 export function approvedSwaps(): ShownProposal[] {

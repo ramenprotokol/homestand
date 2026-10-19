@@ -81,7 +81,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.getByTestId("to-send").click();
   await expect(page.getByTestId("memo")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("memo")).not.toContainText("SYNTHETIC");
-  await expect(page.getByTestId("memo")).toContainText(/Homestand checked \d+ theme nights for Albuquerque, NM sample club against local taste data from Qloo\. It suggested (\d+ swaps?; you approved (\d+|none)|no swaps)/);
+  await expect(page.getByTestId("memo")).toContainText(/Homestand checked \d+ theme nights for Albuquerque, NM sample club against local taste data from Qloo\. It suggested (\d+ swaps?; (\d+ are|1 is|none is) in the revised calendar|no swaps)/);
   await expect(page.getByTestId("memo")).not.toContainText("Bundle score");
   await shot(page, info, "send");
   await page.getByTestId("to-study").click();
@@ -207,7 +207,7 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   console.log("boxes", JSON.stringify([await page.locator(".acts").boundingBox(), await page.locator(".idx").boundingBox(), await page.locator(".now-card").boundingBox(), page.viewportSize()]));
   await page.screenshot({ path: `${dir}/${info.project.name}-venue-3b-viewport.png` });
   expect(await page.locator(".slide").count()).toBeGreaterThanOrEqual(1);
-  expect(await page.getByTestId("angle").count()).toBe(4);
+  expect(await page.getByTestId("angle").count()).toBe(5);
   await expect(page.getByTestId("angle").first()).toContainText(/(Support act idea: fans of .+ near Raleigh also lean toward|Fans of .+ near Raleigh also lean toward .+ promo tie-in)/);
   await expect(page.getByTestId("ideas")).toContainText(/Acts that stand out near Raleigh/);
   await expect(page.getByTestId("disc-badge").first()).toBeVisible(); // at least one swap is an act Qloo found

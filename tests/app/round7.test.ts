@@ -105,3 +105,26 @@ describe("booking tiers", () => {
     expect(withinOneTier(undefined, "stadium")).toBe(true);
   });
 });
+
+describe("the sponsor memo", () => {
+  const swap = { date: "2027-06-26", weekday: "Saturday", from: "Green Day", to: "Mt. Joy", sponsor: "Triangle Taproom", fromZ: -1, toZ: 0.5, fromScore: 0.9, toScore: 0.9, why: "Mt. Joy stands out.", source: "template" as const, fromEntities: ["Green Day"], toEntities: ["Mt. Joy"], discovered: true };
+  const data = { kind: "venue" as const, club: "Raleigh, NC sample amphitheatre", generatedOn: "2027-01-01", swaps: [swap], angles: [], nights: 18, suggested: 2, classic: 2, synthetic: false, recordedLabel: null };
+  it("lists the Qloo entities checked, says it once about attendance, and never says 'you approved'", async () => {
+    const { buildMemoHtml, memoOpener } = await import("../../src/app/export/memo");
+    const html = buildMemoHtml(data);
+    expect(html).toContain("Qloo checked Green Day for the planned date (");
+    expect(html).toContain("Mt. Joy for the swap (found by Qloo, not scored against the library)");
+    expect(html.match(/attendance/gi)).toHaveLength(1);
+    expect(memoOpener(data)).not.toMatch(/you approved/i);
+    expect(memoOpener(data)).toContain("1 is in the revised calendar");
+  });
+});
+
+describe("support acts across locked nights", () => {
+  it("never gives two locked nights the same add-on", async () => {
+    const { pickAngles } = await import("../../src/app/propose/propose");
+    const mk = (i: number): SponsorAngle => ({ index: i, date: "2027-06-01", themeId: `h${i}`, sponsor: "", toThemeId: "x", text: "t", generic: "g", options: [{ toThemeId: "x", text: "x" }, { toThemeId: "y", text: "y" }, { toThemeId: "z", text: "z" }] });
+    expect(pickAngles([mk(0), mk(1), mk(2)], new Set()).map((a) => a.toThemeId)).toEqual(["x", "y", "z"]);
+    expect(pickAngles([mk(0), mk(1)], new Set(["x"])).map((a) => a.toThemeId)).toEqual(["y", "z"]);
+  });
+});
