@@ -359,7 +359,7 @@ body.why-open .nav{visibility:hidden}
   .send>#fx3{bottom:auto;height:260px}
   .check-note{flex-basis:100%}
   .acts{bottom:6px}
-  .nav.solid,.nav{background:rgba(5,8,24,.97)}
+  .nav.solid,.nav{background:rgb(5,8,24)}
 }
 /* Sticky Approve/Reject needs an ancestor that clips without becoming a scroll container. */
 .fix{overflow:hidden;overflow:clip}
