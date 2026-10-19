@@ -20,7 +20,7 @@ function deps(over: Partial<Deps> = {}): Deps {
   const base: Deps = {
     kv: memoryKv(), ai: null, mode: "live", qlooFetch: syntheticQlooFetch, qlooBase: "https://qloo.test", qlooKey: "k", library: activeLibrary({}, true), reference: SYNTHETIC_REFERENCE,
     now: () => new Date("2026-10-15T12:00:00.000Z"), qlooDailyCap: 1000, aiDailyCap: 0, qlooDelayMs: 0, discoveryRef: syntheticDiscoveryReference(),
-    venueLibrary: activeLibrary({}, true, VENUE_LIBRARY), actsRef: syntheticActsReference(), popularityOf: () => 0.995,
+    venueLibrary: activeLibrary({}, true, VENUE_LIBRARY), actsRef: syntheticActsReference(),
   };
   return { ...base, ...over };
 }
@@ -185,8 +185,11 @@ describe("a venue run end to end on the synthetic data", () => {
     }
     expect(p.trace.map((t) => t.text).join(" ")).toMatch(/taste graph/);
   });
-  it("calls it a promo tie-in, not a support act, when no act can open for the headliner", async () => {
-    const d = forKind(deps({ popularityOf: (id) => (/dave-matthews|luke-bryan|phish|the-lumineers|jason-aldean/.test(id) ? 0.4 : 0.99) }), "venue");
+  it("calls it a promo tie-in, not a support act, when no act sits a tier below the headliner", async () => {
+    // Every pool act is at the headliners' own tier, so none sits a tier below.
+    const flat = syntheticActsReference();
+    flat.pool = flat.pool.map((x) => ({ ...x, tier: "amphitheatre" as const }));
+    const d = forKind(deps({ actsRef: flat }), "venue");
     const a = await analyze(d, { market, rows: parseCalendar(sampleCsv("raleigh")).rows });
     const nights = a.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.resolution.kind === "theme" ? n.themeId : null, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
     const p = await proposeSwaps(d, { market, nights, allowDuplicates: false });

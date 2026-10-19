@@ -119,6 +119,13 @@ export function pickAngles(angles: readonly SponsorAngle[], taken: ReadonlySet<s
   });
 }
 
+/**
+ * A club swap must keep either the kind of night (film, TV and kids' TV count as one kind; music, games, sports entertainment and holidays each stand alone)
+ * or its audience (kids and family count as one band; teen and adult each stand alone). Pro wrestling (teen) can become a teen theme, never adult music.
+ */
+export const keepsKindOrAudience = (original: Pick<Theme, "category" | "audience">, cand: Pick<Theme, "category" | "audience">): boolean =>
+  categoryGroup(original.category) === categoryGroup(cand.category) || audienceBand(original.audience) === audienceBand(cand.audience);
+
 export interface SponsorAngle {
   /** The ranked candidates (best first) the taste graph returned, each with its finished sentence. */
   options?: AngleOption[];
@@ -296,7 +303,8 @@ export function propose(input: ProposeInput): ProposeResult {
     for (const cand of leaning) {
       if (venue && !venueEligible(original, cand)) continue;
       const r = checkCandidate(slot, original, cand, used, allowDuplicates);
-      if (r.ok) passing.push({ theme: cand, detail: r.detail });
+      if (r.ok && !venue && !keepsKindOrAudience(original, cand)) rejects.audience++;
+      else if (r.ok) passing.push({ theme: cand, detail: r.detail });
       else rejects[r.reason!]++;
     }
     const rejected = Object.entries(rejects).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${REJECT_WORDS[k as RejectReason]}`).join(", ");

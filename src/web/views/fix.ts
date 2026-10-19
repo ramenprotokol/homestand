@@ -91,7 +91,7 @@ export function fixView(): HTMLElement {
   const advanced = h(
     "details",
     { class: "advanced", "data-testid": "advanced", open: state.allowDuplicates || ui.dupesNote ? "" : null },
-    h("summary", null, icon("caretDown"), "Repeat options: let a theme repeat"),
+    h("summary", null, icon("caretDown"), state.kind === "venue" ? "Repeat options: let an act repeat" : "Repeat options: let a theme repeat"),
     h(
       "div",
       { class: "advanced-body" },

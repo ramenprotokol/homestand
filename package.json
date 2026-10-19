@@ -26,7 +26,7 @@
     "study:pull": "tsx study/pull.ts",
     "study:analyze": "tsx study/analyze.ts",
     "qloo:discovery-reference": "node --env-file=.dev.vars --import tsx scripts/qloo-discovery-reference.ts",
-    "qloo:popularity": "node --env-file=.dev.vars --import tsx scripts/qloo-popularity.ts",
+    "qloo:support-acts": "node --env-file=.dev.vars --import tsx scripts/qloo-support-acts.ts",
     "qloo:acts-reference": "node --env-file=.dev.vars --import tsx scripts/qloo-acts-reference.ts"
   },
   "engines": {

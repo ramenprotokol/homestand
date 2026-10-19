@@ -260,6 +260,18 @@
     "hozier:artist": {
       "id": "7D903E2F-70AB-44CB-AA88-82501E6D04DD",
       "name": "Hozier"
+    },
+    "avril-lavigne:artist": {
+      "id": "A8A77393-4BF2-4389-971D-8F0089C6F603",
+      "name": "Avril Lavigne"
+    },
+    "cage-the-elephant:artist": {
+      "id": "F6BBDF90-222E-43F4-A1F8-1F20CD7A2742",
+      "name": "Cage the Elephant"
+    },
+    "pierce-the-veil:artist": {
+      "id": "653BD725-93BF-4488-88F5-26881AFBE1BA",
+      "name": "Pierce the Veil"
     }
   },
   "dropped": {

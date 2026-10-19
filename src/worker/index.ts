@@ -51,7 +51,6 @@ function depsFor(env: Env): RouterDeps {
     library: activeLibrary(COMMITTED_IDS, synthetic),
     venueLibrary: activeLibrary(COMMITTED_IDS, synthetic, VENUE_LIBRARY),
     actsRef: synthetic ? syntheticActsReference() : ACTS_REFERENCE,
-    ...(synthetic ? { popularityOf: (id: string) => (id.startsWith("SYN-") ? 0.9 : undefined) } : {}),
     reference: synthetic ? SYNTHETIC_REFERENCE : REFERENCE,
     discoveryRef: synthetic ? syntheticDiscoveryReference() : DISCOVERY_REFERENCE,
     now: () => new Date(),

@@ -15,7 +15,6 @@ import { THEME_LIBRARY } from "../app/themes/library";
 import { VENUE_CLASSIC_PHRASES, VENUE_LIBRARY } from "../app/themes/artists";
 import { ACT_POPULARITY, ACTS_REFERENCE, actBatches, rankActs, worthABooking, type ActsReference } from "../app/acts";
 import { cityOfLabel, copyFor, type Kind } from "../app/kind";
-import popularityFile from "../app/data/artist-popularity.json";
 import { TIER_RANK, type Genre, type Tier } from "../app/themes/library";
 import { DISCOVERY_REFERENCE, IDEA_POPULARITY, poolOffset, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
 import { step, type TraceStep } from "../app/trace";
@@ -46,8 +45,6 @@ export interface Deps {
   venueLibrary?: LiveTheme[];
   /** The touring-act pool and its reference spread. Defaults to the committed one; synthetic mode and tests pass their own. */
   actsRef?: ActsReference;
-  /** National popularity (0 to 1) of a venue-library artist by Qloo id. Defaults to the committed one. */
-  popularityOf?: (entityId: string) => number | undefined;
   /** Per-client daily allowance, set per request by the router. Unset means no per-client limit (tests). */
   gate?: Gate;
 }
@@ -471,14 +468,12 @@ interface ActCandidate {
   discovered: boolean;
   touring: boolean;
   tier: Tier | undefined;
-  /** National popularity, when known. */
-  popularity: number | undefined;
 }
 
 /**
  * A locked headliner cannot change, so it gets a support-act idea from one Qloo call: the affinities of candidate acts (unused library
  * artists and the touring-act pool) among fans of the headliner near the venue (signal.interests.entities). A support act must still tour
- * and be no more popular nationally than the headliner. Candidates in the headliner's own genre are asked about first (50 at most);
+ * and sit at least one declared booking tier below the headliner. Candidates in the headliner's own genre are asked about first (50 at most);
  * with fewer than four of those, other genres fill the list. When no act qualifies as support, the same call still finds what the fans
  * lean toward, and it is worded as a promo tie-in, never as a support act. Without an answer, the generic sponsor angle stays.
  */
@@ -488,7 +483,6 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
   const pool = (d.actsRef ?? ACTS_REFERENCE).pool;
   const used = new Set(nights.map((n) => n.themeId).filter((x): x is string => x !== null));
   const libraryIds = new Set(d.library.flatMap((t) => t.entities.map((e) => e.id)));
-  const popOf = d.popularityOf ?? ((id: string): number | undefined => (popularityFile as Record<string, number>)[id]);
   const out: SponsorAngle[] = [];
   let client: ReturnType<typeof createQlooClient> | null = null;
   for (const angle of angles) {
@@ -499,12 +493,11 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
     }
     const headIds = new Set(original.entities.map((e) => e.id));
     const headTier = original.tier;
-    const headPop = Math.max(-1, ...original.entities.map((e) => popOf(e.id) ?? -1));
     const everyone: ActCandidate[] = [
-      ...d.library.filter((t) => t.id !== original.id && !used.has(t.id) && t.entities.length === 1 && t.entities[0]!.type === "artist" && !headIds.has(t.entities[0]!.id)).map((t) => ({ ref: t.id, id: t.entities[0]!.id, label: t.label, genre: t.genre, discovered: false, touring: t.touring !== false, tier: t.tier, popularity: popOf(t.entities[0]!.id) })),
-      ...pool.filter((p) => !libraryIds.has(p.entityId) && !headIds.has(p.entityId)).map((p) => ({ ref: `qloo:${p.entityId}`, id: p.entityId, label: p.name, genre: p.genre as Genre | undefined, discovered: true, touring: true, tier: p.tier, popularity: p.popularity })),
+      ...d.library.filter((t) => t.id !== original.id && !used.has(t.id) && t.entities.length === 1 && t.entities[0]!.type === "artist" && !headIds.has(t.entities[0]!.id)).map((t) => ({ ref: t.id, id: t.entities[0]!.id, label: t.label, genre: t.genre, discovered: false, touring: t.touring !== false, tier: t.tier })),
+      ...pool.filter((p) => !libraryIds.has(p.entityId) && !headIds.has(p.entityId)).map((p) => ({ ref: `qloo:${p.entityId}`, id: p.entityId, label: p.name, genre: p.genre as Genre | undefined, discovered: true, touring: true, tier: p.tier })),
     ];
-    const support = everyone.filter((c) => c.touring && headPop >= 0 && c.popularity !== undefined && c.popularity <= headPop && (headTier === undefined || c.tier === undefined || TIER_RANK[c.tier] <= TIER_RANK[headTier] - 1));
+    const support = everyone.filter((c) => c.touring && (headTier !== undefined && c.tier !== undefined && TIER_RANK[c.tier] <= TIER_RANK[headTier] - 1));
     const promo = support.length === 0;
     const all = promo ? everyone : support;
     const same = all.filter((c) => original.genre !== undefined && c.genre === original.genre);

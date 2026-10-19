@@ -19,10 +19,10 @@ describe("joint assignment", () => {
     expect(hungarian([[5, 9, 1], [4, 2, 8]])).toEqual([2, 1]);
   });
 
-  it("gives a country night the country act and leaves the other night something else (club)", () => {
-    // Two weak nights both want the strongest candidate. Garth (country) must get Kenny (country), not the Beatles; the wrestling night takes the Beatles.
-    const lib: Theme[] = [music("garth", "country"), { ...music("wrestling", undefined), category: "sports entertainment", audience: "teen", genre: undefined }, music("kenny", "country"), music("beatles", "classic-rock")];
-    const fits: Record<string, ThemeFit> = { garth: fit("leans-away", -1.5), wrestling: fit("leans-away", -2), kenny: fit("leans-in", 1.2), beatles: fit("leans-in", 1.8) };
+  it("gives a country night the country act and leaves the other night something it can have (club)", () => {
+    // Two weak nights both want the strongest candidate. Garth (country) must get Kenny (country), not the Beatles; the wrestling night (teen) takes the teen theme.
+    const lib: Theme[] = [music("garth", "country"), { ...music("wrestling", undefined), category: "sports entertainment", audience: "teen", genre: undefined }, music("kenny", "country"), music("beatles", "classic-rock"), { ...music("star-trek", undefined), category: "film", audience: "teen", genre: undefined }];
+    const fits: Record<string, ThemeFit> = { garth: fit("leans-away", -1.5), wrestling: fit("leans-away", -2), kenny: fit("leans-in", 1.2), beatles: fit("leans-in", 1.8), "star-trek": fit("leans-in", 1.0) };
     const nights: PlanNight[] = [
       { index: 0, date: "2027-07-02", themeId: "garth", sponsor: "", locked: false, notes: "" },
       { index: 1, date: "2027-07-09", themeId: "wrestling", sponsor: "", locked: false, notes: "" },
@@ -30,7 +30,7 @@ describe("joint assignment", () => {
     const r = propose({ nights, library: lib, fits, allowDuplicates: false, now: "t" });
     const by = Object.fromEntries(r.proposals.map((p) => [p.fromThemeId, p.toThemeId]));
     expect(by.garth).toBe("kenny");
-    expect(by.wrestling).toBe("beatles");
+    expect(by.wrestling).toBe("star-trek");
   });
 });
 
@@ -126,5 +126,26 @@ describe("support acts across locked nights", () => {
     const mk = (i: number): SponsorAngle => ({ index: i, date: "2027-06-01", themeId: `h${i}`, sponsor: "", toThemeId: "x", text: "t", generic: "g", options: [{ toThemeId: "x", text: "x" }, { toThemeId: "y", text: "y" }, { toThemeId: "z", text: "z" }] });
     expect(pickAngles([mk(0), mk(1), mk(2)], new Set()).map((a) => a.toThemeId)).toEqual(["x", "y", "z"]);
     expect(pickAngles([mk(0), mk(1)], new Set(["x"])).map((a) => a.toThemeId)).toEqual(["y", "z"]);
+  });
+});
+
+describe("a club swap keeps the kind of night or its audience", () => {
+  const mk = (id: string, category: Theme["category"], audience: Theme["audience"]): Theme => ({ id, label: id.toUpperCase(), aliases: [], category, audience, entities: ent });
+  it("lets wrestling (teen) become a teen theme but never adult music", async () => {
+    const { keepsKindOrAudience } = await import("../../src/app/propose/propose");
+    const wrestling = mk("wrestling", "sports entertainment", "teen");
+    expect(keepsKindOrAudience(wrestling, mk("dolly", "music", "adult"))).toBe(false);
+    expect(keepsKindOrAudience(wrestling, mk("star-trek", "film", "teen"))).toBe(true);
+    expect(keepsKindOrAudience(mk("bluey", "kids tv", "kids"), mk("mario", "toys and games", "family"))).toBe(true); // kids and family are compatible
+    expect(keepsKindOrAudience(mk("marvel", "film", "family"), mk("princess", "kids tv", "kids"))).toBe(true); // same kind of night
+    expect(keepsKindOrAudience(mk("elvis", "music", "adult"), mk("star-trek", "film", "teen"))).toBe(false);
+  });
+  it("falls to Could not fix when only such candidates lean in", () => {
+    const lib = [mk("wrestling", "sports entertainment", "teen"), mk("dolly", "music", "adult")];
+    const fits: Record<string, ThemeFit> = { wrestling: fit("leans-away", -1.5), dolly: fit("leans-in", 1.5) };
+    const nights: PlanNight[] = [{ index: 0, date: "2027-08-14", themeId: "wrestling", sponsor: "", locked: false, notes: "" }];
+    const r = propose({ nights, library: lib, fits, allowDuplicates: false, now: "t" });
+    expect(r.proposals).toEqual([]);
+    expect(r.unfixed).toHaveLength(1);
   });
 });

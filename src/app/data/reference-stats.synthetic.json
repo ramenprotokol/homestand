@@ -329,6 +329,21 @@
       "mean": 0.75492,
       "sd": 0.08553
     },
+    "avril-lavigne": {
+      "n": 40,
+      "mean": 0.50783,
+      "sd": 0.07739
+    },
+    "pierce-the-veil": {
+      "n": 40,
+      "mean": 0.65427,
+      "sd": 0.08776
+    },
+    "cage-the-elephant": {
+      "n": 40,
+      "mean": 0.6001,
+      "sd": 0.07761
+    },
     "eagles": {
       "n": 40,
       "mean": 0.5441,

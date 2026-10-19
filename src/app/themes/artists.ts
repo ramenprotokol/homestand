@@ -21,7 +21,7 @@ const TIER: Record<string, Tier> = {
   "dua-lipa": "arena", "sza": "arena", "post-malone": "arena", "travis-scott": "arena", "chris-stapleton": "arena",
   "luke-bryan": "amphitheatre", "jason-aldean": "amphitheatre", "journey": "amphitheatre", "stevie-nicks": "amphitheatre", "fleetwood-mac": "arena",
   "dave-matthews-band": "amphitheatre", "phish": "amphitheatre", "widespread-panic": "amphitheatre", "the-lumineers": "amphitheatre",
-  "zac-brown-band": "amphitheatre", "brad-paisley": "amphitheatre", "darius-rucker": "amphitheatre", "old-dominion": "amphitheatre", "the-revivalists": "amphitheatre", "hozier": "amphitheatre",
+  "zac-brown-band": "amphitheatre", "brad-paisley": "amphitheatre", "darius-rucker": "amphitheatre", "old-dominion": "amphitheatre", "the-revivalists": "amphitheatre", "hozier": "amphitheatre", "avril-lavigne": "amphitheatre", "pierce-the-veil": "amphitheatre", "cage-the-elephant": "amphitheatre",
   "yacht-rock": "amphitheatre", "emo-night": "amphitheatre",
 };
 const withTier = (t: Theme): Theme => (TIER[t.id] ? { ...t, tier: TIER[t.id] } : t);
@@ -52,6 +52,9 @@ const ACTS: readonly Theme[] = [
   solo("old-dominion", "Old Dominion", "country"),
   solo("the-revivalists", "The Revivalists", "indie", ["the revivalists", "revivalists"]),
   solo("hozier", "Hozier", "indie"),
+  solo("avril-lavigne", "Avril Lavigne", "rock"),
+  solo("pierce-the-veil", "Pierce the Veil", "emo", ["pierce the veil"]),
+  solo("cage-the-elephant", "Cage the Elephant", "rock"),
   solo("eagles", "Eagles", "classic-rock", ["eagles", "the eagles"]),
   solo("journey", "Journey", "classic-rock"),
   solo("dave-matthews-band", "Dave Matthews Band", "jam", ["dave matthews band", "dave matthews", "dmb"]),
