@@ -27,8 +27,8 @@ describe("discovery requests", () => {
     expect(seen[1]!.searchParams.get("signal.demographics.age")).toBe("24_and_younger");
     expect(seen[1]!.searchParams.get("take")).toBe("6");
   });
-  it("keeps only name, id, type and affinity, and skips rows without a name or id", () => {
+  it("keeps only name, id, type, affinity and popularity, and skips rows without a name or id", () => {
     const out = discoveredFromBody({ results: { entities: [{ entity_id: "a", name: " Sing 2 ", query: { affinity: 0.91 }, properties: { x: 1 } }, { entity_id: "", name: "No id" }, { entity_id: "b", name: "Smallfoot" }] } }, "movie");
-    expect(out).toEqual([{ entityId: "a", name: "Sing 2", type: "movie", affinity: 0.91 }, { entityId: "b", name: "Smallfoot", type: "movie", affinity: null }]);
+    expect(out).toEqual([{ entityId: "a", name: "Sing 2", type: "movie", affinity: 0.91, popularity: null }, { entityId: "b", name: "Smallfoot", type: "movie", affinity: null, popularity: null }]);
   });
 });

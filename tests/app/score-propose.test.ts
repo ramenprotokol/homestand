@@ -118,7 +118,11 @@ describe("constraint rules", () => {
       expect(checkCandidate(sat, T(from), T(to), new Set(), false), `${from} to ${to}`).toMatchObject({ ok: false, reason: "audience" });
     }
     expect(checkCandidate(sat, T("super-mario"), T("pokemon"), new Set(), false).ok).toBe(true);
-    expect(checkCandidate(sat, T("star-wars"), T("batman"), new Set(), false).ok).toBe(true);
+    expect(checkCandidate(sat, T("star-wars"), T("ghostbusters"), new Set(), false).ok).toBe(true);
+    // Star Trek and pro wrestling are teen themes: never for a kids' night, whatever else leans in.
+    for (const [from, to] of [["bluey", "star-trek"], ["bluey", "wrestling"], ["dinosaur", "wrestling"], ["princess", "star-trek"], ["super-mario", "wrestling"], ["star-wars", "star-trek"]] as const) {
+      expect(checkCandidate(sat, T(from), T(to), new Set(), false), `${from} to ${to}`).toMatchObject({ ok: false, reason: "audience" });
+    }
     // Adult nights may take adult or family themes; kids' themes only at a weekend or day game.
     expect(checkCandidate({ date: "2026-04-10", notes: "" }, T("elvis"), T("batman"), new Set(), false).ok).toBe(true);
     expect(checkCandidate({ date: "2026-04-10", notes: "" }, T("elvis"), T("bluey"), new Set(), false).ok).toBe(false);
@@ -195,31 +199,43 @@ describe("proposals", () => {
   it("hands a kids or family night the library cannot fix to a discovered Qloo title, never repeating one", () => {
     const f2 = { ...fits, "paw-patrol": fit("average", 0), pokemon: fit("average", 0), "super-mario": fit("leans-away", -1), bluey: fit("leans-away", -2) };
     const discovered = [
-      { name: "Kite Club", entityId: "m1", type: "movie" as const, affinity: 0.9 },
-      { name: "Puddle Patrol", entityId: "s1", type: "tv_show" as const, affinity: 0.9 },
+      { name: "Kite Club", entityId: "m1", type: "movie" as const, affinity: 0.9, z: 1.5 },
+      { name: "Puddle Patrol", entityId: "s1", type: "tv_show" as const, affinity: 0.9, z: 1.2 },
     ];
     const res = propose({ ...base, fits: f2, discovered, city: "Tulsa", nights: [night(0, "2026-04-11", "bluey", { sponsor: "Sunrise Dental" }), night(1, "2026-04-18", "super-mario")]});
     expect(res.proposals).toHaveLength(2);
     const [a, b] = res.proposals;
     expect(a).toMatchObject({ fromThemeId: "bluey", toThemeId: "qloo:m1", sponsor: "Sunrise Dental", date: "2026-04-11", to: { label: "found", z: null, score: null }, discovered: { name: "Kite Club" } });
-    expect(a!.why).toBe("Qloo ranks Kite Club among the top family movies for fans near Tulsa.");
+    expect(a!.why).toBe("Kite Club stands out near Tulsa: fans here like it more than at most of the 40 ballpark markets we compare against.");
     expect(b!.toThemeId).toBe("qloo:s1");
-    expect(b!.why).toBe("Qloo ranks Puddle Patrol among the top family shows for fans near Tulsa.");
+    expect(b!.why).toBe("Puddle Patrol stands out near Tulsa: fans here like it more than at most of the 40 ballpark markets we compare against.");
     // Not offered to an adult night, and nothing is left to repeat.
     const adult = propose({ ...base, fits: { ...f2, elvis: fit("leans-away", -2), "grateful-dead": fit("average", 0), yellowstone: fit("average", 0), "taylor-swift": fit("average", 0) }, discovered, nights: [night(0, "2026-04-24", "elvis")] });
     expect(adult.proposals).toEqual([]);
     expect(adult.unfixed).toHaveLength(1);
   });
-  it("a locked night gets a cross-theme touch only from the same kind of theme", () => {
-    const f4 = { ...fits, "star-trek": fit("leans-away", -1), wrestling: fit("leans-in", 3), "star-wars": fit("leans-in", 0.6), country: fit("leans-away", -1), "stranger-things": fit("leans-in", 3), "garth-brooks": fit("leans-in", 0.6) };
+  it("a locked night gets a cross-theme touch only from the same kind and band of theme", () => {
+    const f4 = { ...fits, "star-trek": fit("leans-away", -1), wrestling: fit("leans-in", 3), "star-wars": fit("leans-in", 3), batman: fit("leans-in", 0.6), country: fit("leans-away", -1), "stranger-things": fit("leans-in", 3), "garth-brooks": fit("leans-in", 0.6), dinosaur: fit("leans-in", 3) };
     const trek = propose({ ...base, fits: f4, nights: [night(0, "2026-04-11", "star-trek", { locked: true })] });
-    expect(trek.angles[0]!.text).toMatch(/Star Wars|PAW Patrol/);
-    expect(trek.angles[0]!.text).not.toContain("Pro wrestling");
+    expect(trek.angles[0]!.text).toContain("Batman"); // teen film with teen film
+    expect(trek.angles[0]!.text).not.toMatch(/Pro wrestling|Star Wars|Dinosaur/);
     const country = propose({ ...base, fits: f4, nights: [night(0, "2026-04-11", "country", { locked: true })] });
     expect(country.angles[0]!.text).toMatch(/Grateful Dead|Garth Brooks/);
-    expect(country.angles[0]!.text).not.toContain("Stranger Things");
+    expect(country.angles[0]!.text).not.toMatch(/Stranger Things|Dinosaur/);
     const lonely = propose({ ...base, fits: { ...f4, "garth-brooks": fit("average", 0), "grateful-dead": fit("average", 0) }, nights: [night(0, "2026-04-11", "country", { locked: true })] });
     expect(lonely.angles[0]!.text).toContain("A sponsor-friendly angle");
+    // A Yellowstone night is never offered a kids' show as its touch.
+    const ys = propose({ ...base, fits: { ...f4, yellowstone: fit("leans-away", -1) }, nights: [night(0, "2026-04-11", "yellowstone", { locked: true })] });
+    expect(ys.angles[0]!.text).not.toMatch(/Dinosaur|PAW Patrol|Bluey/);
+  });
+  it("Bluey Day is never turned into Star Trek or pro wrestling, however hard they lean in: Could not fix instead", () => {
+    const f5 = { ...fits, bluey: fit("leans-away", -2), "star-trek": fit("leans-in", 3), wrestling: fit("leans-in", 3), "taylor-swift": fit("leans-in", 3), "paw-patrol": fit("average", 0), pokemon: fit("average", 0) };
+    const res = propose({ ...base, fits: f5, nights: [night(0, "2027-04-10", "bluey", { sponsor: "Sunrise Dental", notes: "Day game" })] });
+    expect(res.proposals).toEqual([]);
+    expect(res.unfixed).toHaveLength(1);
+    expect(res.unfixed[0]!.reason).toBe("No family theme leans in here that fits this date.");
+    // The log never claims it ranked "any theme".
+    expect(res.trace.map((t) => `${t.text} ${t.detail ?? ""}`).join(" ")).not.toMatch(/any theme/);
   });
   it("only touches leans-away nights", () => {
     const res = propose({ ...base, nights: [night(0, "2026-07-03", "paw-patrol"), night(1, "2026-07-04", null)] });
@@ -240,8 +256,8 @@ describe("proposals", () => {
       const res = propose({ ...base2, nights: [night(0, "2026-05-09", "harry-potter")] });
       const p = res.proposals[0]!;
       expect(T(p.toThemeId).category).toBe("film");
-      expect(p.toThemeId).toBe("star-trek"); // film, z 0.9 beats film z 0.6; Taylor Swift (z 3) is a different category
-      expect(res.trace.some((s) => s.detail?.includes("same category"))).toBe(true);
+      expect(p.toThemeId).toBe("marvel"); // family film, z 0.7 beats z 0.6; Star Trek (teen) is not allowed on a family night; Taylor Swift (z 3) is a different kind
+      expect(res.trace.some((s) => s.detail?.includes("same kind of theme first, then same audience, then local lean"))).toBe(true);
     });
     it("falls back to the same audience, then to anything", () => {
       expect(likeness(T("bluey"), T("paw-patrol"))).toBe(0);
@@ -250,13 +266,13 @@ describe("proposals", () => {
       // Ghostbusters (film, family): film candidates removed, so the same audience (family) wins over adult.
       const noFilms = { ...f, "star-wars": fit("average", 0), "star-trek": fit("average", 0), marvel: fit("average", 0), wrestling: fit("leans-in", 0.55) };
       const res = propose({ ...base2, fits: noFilms, nights: [night(0, "2026-05-09", "ghostbusters")] });
-      // Wrestling is family-audience like Ghostbusters: it beats Taylor Swift (adult, z 3) and Bad Bunny.
-      expect(res.proposals[0]!.toThemeId).toBe("wrestling");
+      // Wrestling is a teen theme now, so a family night never gets it. Dinosaur (kids, z 0.8) is the best that fits on a Saturday.
+      expect(res.proposals[0]!.toThemeId).toBe("dinosaur");
     });
     it("offers up to two alternates that pass the same constraints", () => {
       const res = propose({ ...base2, nights: [night(0, "2026-05-09", "harry-potter")] });
       const p = res.proposals[0]!;
-      expect(p.alternates.map((a) => a.toThemeId)).toEqual(["marvel", "star-wars"]);
+      expect(p.alternates.map((a) => a.toThemeId)).toEqual(["star-wars", "dinosaur"]);
       for (const a of p.alternates) {
         expect(a.to.label).toBe("leans-in");
         expect(checkCandidate({ date: p.date, notes: "" }, T("harry-potter"), T(a.toThemeId), new Set(), false).ok).toBe(true);

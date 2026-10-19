@@ -35,15 +35,21 @@ export const isFamilySlot = (n: SlotNight): boolean => {
 
 /**
  * Hard audience rule. A kids or family night is only ever replaced by a kids or family theme (a kids' show for a kids' show).
- * An adult night may take an adult or a family theme. Kids' themes land on adult nights only at weekend or day games.
+ * A teen or adult night may take any theme that is not for small children. Kids' themes land on adult nights only at weekend or day games.
  */
 export function audienceFit(original: Pick<Theme, "audience">, cand: Pick<Theme, "audience">, night: SlotNight): boolean {
-  if (original.audience !== "adult") {
-    if (cand.audience === "adult") return false;
+  if (isYoung(original.audience)) {
+    if (!isYoung(cand.audience)) return false;
     return cand.audience !== "kids" || original.audience === "kids" || isFamilySlot(night);
   }
   return cand.audience !== "kids" || isFamilySlot(night);
 }
+
+/** For a sponsor touch on a locked night the two themes should sit in the same band: young (kids and family), teen, or adult. */
+export const audienceBand = (a: Theme["audience"]): "young" | "teen" | "adult" => (isYoung(a) ? "young" : a === "teen" ? "teen" : "adult");
+
+/** Kids and family themes are the ones a kids' night may use. Teen and adult themes (Star Trek, wrestling, Taylor Swift) are not. */
+export const isYoung = (a: Theme["audience"]): boolean => a === "kids" || a === "family";
 
 /** The three hard rules for putting `cand` on `night` in place of `original`. Locks are checked by the caller, before any candidate is looked at. */
 export function checkCandidate(

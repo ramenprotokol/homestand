@@ -27,6 +27,8 @@ export interface AffinityQuery {
   take?: number;
   /** Fuzzy locality string (A4 fallback); replaces the POINT when set. */
   locationQuery?: string;
+  /** Sent as signal.interests.entities: the affinities become those of fans of these entities near the point (the taste graph). */
+  interestIds?: string[];
 }
 
 export interface DiscoverQuery {
@@ -43,6 +45,8 @@ export interface DiscoveredRow {
   entityId: string;
   name: string;
   affinity: number | null;
+  /** Qloo's popularity for the title (0 to 1), when it sends one. Used only by the offline pool script. */
+  popularity: number | null;
 }
 
 /** Always sent with discovery: without it, local results include adult and explicit titles. */
@@ -58,7 +62,7 @@ export function discoveredFromBody(raw: unknown, type: DiscoverQuery["type"]): A
     const id = typeof e.entity_id === "string" ? e.entity_id : "";
     if (!name || !id) return [];
     const q = e.query as { affinity?: unknown } | undefined;
-    return [{ entityId: id, name, type, affinity: num(q?.affinity) }];
+    return [{ entityId: id, name, type, affinity: num(q?.affinity), popularity: num(e.popularity) }];
   });
 }
 
@@ -169,6 +173,7 @@ export function createQlooClient(opts: ClientOptions) {
     };
     if (q.releaseYearMin !== undefined) params["filter.release_year.min"] = String(q.releaseYearMin);
     if (q.take !== undefined) params["take"] = String(q.take);
+    if (q.interestIds && q.interestIds.length > 0) params["signal.interests.entities"] = q.interestIds.join(",");
     if (q.locationQuery !== undefined) params["signal.location.query"] = q.locationQuery;
     else {
       params["signal.location"] = `POINT(${q.lon} ${q.lat})`; // WKT: longitude first

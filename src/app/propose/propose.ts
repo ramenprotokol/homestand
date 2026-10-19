@@ -3,7 +3,7 @@ import { shortDate } from "../dates";
 import type { FitLabel } from "../score";
 import { step, type TraceStep } from "../trace";
 import type { Theme } from "../themes/library";
-import { checkCandidate, inWindow, audienceFit, type RejectReason } from "./rules";
+import { audienceBand, checkCandidate, inWindow, audienceFit, isYoung, type RejectReason } from "./rules";
 
 export interface PlanNight {
   index: number;
@@ -27,6 +27,8 @@ export interface Discovered {
   entityId: string;
   type: "movie" | "tv_show";
   affinity: number | null;
+  /** How far this title's reading here sits above or below its spread over the 40 reference markets. */
+  z?: number | null;
 }
 
 export const discoveredId = (d: Pick<Discovered, "entityId">): string => `qloo:${d.entityId}`;
@@ -124,13 +126,8 @@ export function propose(input: ProposeInput): ProposeResult {
   const angles: SponsorAngle[] = [];
   const unfixed: ProposeResult["unfixed"] = [];
   const ranked = new Map<string, string[]>();
-  // Movies and shows take turns, so one night is not always handed the same kind of title.
-  const pool: Discovered[] = [];
-  {
-    const movies = (input.discovered ?? []).filter((x) => x.type === "movie");
-    const shows = (input.discovered ?? []).filter((x) => x.type === "tv_show");
-    for (let i = 0; i < Math.max(movies.length, shows.length); i++) for (const x of [movies[i], shows[i]]) if (x) pool.push(x);
-  }
+  // The titles that stand out most here go first.
+  const pool: Discovered[] = [...(input.discovered ?? [])].sort((x, y) => (y.z ?? 0) - (x.z ?? 0) || x.name.localeCompare(y.name));
   const city = input.city ?? "this ballpark";
 
   const away = nights.filter((n) => n.themeId && fits[n.themeId]?.label === "leans-away");
@@ -149,7 +146,7 @@ export function propose(input: ProposeInput): ProposeResult {
     if (night.locked) {
       trace.push(step(now, "constraint", `${night.date} ${original.label}: locked, so it is never swapped.`));
       // A cross-theme touch only when it is the same kind of theme (music with music, film with film) and fits the night; otherwise a generic angle.
-      const alt = leaning.find((t) => inWindow(night.date, t.window) && audienceFit(original, t, slot) && t.id !== original.id && categoryGroup(t.category) === categoryGroup(original.category));
+      const alt = leaning.find((t) => inWindow(night.date, t.window) && audienceFit(original, t, slot) && t.id !== original.id && categoryGroup(t.category) === categoryGroup(original.category) && audienceBand(t.audience) === audienceBand(original.audience));
       angles.push({ index: night.index, date: night.date, themeId: original.id, sponsor: night.sponsor, toThemeId: alt?.id ?? original.id, text: angleText(night, original, alt ?? null) });
       continue;
     }
@@ -165,10 +162,10 @@ export function propose(input: ProposeInput): ProposeResult {
     const chosen = passing[0]?.theme ?? null;
     const chosenDetail = passing[0]?.detail ?? "";
     const rejected = Object.entries(rejects).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${REJECT_WORDS[k as RejectReason]}`).join(", ");
-    if (!chosen && original.audience !== "adult" && pool.length > 0) {
+    if (!chosen && isYoung(original.audience) && pool.length > 0) {
       const found = pool.shift()!;
       const toId = discoveredId(found);
-      trace.push(step(now, "constraint", `${night.date} ${original.label}: no library theme passed, so Qloo's top family ${found.type === "movie" ? "movie" : "show"} near the ballpark is offered: ${found.name}.`, `Found by Qloo, not scored against the library.${rejected ? ` Library themes ruled out: ${rejected}.` : ""}`));
+      trace.push(step(now, "constraint", `${night.date} ${original.label}: no library theme passed, so a family ${found.type === "movie" ? "movie" : "show"} that stands out near the ballpark is offered: ${found.name}.`, `Found by Qloo, not scored against the library.${rejected ? ` Library themes ruled out: ${rejected}.` : ""}`));
       proposals.push({
         id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor,
         fromThemeId: original.id, toThemeId: toId, alternates: [], from: fits[original.id]!, to: { label: "found", z: null, score: null },
@@ -178,19 +175,19 @@ export function propose(input: ProposeInput): ProposeResult {
           "Not used anywhere else in the season.",
           night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
         ],
-        why: `Qloo ranks ${found.name} among the top family ${kindWords(found.type)} for fans near ${city}.`,
+        why: `${found.name} stands out near ${city}: fans here like it more than at most of the 40 ballpark markets we compare against.`,
         discovered: found,
       });
       continue;
     }
     if (!chosen) {
-      const young = original.audience !== "adult";
+      const young = isYoung(original.audience);
       unfixed.push({ index: night.index, date: night.date, reason: young ? "No family theme leans in here that fits this date." : "No theme that leans in passes the date, audience and no-repeat checks." });
       trace.push(step(now, "constraint", `${night.date} ${original.label}: no candidate passed (${rejected || "none left"}).`));
       continue;
     }
-    const tier = ["same category", "same audience", "any theme"][likeness(original, chosen)]!;
-    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by ${tier} first, then local lean.${rejected ? ` Other themes ruled out: ${rejected}.` : ""}`));
+    const tier = ["same kind of theme", "same audience", "another theme that fits the night"][likeness(original, chosen)]!;
+    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by same kind of theme first, then same audience, then local lean (this one: ${tier}).${rejected ? ` Other themes ruled out: ${rejected}.` : ""}`));
     ranked.set(`${night.date}-${night.index}`, passing.slice(1).map((x) => x.theme.id));
     if (!allowDuplicates) used.add(chosen.id);
     proposals.push({

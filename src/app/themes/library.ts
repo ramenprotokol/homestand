@@ -1,6 +1,7 @@
 import type { QlooType } from "../../qloo/client";
 
-export type Audience = "kids" | "family" | "adult";
+/** kids: preschool and young children. family: fine for a kids' night too. teen: PG-13 and older fans (sci-fi, wrestling, superhero noir). adult: grown-up music and TV. */
+export type Audience = "kids" | "family" | "teen" | "adult";
 
 /** One Qloo entity of a bundle. `names` are the accepted exact names (pickEntity's rule), `year` the required release year. */
 export interface EntitySpec {
@@ -51,7 +52,7 @@ export const THEME_LIBRARY: readonly Theme[] = [
     entities: [e("country:combs", "artist", "Luke Combs"), e("country:wallen", "artist", "Morgan Wallen"), e("country:underwood", "artist", "Carrie Underwood")] },
   { id: "marvel", label: "Marvel", category: "film", audience: "family", aliases: ["marvel", "avengers", "spider-man", "spiderman", "superhero", "superheroes", "super heroes"],
     entities: [e("marvel:nwh", "movie", "Spider-Man: No Way Home", 2021)] },
-  { id: "wrestling", label: "Pro wrestling", category: "sports entertainment", audience: "family", aliases: ["wrestling", "wrestler", "wrestlers", "wwe"],
+  { id: "wrestling", label: "Pro wrestling", category: "sports entertainment", audience: "teen", aliases: ["wrestling", "wrestler", "wrestlers", "wwe"],
     entities: [e("wrestling:wwe", "brand", "WWE")] },
 
   { id: "paw-patrol", label: "PAW Patrol", category: "kids tv", audience: "kids", aliases: ["paw patrol"], entities: [e("paw-patrol:tv", "tv_show", "PAW Patrol")] },
@@ -62,11 +63,11 @@ export const THEME_LIBRARY: readonly Theme[] = [
   { id: "elvis", label: "Elvis", category: "music", audience: "adult", aliases: ["elvis"], entities: [e("elvis:artist", "artist", "Elvis Presley")] },
   { id: "grateful-dead", label: "Grateful Dead", category: "music", audience: "adult", aliases: ["grateful dead", "jerry garcia", "deadhead"], entities: [e("grateful-dead:artist", "artist", "Grateful Dead")] },
   { id: "beatles", label: "The Beatles", category: "music", audience: "adult", aliases: ["beatles", "beatlemania"], entities: [e("beatles:artist", "artist", "The Beatles")] },
-  { id: "lord-of-the-rings", label: "Lord of the Rings", category: "film", audience: "family", aliases: ["lord of the rings", "lotr", "middle earth", "hobbit"],
+  { id: "lord-of-the-rings", label: "Lord of the Rings", category: "film", audience: "teen", aliases: ["lord of the rings", "lotr", "middle earth", "hobbit"],
     entities: [e("lord-of-the-rings:film", "movie", "The Lord of the Rings: The Fellowship of the Ring", 2001)] },
   { id: "stranger-things", label: "Stranger Things", category: "tv", audience: "adult", aliases: ["stranger things", "upside down"], entities: [e("stranger-things:tv", "tv_show", "Stranger Things")] },
   { id: "the-office", label: "The Office", category: "tv", audience: "adult", aliases: ["the office", "dunder mifflin", "dundies"], entities: [e("the-office:tv", "tv_show", "The Office")] },
-  { id: "batman", label: "Batman", category: "film", audience: "family", aliases: ["batman", "dark knight", "gotham"], entities: [e("batman:film", "movie", "The Dark Knight", 2008)] },
+  { id: "batman", label: "Batman", category: "film", audience: "teen", aliases: ["batman", "dark knight", "gotham"], entities: [e("batman:film", "movie", "The Dark Knight", 2008)] },
   { id: "ninja-turtles", label: "Ninja Turtles", category: "kids tv", audience: "kids", aliases: ["ninja turtles", "tmnt"], entities: [e("ninja-turtles:tv", "tv_show", "Teenage Mutant Ninja Turtles")] },
   { id: "scooby-doo", label: "Scooby-Doo", category: "kids tv", audience: "kids", aliases: ["scooby doo", "scooby-doo", "scooby"], entities: [e("scooby-doo:tv", "tv_show", "Scooby-Doo, Where Are You!", undefined, "Scooby-Doo")] },
   { id: "spongebob", label: "SpongeBob", category: "kids tv", audience: "kids", aliases: ["spongebob", "sponge bob", "bikini bottom"], entities: [e("spongebob:tv", "tv_show", "SpongeBob SquarePants")] },
@@ -74,7 +75,7 @@ export const THEME_LIBRARY: readonly Theme[] = [
   { id: "toy-story", label: "Toy Story", category: "kids tv", audience: "kids", aliases: ["toy story", "buzz lightyear"], entities: [e("toy-story:film", "movie", "Toy Story", 1995)] },
   { id: "barbie", label: "Barbie", category: "toys and games", audience: "family", aliases: ["barbie"], entities: [e("barbie:film", "movie", "Barbie", 2023)] },
   { id: "minecraft", label: "Minecraft", category: "toys and games", audience: "kids", aliases: ["minecraft"], entities: [e("minecraft:film", "movie", "A Minecraft Movie", 2025)] },
-  { id: "star-trek", label: "Star Trek", category: "film", audience: "family", aliases: ["star trek", "trekkie", "trekkies"], entities: [e("star-trek:film", "movie", "Star Trek", 2009)] },
+  { id: "star-trek", label: "Star Trek", category: "film", audience: "teen", aliases: ["star trek", "trekkie", "trekkies"], entities: [e("star-trek:film", "movie", "Star Trek", 2009)] },
   { id: "ghostbusters", label: "Ghostbusters", category: "film", audience: "family", aliases: ["ghostbusters"], entities: [e("ghostbusters:film", "movie", "Ghostbusters", 1984)] },
   { id: "back-to-the-future", label: "Back to the Future", category: "film", audience: "family", aliases: ["back to the future", "delorean"], entities: [e("back-to-the-future:film", "movie", "Back to the Future", 1985)] },
   { id: "yellowstone", label: "Yellowstone", category: "tv", audience: "adult", aliases: ["yellowstone", "dutton"], entities: [e("yellowstone:tv", "tv_show", "Yellowstone")] },
@@ -88,7 +89,7 @@ export const THEME_LIBRARY: readonly Theme[] = [
     entities: [e("hocus-pocus:film", "movie", "Hocus Pocus", 1993)] },
   { id: "bad-bunny", label: "Bad Bunny", category: "music", audience: "adult", aliases: ["bad bunny"], entities: [e("bad-bunny:artist", "artist", "Bad Bunny")] },
   { id: "hello-kitty", label: "Hello Kitty", category: "toys and games", audience: "kids", aliases: ["hello kitty", "sanrio"], entities: [e("hello-kitty:brand", "brand", "Hello Kitty")] },
-  { id: "top-gun", label: "Top Gun", category: "film", audience: "family", aliases: ["top gun", "maverick"], entities: [e("top-gun:film", "movie", "Top Gun", 1986)] },
+  { id: "top-gun", label: "Top Gun", category: "film", audience: "teen", aliases: ["top gun", "maverick"], entities: [e("top-gun:film", "movie", "Top Gun", 1986)] },
   { id: "pirates", label: "Pirates", category: "film", audience: "family", aliases: ["pirate", "pirates", "jolly roger"],
     entities: [e("pirates:film", "movie", "Pirates of the Caribbean: The Curse of the Black Pearl", 2003)] },
 ];

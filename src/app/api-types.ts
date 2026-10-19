@@ -77,7 +77,7 @@ export interface AnalyzeResponse {
   mode: "live" | "synthetic";
   /** Date the scores were recorded when they came from the cache. */
   recordedOn: string | null;
-  /** When those saved scores were pulled from Qloo (full timestamp), same condition as `recordedOn`. */
+  /** When this market's scores were pulled from Qloo (full timestamp). One source for the banner, the step log, the card back and the memo. */
   recordedAt: string | null;
   themes: Record<string, ThemeScoreOut>;
   nights: NightOut[];
