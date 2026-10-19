@@ -373,4 +373,48 @@ describe("geocode", () => {
     expect(((await res.json()) as { results: unknown[] }).results).toEqual([{ label: "Tulsa, Oklahoma, US", lon: -95.99, lat: 36.15 }]);
     expect((await route(new Request("https://api.test/api/geocode?q=a"), h.deps)).status).toBe(400);
   });
+
+  const geo = (h: Harness): Promise<Response> => route(new Request("https://api.test/api/geocode?q=Tulsa", { headers: { origin: ORIGIN } }), h.deps);
+  const okBody = JSON.stringify({ results: [{ name: "Tulsa", admin1: "Oklahoma", country_code: "US", latitude: 36.15, longitude: -95.99, feature_code: "PPLA2" }] });
+
+  it("calls geocodeFetch without the deps object as this (Workers throw Illegal invocation otherwise)", async () => {
+    const h = harness();
+    h.deps.geocodeFetch = function (this: unknown): Promise<Response> {
+      if (this !== undefined && this !== globalThis) throw new TypeError("Illegal invocation");
+      return Promise.resolve(new Response(okBody));
+    } as typeof fetch;
+    const res = await geo(h);
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { results: unknown[] }).results).toHaveLength(1);
+  });
+
+  it("retries once on a network error or a 5xx, then gives up with a 502", async () => {
+    const h = harness();
+    let calls = 0;
+    h.deps.geocodeFetch = async () => {
+      calls++;
+      if (calls === 1) throw new TypeError("network");
+      return new Response(okBody);
+    };
+    expect((await geo(h)).status).toBe(200);
+    expect(calls).toBe(2);
+
+    const h2 = harness();
+    let calls2 = 0;
+    h2.deps.geocodeFetch = async () => {
+      calls2++;
+      return new Response("down", { status: 503 });
+    };
+    expect((await geo(h2)).status).toBe(502);
+    expect(calls2).toBe(2);
+
+    const h3 = harness();
+    let calls3 = 0;
+    h3.deps.geocodeFetch = async () => {
+      calls3++;
+      return new Response("nope", { status: 404 });
+    };
+    expect((await geo(h3)).status).toBe(502);
+    expect(calls3).toBe(1);
+  });
 });

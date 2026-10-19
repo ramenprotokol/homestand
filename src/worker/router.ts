@@ -92,11 +92,26 @@ const STUB_PLACES: GeoHit[] = [
   { label: "Columbus, Ohio, US", lon: -83.00207, lat: 39.96118 },
 ];
 
+/**
+ * One retry on a network error or a 5xx. The function is called detached: in Workers a `fetch` called with any other
+ * `this` (such as the deps object) throws "Illegal invocation".
+ */
+async function fetchOnceMore(f: typeof fetch, url: string): Promise<Response> {
+  const call = f;
+  try {
+    const res = await call(url);
+    if (res.status < 500) return res;
+  } catch {
+    /* fall through to the retry */
+  }
+  return call(url);
+}
+
 async function geocode(deps: RouterDeps, q: string): Promise<GeoHit[]> {
   if (deps.agent.mode === "synthetic") return STUB_PLACES.filter((p) => p.label.toLowerCase().includes(q.toLowerCase()));
   // Open-Meteo geocoding: public, no key (https://open-meteo.com/en/docs/geocoding-api).
   const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`;
-  const res = await deps.geocodeFetch(url);
+  const res = await fetchOnceMore(deps.geocodeFetch, url);
   if (!res.ok) throw new Error(`geocoding HTTP ${res.status}`);
   const body = (await res.json()) as { results?: Array<{ name: string; admin1?: string; country_code?: string; latitude: number; longitude: number; feature_code?: string }> };
   return (body.results ?? [])
@@ -173,6 +188,7 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
       return fail(429, "capped", "Today's live Qloo allowance is used up, and this market has no recorded result yet. The four sample clubs still work.", headers);
     }
     // Qloo or upstream trouble: say so without leaking details.
+    console.error("upstream failure", err instanceof Error ? err.message : String(err));
     return fail(502, "upstream", "Something upstream failed. Try again in a moment.", headers);
   }
 }

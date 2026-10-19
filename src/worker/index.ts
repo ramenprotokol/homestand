@@ -22,7 +22,7 @@ function depsFor(env: Env): RouterDeps {
     kv: env.CACHE,
     ai: env.AI ?? null,
     mode: synthetic ? "synthetic" : "live",
-    qlooFetch: synthetic ? syntheticQlooFetch : fetch,
+    qlooFetch: synthetic ? syntheticQlooFetch : (input, init) => fetch(input, init),
     qlooBase: env.QLOO_API_URL ?? (synthetic ? "https://synthetic.invalid" : ""),
     qlooKey: env.QLOO_API_KEY ?? "",
     library: activeLibrary(COMMITTED_IDS, synthetic),
@@ -36,7 +36,8 @@ function depsFor(env: Env): RouterDeps {
     agent,
     kv: env.CACHE,
     allowedOrigins: (env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
-    geocodeFetch: fetch,
+    // Wrapped: a bare `fetch` called as `deps.geocodeFetch(...)` has the wrong `this` in Workers ("Illegal invocation").
+    geocodeFetch: (input, init) => fetch(input, init),
     clientId,
     limitScale: num(env.RATE_LIMIT_SCALE, 1),
   };
