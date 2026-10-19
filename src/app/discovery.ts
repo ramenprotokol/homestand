@@ -11,9 +11,9 @@ export interface PoolTitle {
   popularity: number;
 }
 
-/** A discovered title must be this well known to be offered as a swap, and a little less to be listed as an idea. */
-export const SWAP_POPULARITY = 0.9;
-export const IDEA_POPULARITY = 0.85;
+/** A discovered title must be a big-studio name to be run as a theme night (0.97), and nearly as well known to be listed as an idea (0.90). */
+export const SWAP_POPULARITY = 0.97;
+export const IDEA_POPULARITY = 0.9;
 
 export interface DiscoveryReference {
   synthetic: boolean;
@@ -35,8 +35,8 @@ export function syntheticDiscoveryReference(): DiscoveryReference {
   const movies = ["Moonpie Pirates", "Captain Pocketwatch", "The Marmalade Express", "Zippy and the Cloud Zoo", "Little Lantern Dragon", "Biscuit Bay Heroes", "Pip the Rocket Mouse", "The Tiny Tuba Parade", "Sunny Side Sleuths", "Wobbly Knight"];
   const shows = ["Puddle Patrol", "The Jellybean Bus", "Mango Moon Club", "Clementine Calling", "Fizz and Flick", "Treehouse Tuesday", "Sprocket Street", "The Pudding Pals", "Kite Runners", "Nimbus Nights"];
   const pool: PoolTitle[] = [
-    ...movies.map((n, i) => ({ entityId: `SYN-D-movie-${i}`, name: `${n} (made up)`, type: "movie" as const, popularity: 0.95 })),
-    ...shows.map((n, i) => ({ entityId: `SYN-D-tv_show-${i}`, name: `${n} (made up)`, type: "tv_show" as const, popularity: 0.95 })),
+    ...movies.map((n, i) => ({ entityId: `SYN-D-movie-${i}`, name: `${n} (made up)`, type: "movie" as const, popularity: 0.99 })),
+    ...shows.map((n, i) => ({ entityId: `SYN-D-tv_show-${i}`, name: `${n} (made up)`, type: "tv_show" as const, popularity: 0.99 })),
   ];
   return { synthetic: true, markets: 40, pulledAt: null, pool, stats: Object.fromEntries(pool.map((p) => [p.entityId, { n: 40, mean: 0.7, sd: 0.1 }])) };
 }

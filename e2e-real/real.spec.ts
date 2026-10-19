@@ -54,7 +54,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(why).toContainText(/Compared with other ballpark markets, this market scores/);
   await expect(why.getByTestId("why-footer")).toContainText("See how we tested this");
   await expect(why).not.toContainText("coin flip");
-  await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Saved result, pulled from Qloo on/);
+  await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Saved result, pulled from Qloo on|Re-checked live/);
   await shot(page, info, "why");
   await why.getByTestId("recheck").click();
   await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked with Qloo within the last day: same answer/);
@@ -81,7 +81,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.getByTestId("to-send").click();
   await expect(page.getByTestId("memo")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("memo")).not.toContainText("SYNTHETIC");
-  await expect(page.getByTestId("memo")).toContainText(/Homestand checked \d+ theme nights for Albuquerque, NM sample club against local taste data from Qloo and suggests (\d+ swaps?|no swaps)\./);
+  await expect(page.getByTestId("memo")).toContainText(/Homestand checked \d+ theme nights for Albuquerque, NM sample club against local taste data from Qloo\. It suggested (\d+ swaps?; you approved (\d+|none)|no swaps)/);
   await expect(page.getByTestId("memo")).not.toContainText("Bundle score");
   await shot(page, info, "send");
   await page.getByTestId("to-study").click();
@@ -140,15 +140,22 @@ test("real data: Boise with the example calendar gets discovered family-title sw
   const pack = page.getByRole("button", { name: /Open the pack/ });
   await expect(pack).toBeVisible({ timeout: 40_000 });
   await expect(page.getByTestId("ideas")).toContainText("Family titles that stand out near Boise");
-  await expect(page.getByTestId("ideas-young")).toContainText("Top picks with under-25 fans here:");
+  await expect(page.getByTestId("ideas")).not.toContainText("under-25");
+  await expect(page.getByTestId("ideas-note")).toContainText(/Qloo had local data for \d+ of our \d+ family titles near Boise/);
   await pack.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("proposal")).toBeVisible();
+  // Walk the swaps to a discovered one (a big-studio title that stands out here, or the best option for a weak night).
+  for (let i = 0; i < 8 && (await page.getByTestId("disc-badge").count()) === 0; i++) {
+    await page.locator("#next").focus();
+    await page.keyboard.press("Enter");
+    await page.waitForTimeout(600);
+  }
   await expect(page.getByTestId("disc-badge")).toHaveText("Discovered by Qloo");
-  await expect(page.locator(".swap-why")).toContainText(/^.+ stands out near Boise: fans here like it more than at most of the 40 ballpark markets we compare against\.$/);
+  await expect(page.locator(".swap-why")).toContainText(/stands out near Boise: fans here like it more than at most of the 40 ballpark markets we compare against\.|Nothing in this audience leans in near Boise, so .+ is offered as a well-known family title/);
   await shot(page, info, "boise-discovered");
   await page.getByTestId("open-trace").click();
-  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo how \d+ family-friendly animated movies score near Boise|Used the recorded family-title scores and under-25 picks near Boise/);
+  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo about \d+ family-friendly animated movies near Boise|Used the recorded family-title scores near Boise/);
 });
 
 test("real data: a recognised theme with no Qloo scores is not called unknown", async ({ page }) => {

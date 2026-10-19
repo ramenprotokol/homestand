@@ -80,37 +80,45 @@ describe("memo", () => {
   const data: MemoData = {
     club: "Akron, OH sample club <b>", generatedOn: "2026-10-15",
     swaps: [{ date: "2026-07-03", weekday: "Friday", from: "Elvis", to: "Grateful Dead", sponsor: "Tallmadge & Sons", fromZ: -1.24, toZ: 1.91, fromScore: 0.512, toScore: 0.731, why: "Closer to local taste." }],
-    angles: ["Keep it."], nights: 24, classic: 3, synthetic: true, recordedLabel: null,
+    angles: ["Keep it."], nights: 24, suggested: 1, classic: 3, synthetic: true, recordedLabel: null,
   };
   it("escapes everything and cites the local pull, not raw affinities or the bundle score", () => {
     const html = buildMemoHtml(data);
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;b&gt;");
-    expect(html).toContain("-1.2 to +1.9");
+    expect(html).toContain("well below to well above"); // words, never a raw index
+    expect(html).not.toMatch(/-1\.2|1\.9/);
     expect(html).not.toContain("0.51 to 0.73");
     expect(html).not.toContain("Bundle score");
     expect(html).toContain("SYNTHETIC DEMO DATA");
     expect(html).toContain("does not say a theme will raise attendance");
   });
-  it("opens with a fixed sentence built only from counts", () => {
-    expect(memoOpener(data)).toBe("Homestand checked 24 theme nights for Akron, OH sample club <b> against local taste data from Qloo and suggests 1 swap. Each swap keeps its original date and sponsor.");
-    expect(memoOpener({ ...data, swaps: [] })).toContain("suggests no swaps. The calendar is unchanged.");
-    expect(buildMemoHtml(data)).toContain("Homestand checked 24 theme nights for Akron, OH sample club &lt;b&gt; against local taste data from Qloo");
+  it("opens with a fixed sentence built only from counts: what was suggested and what was approved", () => {
+    const head = "Homestand checked 24 theme nights for Akron, OH sample club <b> against local taste data from Qloo.";
+    expect(memoOpener(data)).toBe(`${head} It suggested 1 swap; you approved 1. Each approved swap keeps its original date and sponsor.`);
+    expect(memoOpener({ ...data, suggested: 2 })).toBe(`${head} It suggested 2 swaps; you approved 1. Each approved swap keeps its original date and sponsor.`);
+    expect(memoOpener({ ...data, swaps: [], suggested: 2 })).toBe(`${head} It suggested 2 swaps; you approved none. The calendar is unchanged.`);
+    expect(memoOpener({ ...data, swaps: [], suggested: 0 })).toBe(`${head} It suggested no swaps, so the calendar is unchanged.`);
+    // The approved count can never read higher than the suggested one.
+    expect(memoOpener({ ...data, suggested: 0 })).toContain("It suggested 1 swap; you approved 1.");
+    expect(buildMemoHtml(data)).toContain("Homestand checked 24 theme nights for Akron, OH sample club &lt;b&gt; against local taste data from Qloo.");
     expect(buildMemoHtml(data)).not.toMatch(/preference for certain/i);
   });
   it("labels a discovered swap, has no local-pull number for it, and repeats Qloo's family ideas", () => {
     const d: MemoData = {
       ...data, synthetic: false,
       swaps: [{ date: "2026-05-08", weekday: "Friday", from: "Barbie", to: "DC League of Super-Pets", sponsor: "Pinecrest Auto", fromZ: -2.1, toZ: null, fromScore: null, toScore: null, why: "Qloo ranks DC League of Super-Pets among the top family movies for fans near Tulsa.", source: "template", discovered: true }],
-      ideas: { city: "Tulsa", titles: ["Fuller House", "Sing 2"], young: ["All That"] },
+      ideas: { city: "Tulsa", titles: ["Fuller House", "Sing 2"], scored: 19, poolSize: 46 },
     };
     const html = buildMemoHtml(d);
     expect(html).toContain("DC League of Super-Pets <em>(Discovered by Qloo)</em>");
-    expect(html).toContain("-2.1 to Found by Qloo");
+    expect(html).toContain("well below to found by Qloo");
+    expect(html).not.toMatch(/-2\.1/);
     expect(html).toContain("Family titles that stand out near Tulsa");
     expect(html).toContain("Fuller House, Sing 2.");
-    expect(html).toContain("Top picks with under-25 fans here: All That.");
-    expect(html).toContain("These come from Qloo's taste data for this area");
+    expect(html).toContain("Qloo had local data for 19 of our 46 family titles here");
+    expect(html).not.toContain("under-25");
+    expect(html).toContain("They come from Qloo's taste data for this area");
     expect(html).not.toContain("n/a");
   });
   it("carries a discovered title into the CSV and the calendar file", () => {

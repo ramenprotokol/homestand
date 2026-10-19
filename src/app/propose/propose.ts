@@ -1,6 +1,6 @@
 import { weekdayName } from "../calendar/csv";
 import { shortDate } from "../dates";
-import type { FitLabel } from "../score";
+import { labelForZ, type FitLabel } from "../score";
 import { step, type TraceStep } from "../trace";
 import type { Theme } from "../themes/library";
 import { audienceBand, checkCandidate, inWindow, audienceFit, isYoung, type RejectReason } from "./rules";
@@ -57,7 +57,12 @@ export interface Proposal {
   why: string;
   /** Set when the replacement is a title Qloo found, not a library theme. `to` then has label "found" and no number. */
   discovered?: Discovered;
+  /** "best-option": nothing in this night's audience leans in here, so this is the strongest of its audience, about the town's usual. */
+  kind?: "best-option";
 }
+
+/** A best-option swap must beat the planned night by at least a full band (the Leans in and Leans away cut-offs are 1.0 apart). */
+export const BEST_OPTION_GAIN = 1.0;
 
 export interface Alternate {
   toThemeId: string;
@@ -101,7 +106,7 @@ export interface ProposeInput {
   fits: Record<string, ThemeFit>;
   allowDuplicates: boolean;
   now: string;
-  /** Qloo's local family titles, already stripped of library themes. Offered to a kids or family night nothing else can fix. */
+  /** Well-known family titles Qloo found here (z at or above typical). Those that stand out are offered to a kids or family night nothing else can fix; the rest can be its best option. */
   discovered?: readonly Discovered[];
   /** The market's city, for the reason text. */
   city?: string;
@@ -164,8 +169,9 @@ export function propose(input: ProposeInput): ProposeResult {
     const chosen = passing[0]?.theme ?? null;
     const chosenDetail = passing[0]?.detail ?? "";
     const rejected = Object.entries(rejects).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${REJECT_WORDS[k as RejectReason]}`).join(", ");
-    if (!chosen && isYoung(original.audience) && pool.length > 0) {
-      const found = pool.shift()!;
+    const standing = !chosen && isYoung(original.audience) ? pool.findIndex((x) => labelForZ(x.z ?? -9) === "leans-in") : -1;
+    if (!chosen && isYoung(original.audience) && standing >= 0) {
+      const found = pool.splice(standing, 1)[0]!;
       const toId = discoveredId(found);
       trace.push(step(now, "constraint", `${night.date} ${original.label}: no library theme passed, so a family ${found.type === "movie" ? "movie" : "show"} that stands out near the ballpark is offered: ${found.name}.`, `Found by Qloo, not scored against the library.${rejected ? ` Library themes ruled out: ${rejected}.` : ""}`));
       proposals.push({
@@ -181,6 +187,44 @@ export function propose(input: ProposeInput): ProposeResult {
         discovered: found,
       });
       continue;
+    }
+    // Nothing in this audience leans in. A promotions director runs the kids theme the town likes most, if it is not itself a weak one
+    // and clearly beats the planned night. Library themes first, then a well-known discovered title that is at least typical here.
+    if (!chosen && isYoung(original.audience)) {
+      const originalZ = fits[original.id]?.z ?? 0;
+      const best = library
+        .filter((t) => t.id !== original.id && fits[t.id]?.label === "average" && (fits[t.id]!.z ?? -9) - originalZ >= BEST_OPTION_GAIN && inWindow(night.date, t.window) && audienceFit(original, t, slot) && (allowDuplicates || !used.has(t.id)))
+        .sort((a, b) => (fits[b.id]!.z ?? 0) - (fits[a.id]!.z ?? 0) || a.id.localeCompare(b.id))[0];
+      const kind = original.audience === "kids" ? "kids" : "family";
+      const common = { id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor, fromThemeId: original.id, alternates: [] as Alternate[], from: fits[original.id]!, kind: "best-option" as const };
+      const checks = [
+        "Night is not locked.",
+        "Not used anywhere else in the season.",
+        "Inside its date window, if it has one.",
+        `Same audience: a ${kind} night stays a ${kind === "kids" ? "kids or family" : "kids or family"} night.`,
+        "It is not a weak theme here and it clearly beats the planned night.",
+        night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
+      ];
+      if (best) {
+        if (!allowDuplicates) used.add(best.id);
+        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience leans in here, so the best option for it is offered: ${best.label}.`, `About this town's usual, and ahead of ${original.label} by at least ${BEST_OPTION_GAIN.toFixed(1)}.`));
+        proposals.push({
+          ...common, toThemeId: best.id, to: fits[best.id]!, checks,
+          why: `${best.label} is the strongest ${kind} choice here: about this town's usual, where ${original.label} sits well below it. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
+        });
+        continue;
+      }
+      const decentIdx = originalZ <= -1 ? pool.findIndex((x) => (x.z ?? -9) >= 0) : -1;
+      if (decentIdx >= 0) {
+        const found = pool.splice(decentIdx, 1)[0]!;
+        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience leans in here, so a well-known family ${found.type === "movie" ? "movie" : "show"} that holds up near the ballpark is offered as its best option: ${found.name}.`, "Found by Qloo, not scored against the library."));
+        proposals.push({
+          ...common, toThemeId: discoveredId(found), to: { label: "found", z: null, score: null }, discovered: found,
+          checks: checks.map((c) => (c.startsWith("Same audience") ? "A well-known family title, so it suits a kids or family night." : c)),
+          why: `Nothing in this audience leans in near ${city}, so ${found.name} is offered as a well-known family title that is at least typical here.`,
+        });
+        continue;
+      }
     }
     if (!chosen) {
       const young = isYoung(original.audience);

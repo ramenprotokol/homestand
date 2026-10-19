@@ -51,7 +51,7 @@ function depsFor(env: Env): RouterDeps {
     discoveryRef: synthetic ? syntheticDiscoveryReference() : DISCOVERY_REFERENCE,
     now: () => new Date(),
     qlooDailyCap: num(env.QLOO_DAILY_CAP, 400),
-    aiDailyCap: num(env.AI_DAILY_CAP, 150),
+    aiDailyCap: num(env.AI_DAILY_CAP, 400),
     qlooDelayMs: synthetic ? 0 : 260,
   };
   return {

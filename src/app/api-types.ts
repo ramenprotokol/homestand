@@ -99,8 +99,9 @@ export interface ProposeNightIn {
 export interface DiscoveryOut {
   movies: Discovered[];
   shows: Discovered[];
-  /** Family shows that fans aged 24 and younger lean toward. */
-  young: Discovered[];
+  /** How many of the pool's titles Qloo had a local reading for here, and how big the pool is. */
+  scored: number;
+  poolSize: number;
   source: "live" | "cache" | "synthetic";
   fetchedAt: string;
 }

@@ -11,8 +11,7 @@ import { shortDate } from "../app/dates";
 import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
 import { idsOfType, type LiveTheme } from "../app/themes/ids";
 import { THEME_LIBRARY } from "../app/themes/library";
-import { libraryTitleMatcher } from "../app/themes/match";
-import { DISCOVERY_REFERENCE, IDEA_POPULARITY, rankPool, standsOut, worthASwap, type DiscoveryReference } from "../app/discovery";
+import { DISCOVERY_REFERENCE, IDEA_POPULARITY, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
 import { step, type TraceStep } from "../app/trace";
 import { createQlooClient, type QlooType } from "../qloo/client";
 import { AI_MODEL, type AiPort, type KvPort } from "./ports";
@@ -235,8 +234,11 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
       continue;
     }
     const slot = { date: night.date, notes: night.notes };
-    const cands = d.library.filter((t) => t.id !== original.id && !used.has(t.id) && categoryGroup(t.category) === categoryGroup(original.category) && audienceBand(t.audience) === audienceBand(original.audience) && audienceFit(original, t, slot) && inWindow(night.date, t.window) && t.entities.some((e) => e.type === type));
-    if (cands.length < 2) {
+    const usable = (t: (typeof d.library)[number]): boolean => t.id !== original.id && !used.has(t.id) && audienceBand(t.audience) === audienceBand(original.audience) && audienceFit(original, t, slot) && inWindow(night.date, t.window) && t.entities.some((e) => e.type === type);
+    // Same kind of theme first; if there is none, any theme for the same audience; one candidate is enough to ask.
+    let cands = d.library.filter((t) => usable(t) && categoryGroup(t.category) === categoryGroup(original.category));
+    if (cands.length === 0) cands = d.library.filter(usable);
+    if (cands.length < 1) {
       out.push(angle);
       continue;
     }
@@ -269,7 +271,7 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
         }).sort((x, y) => y.affinity - x.affinity || x.themeId.localeCompare(y.themeId));
         stored = { v: 1, fetchedAt: iso(d), ranked };
         await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
-        trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${original.label} near ${city} also lean toward, among ${cands.length} similar themes (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+        trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${original.label} near ${city} also lean toward, among ${cands.length} ${cands.length === 1 ? "theme" : "themes"} for the same audience (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
       } catch (err) {
         console.error("taste graph failed", err instanceof Error ? err.message : String(err));
         trace.push(step(iso(d), "qloo", `The taste graph for ${original.label} was not available right now, so the angle uses the local lean.`));
@@ -295,19 +297,19 @@ interface StoredDiscovery {
   fetchedAt: string;
   movies: Discovered[];
   shows: Discovered[];
-  young: Discovered[];
+  scored: number;
+  poolSize: number;
 }
 
 const discoveryKey = (d: Deps, m: MarketIn): string => {
   const ref = d.discoveryRef ?? DISCOVERY_REFERENCE;
-  return `disc:v4:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
+  return `disc:v5:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
 };
 
 /**
  * Two calls score a fixed pool of family-friendly animated titles at this market (filter.results.entities), and each title is
- * ranked by how far its reading sits above its own spread over the 40 reference markets. A third call asks for the top family
- * picks among fans aged 24 and younger here. Returns null, never throws, when discovery is unavailable: swaps then use library
- * themes only.
+ * ranked by how far its reading sits above its own spread over the 40 reference markets. Returns null, never throws, when
+ * discovery is unavailable: swaps then use library themes only.
  */
 export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promise<DiscoveryOut | null> {
   const city = m.label.split(",")[0]!.replace(/ (sample )?club$/, "");
@@ -322,14 +324,14 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     try {
       const s = JSON.parse(hit) as StoredDiscovery;
       if (s.v === 1) {
-        trace.push(step(iso(d), "qloo", `Used the recorded family-title scores and under-25 picks near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
-        return { movies: s.movies, shows: s.shows, young: s.young, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
+        trace.push(step(iso(d), "qloo", `Used the recorded family-title scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        return { movies: s.movies, shows: s.shows, scored: s.scored, poolSize: s.poolSize, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
       }
     } catch {
       /* fall through to a fresh pull */
     }
   }
-  if (!(await reserveQloo(d, 3))) {
+  if (!(await reserveQloo(d, 2))) {
     trace.push(step(iso(d), "qloo", `Skipped the family titles near ${city}: today's Qloo allowance is used up.`));
     return null;
   }
@@ -337,21 +339,18 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     const client = createQlooClient({ baseUrl: d.qlooBase, apiKey: d.qlooKey, fetchImpl: d.qlooFetch, delayMs: d.qlooDelayMs, maxTries: 3, sleep: d.qlooDelayMs === 0 ? async () => undefined : undefined });
     const synthetic = d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : "";
     const ranked: Record<"movie" | "tv_show", Discovered[]> = { movie: [], tv_show: [] };
+    let scored = 0;
     for (const type of ["movie", "tv_show"] as const) {
       const ids = ref.pool.filter((p) => p.type === type).map((p) => p.entityId);
       const rows = await client.localAffinity({ type, entityIds: ids, lon: m.lon, lat: m.lat, radiusM: RADIUS_M, take: ids.length, ...(type === "movie" ? { releaseYearMin: 1900 } : {}) });
-      ranked[type] = rankPool(new Map(rows.map((r) => [r.entityId, r.affinity])), ref, type).filter((x) => (x.popularity ?? 0) >= IDEA_POPULARITY).slice(0, 12);
-      const standing = ranked[type].filter(standsOut).length;
-      trace.push(step(iso(d), "qloo", `Asked Qloo how ${ids.length} family-friendly animated ${type === "movie" ? "movies" : "shows"} score near ${city} (80 km), and compared each with its spread over ${ref.markets} ballpark markets.`, `Live call at ${iso(d)}. ${standing} stand out here.${synthetic}`));
+      const all = rankPool(new Map(rows.map((r) => [r.entityId, r.affinity])), ref, type);
+      scored += all.length;
+      ranked[type] = all.filter((x) => (x.popularity ?? 0) >= IDEA_POPULARITY).slice(0, 12);
+      trace.push(step(iso(d), "qloo", `Asked Qloo about ${ids.length} family-friendly animated ${type === "movie" ? "movies" : "shows"} near ${city} (80 km), and compared each with its spread over ${ref.markets} ballpark markets.`, `Live call at ${iso(d)}. Qloo had local data for ${all.length} of ${ids.length}. ${all.filter(standsOut).length} stand out here.${synthetic}`));
     }
-    const isLibrary = libraryTitleMatcher(new Set(d.library.flatMap((t) => t.entities.map((e) => e.id))), THEME_LIBRARY);
-    const youngRows = (await client.discoverFamily({ type: "tv_show", lon: m.lon, lat: m.lat, radiusM: RADIUS_M, take: 6, age: "24_and_younger" }))
-      .filter((r) => !isLibrary(r.entityId, r.name))
-      .map((r): Discovered => ({ name: r.name, entityId: r.entityId, type: r.type, affinity: r.affinity }));
-    trace.push(step(iso(d), "qloo", `Asked Qloo for the top family picks among fans aged 24 and younger near ${city}.`, `Live call at ${iso(d)}. ${youngRows.length} kept.${synthetic}`));
-    const stored: StoredDiscovery = { v: 1, fetchedAt: iso(d), movies: ranked.movie, shows: ranked.tv_show, young: youngRows };
+    const stored: StoredDiscovery = { v: 1, fetchedAt: iso(d), movies: ranked.movie, shows: ranked.tv_show, scored, poolSize: ref.pool.length };
     await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
-    return { movies: stored.movies, shows: stored.shows, young: stored.young, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
+    return { movies: stored.movies, shows: stored.shows, scored, poolSize: ref.pool.length, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
   } catch (err) {
     console.error("discovery failed", err instanceof Error ? err.message : String(err));
     trace.push(step(iso(d), "qloo", `Family titles near ${city} were not available right now, so swaps use library themes only.`));
@@ -378,17 +377,17 @@ export function replyText(res: unknown): string | null {
 
 class ModelTimeout extends Error {}
 
-export async function runModel(d: Deps, system: string, user: string, trace: TraceStep[], what: string, maxTokens = 900): Promise<string | null> {
+export async function runModel(d: Deps, system: string, user: string, trace: TraceStep[], what: string, maxTokens = 900, fallback = "template text is used"): Promise<string | null> {
   if (!d.ai) {
-    trace.push(step(iso(d), "model", `${what}: no model attached here, so template text is used.`));
+    trace.push(step(iso(d), "model", `${what}: no model attached here, so ${fallback}.`));
     return null;
   }
   if ((await counter(d, "ai")) >= d.aiDailyCap) {
-    trace.push(step(iso(d), "model", `${what}: today's model budget is spent, so template text is used.`));
+    trace.push(step(iso(d), "model", `${what}: today's shared model budget is spent, so ${fallback}.`));
     return null;
   }
   if (d.gate && !(await d.gate.allow("model"))) {
-    trace.push(step(iso(d), "model", `${what}: your daily model allowance is spent, so template text is used.`));
+    trace.push(step(iso(d), "model", `${what}: your daily limit of model calls is spent, so ${fallback}.`));
     return null;
   }
   await bump(d, "ai", 1);
@@ -399,13 +398,13 @@ export async function runModel(d: Deps, system: string, user: string, trace: Tra
     call.catch(() => undefined); // a late failure after the timeout must not surface
     const res = await Promise.race([call, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new ModelTimeout()), limit); })]);
     const text = replyText(res);
-    trace.push(step(iso(d), "model", text === null ? `${what}: the model's reply couldn't be used, so template text is used.` : `${what}: the model replied.`));
+    trace.push(step(iso(d), "model", text === null ? `${what}: the model's reply couldn't be used, so ${fallback}.` : `${what}: the model replied.`));
     return text;
   } catch (err) {
-    if (err instanceof ModelTimeout) trace.push(step(iso(d), "model", `${what}: the model took too long (over ${Math.round(limit / 1000)} seconds), so template text is used.`));
+    if (err instanceof ModelTimeout) trace.push(step(iso(d), "model", `${what}: the model took too long (over ${Math.round(limit / 1000)} seconds), so ${fallback}.`));
     else {
       console.error("model call failed", err instanceof Error ? err.message : String(err));
-      trace.push(step(iso(d), "model", `${what}: the model call failed, so template text is used.`));
+      trace.push(step(iso(d), "model", `${what}: the model call failed, so ${fallback}.`));
     }
     return null;
   } finally {
@@ -463,6 +462,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
         trace,
         "Matching unrecognised theme names",
         600,
+        "those names stay unscored",
       );
       if (reply !== null) await safePut(d.kv, key, reply, { expirationTtl: TTL });
     }
@@ -527,7 +527,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   const discovery = await discover(d, input.market, trace);
   const city = input.market.label.split(",")[0]!.replace(/ (sample )?club$/, "");
   const nights: PlanNight[] = input.nights.map((n) => ({ ...n, themeId: n.themeId && Object.hasOwn(themes, n.themeId) ? n.themeId : null }));
-  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter(worthASwap) : [], city });
+  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter((x) => (x.popularity ?? 0) >= SWAP_POPULARITY && (x.z ?? -9) >= 0) : [], city });
   trace.push(...res.trace);
 
   const whys = new Map<string, string>();

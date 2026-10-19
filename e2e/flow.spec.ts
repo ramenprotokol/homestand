@@ -28,8 +28,11 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("study-teaser")).not.toContainText("coin flip");
   // The hero says what the app is, and what it is not, in plain words on readable panels.
   await expect(page.getByTestId("hero-intro")).toContainText("Planning next season's theme nights? Homestand checks each one against what fans in your town like");
-  await expect(page.getByTestId("hero-honest")).toContainText("It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.");
-  await expect(page.getByTestId("hero-honest")).not.toContainText("H1");
+  await expect(page.getByTestId("hero-intro")).toContainText("Every swap comes with a cited reason you can show a sponsor.");
+  // The hero leads with what the tool is for. The coin-flip result lives on the Study page only.
+  await expect(page.getByTestId("hero-honest")).toContainText("It reads what your town likes. It doesn't forecast ticket sales, and we tested that: see The Study.");
+  await expect(page.getByTestId("hero-honest")).not.toContainText(/coin flip|49|385/);
+  await expect(page.locator("#hero")).not.toContainText("coin flip");
   for (const id of ["hero-intro", "hero-honest"]) expect(await page.getByTestId(id).evaluate((el) => parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(14);
   // Programmatic focus on the heading shows no ring.
   expect(await page.locator("h1").evaluate((el) => (el === document.activeElement ? getComputedStyle(el).outlineStyle : "none"))).toBe("none");
@@ -48,6 +51,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByRole("heading", { name: /Check: Akron, OH sample club/ })).toBeVisible();
   await expect(page.getByText("Synthetic demo data").first()).toBeVisible();
   await expect(page.getByText("Step 1 of 3 · Check")).toBeVisible();
+  await expect(page.locator(".rings")).toHaveCount(0); // no stray ring glyph beside the board
   // The result line comes from the cards themselves.
   const awayCards = await page.locator('.card.tile[data-fit="leans-away"]').count();
   await expect(page.getByTestId("check-result")).toHaveText(awayCards === 0 ? /^None of the 24 nights lean away from what Akron likes\.$/ : new RegExp(`^${awayCards} of 24 nights? leans? away from what Akron likes\\.$`));
@@ -76,11 +80,13 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(why).toBeVisible();
   await expect(why).toContainText(/Against its own average/);
   await expect(why).toContainText("What Qloo looked at");
-  await expect(why.getByTestId("why-pull")).toContainText(/^Local pull: (well )?(below|above|about) this town's usual\./);
-  await expect(why.getByTestId("why-vs")).toContainText(/here: (well )?(below|above|about typical for) (most )?ballpark markets/);
+  await expect(why.locator(".face.back .bk-idx")).toContainText(/Local pull\s*(well )?(below|above|about) this town's usual/);
   await expect(why.getByTestId("bk-vs")).toContainText(/here: (well )?(below|above|about typical for) (most )?ballpark markets/);
-  await expect(why.locator(".bk-h")).toContainText("What Qloo looked at");
-  // Plain words, not 0.99: the card back carries no raw taste number.
+  // Each piece once: the card back holds the glance, the side panel the detail.
+  await expect(why.getByTestId("why-pull")).toHaveCount(0);
+  expect(await why.getByText("What Qloo looked at").count()).toBe(1);
+  expect(await why.getByText(/Local pull/).count()).toBe(1);
+    // Plain words, not 0.99: the card back carries no raw taste number.
   await expect(why.locator(".face.back")).not.toContainText(/\d\.\d\d/);
   await expect(why.locator(".bk-idx")).toContainText("Local pull");
   await expect(why).not.toContainText(/affinity|\bindex\b/i);
@@ -107,6 +113,9 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
   await expect(page.getByText("Step 2 of 3 · Fix")).toBeVisible();
   await expect(page.getByText("How Homestand decided")).toBeVisible();
+  // The repeat switch sits under "Advanced", closed until asked for.
+  await expect(page.getByText("Off by default: each theme is used once")).toBeHidden();
+  await page.getByTestId("advanced").locator("summary").click();
   await expect(page.getByText("Off by default: each theme is used once")).toBeVisible();
   await expect(page.locator("#carousel")).toHaveCount(0);
   const pack = page.getByRole("button", { name: /Open the pack/ });
@@ -137,9 +146,11 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   }
   await noSideScroll(page);
   // The cited comparison replaces the repeated sentence; the why is not said twice.
-  await expect(card.getByTestId("cited")).toContainText(/(above|below|in line with) this market's average \([+-]\d\.\d\)/);
+  await expect(card.getByTestId("cited")).toContainText(/(above|below|in line with) this market's average\./);
   await expect(card).not.toContainText("leans toward");
-  await expect(page.locator(".idx")).toContainText(/now (well )?(below|above|about usual) \([+\u2212]\d\.\d\d\) \u2192 proposed (well )?(below|above|about usual) \([+\u2212]\d\.\d\d\)/);
+  await expect(page.locator(".idx")).toContainText(/now (well )?(below|above|about usual) \u2192 proposed (well )?(below|above|about usual)/);
+  await expect(page.locator(".idx")).not.toContainText(/\d\.\d/);
+  await expect(card).not.toContainText(/\d\.\d/); // no raw index in the swap text
   if ((await page.getByTestId("angle").count()) > 0) {
     const angle = await page.getByTestId("angle").first().innerText();
     expect(angle).toMatch(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) [A-Z][a-z]{2} \d{1,2}\b/);
@@ -207,7 +218,8 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("memo")).toContainText("Theme-night rationale: Akron, OH sample club");
   await expect(page.getByTestId("memo")).toContainText("SYNTHETIC DEMO DATA");
   // The opener is fixed wording built from counts; nothing is written by a model, and there is no bundle score column.
-  await expect(page.getByTestId("memo")).toContainText("Homestand checked 24 theme nights for Akron, OH sample club against local taste data from Qloo and suggests 1 swap. Each swap keeps its original date and sponsor.");
+  await expect(page.getByTestId("memo")).toContainText(/Homestand checked 24 theme nights for Akron, OH sample club against local taste data from Qloo\. It suggested \d+ swaps?; you approved 1\. Each approved swap keeps its original date and sponsor\./);
+  await expect(page.getByTestId("memo")).not.toContainText(/coin flip/);
   await expect(page.getByTestId("memo")).not.toContainText(/Bundle score|preference for certain/);
   expect(await page.locator(".memo-scroll").evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
   await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
@@ -325,8 +337,9 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   await expect(ideas).toContainText("Family titles that stand out near Akron");
   expect(await ideas.locator(".idea").count()).toBeLessThanOrEqual(6);
   expect(await ideas.locator(".idea").count()).toBeGreaterThanOrEqual(4);
-  await expect(page.getByTestId("ideas-young")).toContainText("Top picks with under-25 fans here:");
-  await expect(ideas).toContainText("They come from Qloo's taste data for this area");
+  await expect(page.getByTestId("ideas")).not.toContainText("under-25");
+  await expect(page.getByTestId("ideas-note")).toContainText(/Qloo had local data for \d+ of our \d+ family titles near Akron/);
+  await expect(ideas).toContainText("come from Qloo's taste data for this area");
   await page.getByRole("button", { name: /Open the pack/ }).focus();
   await page.keyboard.press("Enter");
   const now = page.getByTestId("now-card");
@@ -344,9 +357,9 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
   const memo = page.getByTestId("memo");
   await expect(memo).toContainText(/Moonpie Pirates \(made up\) (Day|Night|Friday|Giveaway|Showdown) \(Discovered by Qloo\)/);
-  await expect(memo).toContainText("Found by Qloo");
+  await expect(memo).toContainText(/found by Qloo/i);
   await expect(memo).toContainText("Family titles that stand out near Akron");
-  await expect(memo).toContainText("These come from Qloo's taste data for this area");
+  await expect(memo).toContainText("come from Qloo's taste data for this area");
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-csv").click()]);
   const csvText = await readFile((await csv.path())!, "utf8");
   expect(csvText).toContain("Moonpie Pirates (made up)");
@@ -354,6 +367,54 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   const [ics] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-ics").click()]);
   expect(await readFile((await ics.path())!, "utf8")).toContain("Moonpie Pirates (made up)");
   await expect(page.locator(".tile--swapped").first()).toBeVisible();
+});
+
+test("repeat switch: says plainly when allowing repeats changes nothing", async ({ page }) => {
+  const proposals: string[][] = [];
+  page.on("response", async (r) => {
+    if (r.url().endsWith("/api/propose")) proposals.push(((await r.json()) as { proposals: Array<{ toThemeId: string }> }).proposals.map((p) => p.toThemeId));
+  });
+  await page.goto("/#/check/akron");
+  await expect(page.getByTestId("summary")).toBeVisible();
+  await page.getByTestId("to-fix").click();
+  await expect(page.getByTestId("skip-pack")).toBeVisible();
+  await page.getByTestId("advanced").locator("summary").click();
+  await page.getByTestId("allow-dupes").check();
+  await expect.poll(() => proposals.length, { timeout: 10_000 }).toBe(2);
+  await expect(page.getByTestId("skip-pack")).toBeVisible();
+  // The screen never goes quiet: a note when nothing changed, nothing extra when the swaps did change.
+  if (JSON.stringify(proposals[0]) === JSON.stringify(proposals[1])) await expect(page.getByTestId("dupes-note")).toHaveText("No change: no other theme qualifies for these nights.");
+  else await expect(page.getByTestId("dupes-note")).toHaveCount(0);
+});
+
+test("Could not fix is one grouped block, not a card for each night", async ({ page }) => {
+  await page.route("**/api/propose", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    body.unfixed = [4, 6, 8].map((index) => ({ index, date: body.proposals[0].date, reason: "No family theme leans in here that fits this date." }));
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.goto("/#/check/akron");
+  await expect(page.getByTestId("summary")).toBeVisible();
+  await page.getByTestId("to-fix").click();
+  const block = page.getByTestId("unfixed-block");
+  await expect(block).toContainText("Could not fix: 3 nights");
+  await expect(block).toContainText("A kids' night stays a kids' night");
+  await expect(block).toContainText("Next step");
+  await expect(block.locator(".nofix-list li")).toHaveCount(3);
+  await expect(page.locator(".stamp", { hasText: "COULD NOT" })).toHaveCount(0);
+  await expect(block.locator(".card")).toHaveCount(0);
+});
+
+test("the Study keeps its short version back until the stamp lands", async ({ page }) => {
+  await page.goto("/#/study");
+  await page.getByTestId("call-yes").click();
+  const lead = page.getByTestId("plain-result");
+  await page.waitForTimeout(700);
+  expect(await lead.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
+  expect(await page.getByTestId("verdict").evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
+  await expect.poll(() => lead.evaluate((el) => getComputedStyle(el).opacity), { timeout: 8000 }).toBe("1");
+  await expect(page.getByTestId("verdict")).toBeVisible();
 });
 
 test("the step log shows the discovery calls to Qloo", async ({ page }) => {
@@ -364,7 +425,8 @@ test("the step log shows the discovery calls to Qloo", async ({ page }) => {
   await page.getByTestId("open-trace").click();
   const log = page.getByRole("dialog");
   // The first Akron run in this server asks Qloo; later ones show the recorded answers. Either way the three calls are named.
-  await expect(log).toContainText(/Asked Qloo how \d+ family-friendly animated movies score near Akron|Used the recorded family-title scores and under-25 picks near Akron/);
+  await expect(log).toContainText(/Asked Qloo about \d+ family-friendly animated movies near Akron|Used the recorded family-title scores near Akron/);
+  await expect(log).not.toContainText("under-25");
 });
 
 test("the production CSP and security headers break nothing on any screen", async ({ page }) => {

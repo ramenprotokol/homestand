@@ -3,7 +3,7 @@ import { parseCalendar } from "../../src/app/calendar/csv";
 import { placeLabel } from "../../src/app/geo";
 import { exampleCsv } from "../../src/app/samples";
 import { sortRowsByDate } from "../../src/app/calendar/csv";
-import { swapName, personalLine, checkResultLine, fitSummary, localDay, lockedLine, longDate, plural } from "../../src/app/text";
+import { cleanTitle, swapName, personalLine, checkResultLine, fitSummary, localDay, lockedLine, longDate, plural } from "../../src/app/text";
 import { resolveTheme } from "../../src/app/calendar/resolve";
 import { THEME_LIBRARY } from "../../src/app/themes/library";
 
@@ -83,5 +83,17 @@ describe("rows in date order", () => {
     const rows = [{ date: "2027-05-02", theme: "b" }, { date: "2027-04-01", theme: "a" }, { date: "2027-05-02", theme: "c" }, { date: "2027-04-30", theme: "d" }];
     expect(sortRowsByDate(rows).map((r) => r.theme)).toEqual(["a", "d", "b", "c"]);
     expect(rows[0]!.theme).toBe("b"); // the input is not changed
+  });
+});
+
+describe("clean display titles", () => {
+  it("strips a trailing series note and nothing else", () => {
+    expect(cleanTitle("Harry Potter and the Sorcerer's Stone (Harry Potter, #1)")).toBe("Harry Potter and the Sorcerer's Stone");
+    expect(cleanTitle("The Hobbit (The Lord of the Rings Series)")).toBe("The Hobbit");
+    expect(cleanTitle("Dune (Dune Chronicles, Book 1) ")).toBe("Dune");
+    expect(cleanTitle("Spider-Man: No Way Home")).toBe("Spider-Man: No Way Home");
+    expect(cleanTitle("Mission: Impossible (1996)")).toBe("Mission: Impossible (1996)");
+    expect(cleanTitle("Chip 'n Dale: Rescue Rangers")).toBe("Chip 'n Dale: Rescue Rangers");
+    expect(cleanTitle("(#1)")).toBe("(#1)");
   });
 });

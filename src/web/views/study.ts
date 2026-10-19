@@ -245,8 +245,8 @@ export function studyView(): HTMLElement {
       under.replaceChildren(h("i"), "Review complete");
       ci.style.opacity = "1";
       setNeedle(acc.estimate * 100);
-      show(meter, verdict, dnote, dls);
-      for (const e of [meter, verdict, dnote, dls]) e.style.transition = "";
+      show(meter, verdict, dnote, dls, lead);
+      for (const e of [meter, verdict, dnote, dls, lead]) e.style.transition = "";
       skip.hidden = true;
     }
     finalRef = final;
@@ -257,7 +257,8 @@ export function studyView(): HTMLElement {
         final();
         return;
       }
-      [meter, verdict, dnote, dls].forEach((e) => (e.style.opacity = "0"));
+      // The short version gives the answer away, so it waits for the stamp like the rest of the verdict.
+      [meter, verdict, dnote, dls, lead].forEach((e) => (e.style.opacity = "0"));
       ci.style.opacity = "0";
       const t0 = performance.now();
       const loop = (now: number): void => {
@@ -279,7 +280,7 @@ export function studyView(): HTMLElement {
         });
       });
       T(REVIEW_MS.verdict, () => {
-        show(verdict);
+        show(verdict, lead);
         const stamp = verdict.querySelector(".stampv");
         if (stamp) gsap.fromTo(stamp, { scale: 2.6, opacity: 0, rotation: -14 }, { scale: 1, opacity: 1, rotation: -4, duration: 0.45, ease: "back.out(1.6)" });
         under.classList.add("fin");

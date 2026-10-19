@@ -71,6 +71,8 @@ export async function startCheck(market: MarketIn, rowsIn: CalendarRow[], parseE
   saveClub({ market, rows, parseErrors, sampleId });
   ui.loading = true;
   ui.error = null;
+  ui.dupesNote = null;
+  ui.dupesBefore = null;
   // A sample club has a link of its own: #/check/biloxi opens it from a cold start.
   if (go) navigate(sampleId ? `#/check/${sampleId}` : "#/check");
   await analyzeClub({ market, rows, parseErrors, sampleId });
@@ -97,6 +99,11 @@ export async function ensureProposals(): Promise<void> {
     });
     const res = await api.propose(state.market, nights, state.allowDuplicates);
     state.propose = res;
+    // Allowing repeats re-runs the proposals. Say so when that changed nothing.
+    if (ui.dupesBefore !== null) {
+      ui.dupesNote = ui.dupesBefore === JSON.stringify(res.proposals.map((x) => x.toThemeId)) ? "No change: no other theme qualifies for these nights." : null;
+      ui.dupesBefore = null;
+    }
     state.altChoice = {};
     state.analysis.caps = res.caps;
     addTrace("Fix: propose swaps", res.trace);

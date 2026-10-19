@@ -1,12 +1,12 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS, NEAR_TOP_NOTE, pullWords, vsMarketsWords } from "../../app/score";
+import { CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS, NEAR_TOP_NOTE, vsMarketsWords } from "../../app/score";
 import { themeById } from "../../app/themes/library";
-import { checkResultLine, fitSummary, lockedLine, swapName } from "../../app/text";
+import { checkResultLine, cleanTitle, fitSummary, lockedLine, swapName } from "../../app/text";
 import { ApiFailure } from "../api";
 import { fitChip, syntheticBanner } from "../components";
 import { formatDate, formatDateTime, h, type Child } from "../dom";
 import { recheckTheme, navigate } from "../flow";
-import { bindTilt, FIT_NAME, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
+import { bindTilt, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
 import { tally } from "../foil/tally";
 import { onCleanup, onMount, route, routeContext } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
@@ -158,7 +158,7 @@ export function checkView(): HTMLElement {
     bokeh(),
     garland(),
     lamp(),
-    h("div", { class: "wrap deck-in" }, deckL, h("div", { class: "deck-r" }, h("div", { class: "binder", id: "binder" }, h("div", { class: "rings", "aria-hidden": "true" }), grid))),
+    h("div", { class: "wrap deck-in" }, deckL, h("div", { class: "deck-r" }, h("div", { class: "binder", id: "binder" }, grid))),
   );
 
   function tap(c: HTMLElement): void {
@@ -214,7 +214,7 @@ function loadingView(): HTMLElement {
       "div",
       { class: "wrap deck-in" },
       h("div", { class: "deck-l" }, h("div", { class: "eyebrow" }, "Step 1 of 3 · Check"), h("h1", { class: "h2", tabindex: "-1" }, "Checking ", h("em", null, "your calendar")), h("p", { class: "lede", role: "status" }, "Matching theme names and asking Qloo what this market leans toward. A few seconds.")),
-      h("div", { class: "deck-r" }, h("div", { class: "binder" }, h("div", { class: "rings", "aria-hidden": "true" }), h("div", { class: "grid" }, Array.from({ length: 10 }, () => h("div", { class: "skeleton" }))))),
+      h("div", { class: "deck-r" }, h("div", { class: "binder" }, h("div", { class: "grid" }, Array.from({ length: 10 }, () => h("div", { class: "skeleton" }))))),
     ),
   );
 }
@@ -223,9 +223,10 @@ function loadingView(): HTMLElement {
 
 const rel = (z: number | null): string => (z === null ? "n/a" : `${z >= 0 ? "+" : ""}${z.toFixed(2)}`);
 
-function sourceLine(s: ThemeScoreOut, recheckedAt: string | null): string {
-  if (recheckedAt) return `Re-checked live at ${formatDateTime(recheckedAt)}.`;
+function sourceLine(s: ThemeScoreOut, boardAt: string | null): string {
   if (s.source === "synthetic") return `Synthetic test data generated ${formatDateTime(s.fetchedAt)}. Not from Qloo.`;
+  // One theme can be re-read after the board was pulled: say so, so the two times read as consistent.
+  if (boardAt && s.fetchedAt !== boardAt) return `Re-checked live ${formatDateTime(s.fetchedAt)} (the board was pulled ${formatDateTime(boardAt)}). "Re-check live" asks Qloo again.`;
   if (s.source === "cache") return `Saved result, pulled from Qloo on ${formatDateTime(s.fetchedAt)}. "Re-check live" asks Qloo again.`;
   return `Fetched from Qloo ${formatDateTime(s.fetchedAt)}.`;
 }
@@ -240,7 +241,7 @@ function backOf(v: NightView): BackSpec {
   const s = v.score;
   const scored = !!s && s.label !== "not-scored";
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
-  const reason = v.discovered ? `Qloo found this title among the top family ${v.discovered.type === "movie" ? "movies" : "shows"} for fans near ${city()}. It is not scored against the library, so there is no local-pull number.` : v.fit === "classic" ? CLASSIC_REASON : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone.` : `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
+  const reason = v.discovered ? `${v.discovered.name} stands out near ${city()}: ${vsMarketsWords(v.discovered.z)}. It is not scored against the library, so there is no local-pull rating.` : v.fit === "classic" ? CLASSIC_REASON : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone.` : `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
   return {
     no: n.index + 1,
     total: state.analysis!.nights.length,
@@ -293,7 +294,7 @@ function whyInfo(index: number): Child {
     return out;
   }
   if (v.discovered) {
-    out.push(h("p", { class: "panel-box" }, `Qloo ranks ${v.discovered.name} among the top family ${v.discovered.type === "movie" ? "movies" : "shows"} for fans near ${city()}. It is not scored against the library, so there is no local-pull number: it was found, not measured.`));
+    out.push(h("p", { class: "panel-box" }, `${v.discovered.name} stands out near ${city()}: ${vsMarketsWords(v.discovered.z)}. It is not scored against the library, so there is no local-pull rating: it was found, not measured.`));
     return out;
   }
   if (v.needsChoice) {
@@ -309,12 +310,11 @@ function whyInfo(index: number): Child {
   if (s.label === "not-scored") {
     out.push(h("p", { class: "panel-box" }, s.reason ?? "Not scored."));
   } else {
+    // The card back holds the glanceable lines (local pull, versus other markets); this panel holds the detail, once.
     out.push(
-      h("p", { class: "why-index", "data-testid": "why-pull" }, h("b", null, "Local pull:"), ` ${pullWords(s.index)}. ${FIT_NAME[fit]}.`),
       h(
         "div",
         { class: "panel-box" },
-        h("p", { "data-testid": "why-vs" }, h("b", null, `${theme.label} here:`), ` ${vsMarketsWords(s.z)}.`),
         s.score !== null && s.score >= 0.9 ? h("p", { class: "small" }, NEAR_TOP_NOTE) : null,
         h("p", null, marketLevelSentence(s.marketMeanZ)),
         h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label)),
@@ -322,7 +322,7 @@ function whyInfo(index: number): Child {
     );
   }
   out.push(
-    h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${e.name} (${e.type.replace("_", " ")})`)))),
+    h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${cleanTitle(e.name)} (${e.type.replace("_", " ")})`)))),
   );
 
   const toggle = h("button", { type: "button", class: "toggle", "aria-expanded": String(showNumbers), "data-keep": "numbers", onclick: () => { showNumbers = !showNumbers; refreshWhy(); } }, icon("caretDown"), showNumbers ? "Hide the numbers" : "Show the numbers");
@@ -333,8 +333,9 @@ function whyInfo(index: number): Child {
         "div",
         { class: "panel-box" },
         h("p", { class: "small" }, METHOD_WORDS),
+        Math.abs(s.index ?? 0) > 4 || Math.abs(s.z ?? 0) > 4 ? h("p", { class: "small", "data-testid": "tiny-sd-note" }, "Differences between markets are tiny for this title, so the number looks bigger than it is.") : null,
         h("p", { class: "small" }, "Taste match here, item by item:"),
-        h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, e.name), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(4))])),
+        h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, cleanTitle(e.name)), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(4))])),
         h(
           "dl",
           { class: "kv kv--sum" },
@@ -358,7 +359,7 @@ function whyInfo(index: number): Child {
     h(
       "div",
       { class: "panel-box" },
-      h("p", { class: "small", "data-testid": "source-line" }, sourceLine(s, rechecked[s.themeId] ?? null)),
+      h("p", { class: "small", "data-testid": "source-line" }, sourceLine(s, a.recordedAt)),
       h(
         "button",
         {

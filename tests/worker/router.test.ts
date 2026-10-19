@@ -195,6 +195,13 @@ describe("analyze", () => {
     expect(out.trace.some((s) => s.kind === "model")).toBe(true);
   });
 
+  it("name matching has no template text: when the budget is spent those names stay unscored, and the log says so", async () => {
+    const h = harness({ aiDailyCap: 0 }, { run: async () => ({ response: "{}" }) });
+    const out = await analyzeOk(h, { market, rows: [{ line: 2, date: "2027-04-10", theme: "Mystery Night", sponsor: "", locked: false, notes: "" }] });
+    expect(out.trace.some((t) => t.text === "Matching unrecognised theme names: today's shared model budget is spent, so those names stay unscored.")).toBe(true);
+    expect(out.nights[0]!.label).toBe("not-scored");
+  });
+
   it("ignores model ids that are not in the library", async () => {
     const h = harness({}, { run: async () => ({ response: '{"0": ["made-up-theme"]}' }) });
     const res = await route(post("/api/analyze", { market, rows: [{ line: 2, date: "2026-04-10", theme: "Mystery Night", sponsor: "", locked: false, notes: "" }] }), h.deps);
@@ -386,14 +393,8 @@ describe("propose", () => {
       return syntheticQlooFetch(input, init);
     };
 
-    it("scores the fixed pool at the market, ranks by z, drops library titles from the under-25 call, caches, and never breaks Fix when Qloo fails", async () => {
-      const young = [
-        { entity_id: "SYN-star-wars:tv", name: "Whatever" },
-        { entity_id: "X1", name: "Bluey" },
-        { entity_id: "X2", name: "Bluey Minisodes" },
-        { entity_id: "Y1", name: "Kite Club", query: { affinity: 0.8 } } as { entity_id: string; name: string },
-      ];
-      const h = harness({}, null, poolFetch((id) => (id === "SYN-D-movie-3" ? 0.9 : id === "SYN-D-movie-1" ? 0.76 : id === "SYN-D-tv_show-2" ? 0.85 : 0.7), young));
+    it("scores the fixed pool at the market in two calls, ranks by z, caches, and never breaks Fix when Qloo fails", async () => {
+      const h = harness({}, null, poolFetch((id) => (id === "SYN-D-movie-3" ? 0.9 : id === "SYN-D-movie-1" ? 0.76 : id === "SYN-D-tv_show-2" ? 0.85 : 0.7)));
       const { p } = await proposeOk(h);
       const poolCalls = h.qlooUrls.filter((u) => (u.searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-"));
       expect(poolCalls).toHaveLength(2);
@@ -402,44 +403,38 @@ describe("propose", () => {
         expect(u.searchParams.get("filter.results.entities")!.split(",").every((id) => id.startsWith("SYN-D-"))).toBe(true);
         expect(u.searchParams.has("filter.tags")).toBe(false); // the pool is fixed, so no tags are needed
       }
-      const tagged = h.qlooUrls.filter((u) => u.searchParams.has("filter.tags"));
-      expect(tagged).toHaveLength(1);
-      expect(tagged[0]!.searchParams.get("filter.tags")).toBe("urn:tag:genre:media:family,urn:tag:genre:media:animation");
-      expect(tagged[0]!.searchParams.get("operator.filter.tags")).toBe("intersection");
-      expect(tagged[0]!.searchParams.get("signal.demographics.age")).toBe("24_and_younger");
+      // The under-25 call is gone: nothing asks for a demographic.
+      expect(h.qlooUrls.filter((u) => u.searchParams.has("filter.tags") || u.searchParams.has("signal.demographics.age"))).toHaveLength(0);
       expect(p.discovery!.movies[0]).toMatchObject({ entityId: "SYN-D-movie-3", z: expect.closeTo(2, 5) });
       expect(p.discovery!.movies[1]!.z).toBeCloseTo(0.6, 5);
       expect(p.discovery!.shows[0]).toMatchObject({ entityId: "SYN-D-tv_show-2" });
-      expect(p.discovery!.young.map((x) => x.name)).toEqual(["Kite Club"]);
-      expect(Object.keys(p.discovery!.young[0]!).sort()).toEqual(["affinity", "entityId", "name", "type"]);
-      expect(p.trace.some((s) => /Asked Qloo how \d+ family-friendly animated movies score near Akron/.test(s.text))).toBe(true);
-      expect(p.trace.some((s) => /fans aged 24 and younger near Akron/.test(s.text))).toBe(true);
+      expect(p.discovery).not.toHaveProperty("young");
+      expect(p.discovery!.scored).toBe(20);
+      expect(p.discovery!.poolSize).toBe(20);
+      expect(p.trace.some((s) => /Asked Qloo about \d+ family-friendly animated movies near Akron/.test(s.text) && /Qloo had local data for 10 of 10/.test(s.detail ?? ""))).toBe(true);
       h.qlooUrls.length = 0;
       const again = await proposeOk(h);
-      expect(h.qlooUrls.filter((u) => u.searchParams.has("filter.tags") || (u.searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-"))).toHaveLength(0);
-      expect(again.p.trace.some((s) => /recorded family-title scores and under-25 picks/.test(s.text))).toBe(true);
+      expect(h.qlooUrls.filter((u) => (u.searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-"))).toHaveLength(0);
+      expect(again.p.trace.some((s) => /recorded family-title scores/.test(s.text))).toBe(true);
 
-      const broken = harness({}, null, async (input, init) => {
-        const u = new URL(String(input));
-        return u.searchParams.has("filter.tags") || (u.searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-") ? new Response("no", { status: 400 }) : syntheticQlooFetch(input, init);
-      });
+      const broken = harness({}, null, async (input, init) => ((new URL(String(input)).searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-") ? new Response("no", { status: 400 }) : syntheticQlooFetch(input, init)));
       const res = await proposeOk(broken);
       expect(res.p.discovery).toBeNull();
       expect(res.p.proposals.length).toBeGreaterThan(0);
     });
 
-    it("lists ideas from popularity 0.85 up but offers a swap only from 0.90, and leaves out unknown titles", async () => {
+    it("lists ideas from popularity 0.90 up but offers a swap only from 0.97, and leaves out less known titles", async () => {
       const ref = syntheticDiscoveryReference();
-      const pops: Record<string, number> = { "SYN-D-movie-0": 0.95, "SYN-D-movie-1": 0.87, "SYN-D-movie-2": 0.8 };
-      ref.pool = ref.pool.map((p) => ({ ...p, popularity: pops[p.entityId] ?? 0.95 }));
+      const pops: Record<string, number> = { "SYN-D-movie-0": 0.99, "SYN-D-movie-1": 0.93, "SYN-D-movie-2": 0.85 };
+      ref.pool = ref.pool.map((p) => ({ ...p, popularity: pops[p.entityId] ?? 0.99 }));
       const h = harness({ discoveryRef: ref }, null, poolFetch((id) => (id.startsWith("SYN-D-movie-") && Number(id.slice(12)) <= 2 ? 0.9 : 0.7)));
       const { p } = await proposeOk(h);
       const names = p.discovery!.movies.map((m) => m.entityId);
       expect(names).toContain("SYN-D-movie-0");
-      expect(names).toContain("SYN-D-movie-1"); // 0.87: fine as an idea
-      expect(names).not.toContain("SYN-D-movie-2"); // 0.80: not recognisable enough even to list
+      expect(names).toContain("SYN-D-movie-1"); // 0.93: fine as an idea
+      expect(names).not.toContain("SYN-D-movie-2"); // 0.85: not well known enough even to list
       const offered = p.proposals.flatMap((x) => (x.discovered ? [x.discovered.entityId] : []));
-      expect(offered).not.toContain("SYN-D-movie-1"); // 0.87 is below the 0.90 a swap needs
+      expect(offered).not.toContain("SYN-D-movie-1"); // 0.93 is below the 0.97 a swap needs
       expect(offered).not.toContain("SYN-D-movie-2");
     });
 
@@ -462,10 +457,11 @@ describe("propose", () => {
         const res = await route(post("/api/propose", { market: body.market, nights: planFrom(a), allowDuplicates: false }), h.deps);
         return { p: (await res.json()) as ProposeResponse, index: night.index, date: night.date };
       };
-      // Nothing stands out: the night stays "Could not fix".
-      const quiet = await run(() => 0.7);
-      expect(quiet.p.proposals.find((q) => q.index === quiet.index)).toBeUndefined();
-      expect(quiet.p.unfixed.find((q) => q.index === quiet.index)).toBeDefined();
+      // No title stands out: the night is not handed a discovered title. (A library theme at the town's usual can still be its best option.)
+      const quiet = await run(() => 0.6);
+      const q = quiet.p.proposals.find((x) => x.index === quiet.index);
+      expect(q?.discovered).toBeUndefined();
+      expect(q?.kind).toBe("best-option");
       // One title stands out (z = 2): it is offered, and the one at z = 0.4 is not.
       const loud = await run((id) => (id === "SYN-D-movie-4" ? 0.9 : id === "SYN-D-movie-5" ? 0.74 : 0.7));
       const x = loud.p.proposals.find((q) => q.index === loud.index)!;
@@ -763,7 +759,7 @@ describe("closed doors", () => {
   });
 
   it("keeps upstream error text out of the trace, and out of the response", async () => {
-    const h = harness({}, null, async (input, init) => (new URL(String(input)).searchParams.has("filter.tags") ? new Response("SECRET-UPSTREAM-BODY", { status: 400 }) : syntheticQlooFetch(input, init)));
+    const h = harness({}, null, async (input, init) => ((new URL(String(input)).searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-") ? new Response("SECRET-UPSTREAM-BODY", { status: 400 }) : syntheticQlooFetch(input, init)));
     const out = await analyzeOk(h, akronBody);
     const plan = out.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
     const res = await route(post("/api/propose", { market: akronBody.market, nights: plan, allowDuplicates: false }), h.deps);
@@ -848,6 +844,32 @@ describe("taste graph angles for locked nights", () => {
     expect(h.qlooUrls.filter((u) => u.searchParams.has("signal.interests.entities"))).toHaveLength(0);
     expect(again.angles[0]!.text).toBe(p.angles[0]!.text);
     expect(again.trace.some((s) => /recorded taste graph for fans of Star Trek/.test(s.text))).toBe(true);
+  });
+
+  it("asks with a single candidate, and widens to the same audience of any kind when the same-kind set is empty", async () => {
+    const all = activeLibrary({}, true);
+    const sub = all.filter((t) => ["marvel", "barbie", "bluey", "taylor-swift", "elvis", "beatles"].includes(t.id));
+    const ref = { synthetic: false, markets: 40, pulledAt: null, themes: Object.fromEntries(sub.map((t) => [t.id, { n: 40, mean: 0.7, sd: 0.1 }])) };
+    const fetchImpl: typeof fetch = async (input) => {
+      const u = new URL(String(input));
+      if (u.searchParams.has("filter.tags")) return new Response(JSON.stringify({ results: { entities: [] } }));
+      const ids = (u.searchParams.get("filter.results.entities") ?? "").split(",");
+      const interests = u.searchParams.get("signal.interests.entities");
+      return new Response(JSON.stringify({ results: { entities: ids.map((id) => ({ entity_id: id, name: id, query: { affinity: interests ? 0.91 : id === "SYN-marvel:nwh" ? 0.3 : 0.7 } })) } }));
+    };
+    const h = harness({ library: sub, reference: ref }, null, fetchImpl);
+    const rows = [{ date: "2027-05-15", theme: "Marvel Night", sponsor: "Summit Savings", locked: true, notes: "" }, { date: "2027-05-22", theme: "Bluey Day", sponsor: "", locked: false, notes: "" }, { date: "2027-05-29", theme: "Taylor Swift Night", sponsor: "", locked: false, notes: "" }, { date: "2027-06-05", theme: "Elvis Night", sponsor: "", locked: false, notes: "" }, { date: "2027-06-12", theme: "Beatles Night", sponsor: "", locked: false, notes: "" }];
+    const a = (await (await route(post("/api/analyze", { market: akronBody.market, rows }), h.deps)).json()) as AnalyzeResponse;
+    expect(a.nights.find((n) => n.themeId === "marvel")!.label).toBe("leans-away");
+    const plan = a.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
+    h.qlooUrls.length = 0;
+    const p = (await (await route(post("/api/propose", { market: akronBody.market, nights: plan, allowDuplicates: false }), h.deps)).json()) as ProposeResponse;
+    const call = h.qlooUrls.filter((u) => u.searchParams.has("signal.interests.entities"));
+    expect(call).toHaveLength(1);
+    expect(call[0]!.searchParams.get("filter.results.entities")).toBe("SYN-barbie:film"); // one candidate, from the toys category, same young audience
+    expect(p.angles[0]!.toThemeId).toBe("barbie");
+    expect(p.angles[0]!.text).toContain("Fans of Marvel near Akron also lean toward Barbie, so if Summit Savings is open to it");
+    expect(p.trace.some((s) => /among 1 theme for the same audience/.test(s.text))).toBe(true);
   });
 
   it("falls back to the plain angle when the taste graph call fails, without leaking the upstream text", async () => {

@@ -29,7 +29,7 @@ function ideasOf(marketLabel: string): MemoData["ideas"] {
   const d = state.propose?.discovery;
   if (!d) return undefined;
   const titles = ideaTitles(d);
-  return titles.length === 0 ? undefined : { city: marketLabel.split(",")[0]!.replace(/ (sample )?club$/, ""), titles, young: d.young.map((x) => x.name).filter((n) => !titles.includes(n)).slice(0, 3) };
+  return titles.length === 0 ? undefined : { city: marketLabel.split(",")[0]!.replace(/ (sample )?club$/, ""), titles, scored: d.scored, poolSize: d.poolSize };
 }
 
 function memoData(): MemoData {
@@ -40,7 +40,7 @@ function memoData(): MemoData {
   }));
   return {
     club: a.market.label, generatedOn: localDay(), swaps,
-    angles: (state.propose?.angles ?? []).map((x) => x.text), nights: a.nights.length, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
+    angles: (state.propose?.angles ?? []).map((x) => x.text), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
     synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedLabel: a.recordedAt ? formatDateTime(a.recordedAt) : null,
   };

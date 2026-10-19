@@ -57,11 +57,20 @@ describe("model reply shapes", () => {
     expect(JSON.stringify(r.trace)).not.toMatch(/secret upstream|abc123/);
     expect(r.trace[0]!.text).toContain("the model call failed, so template text is used");
   });
+  it("says whether the budget spent is the shared one or the visitor's own, and what happens to the text", async () => {
+    const shared = await run({ run: async () => ({ response: TEXT }) }, { aiDailyCap: 0 });
+    expect(shared.trace[0]!.text).toBe("Asking: today's shared model budget is spent, so template text is used.");
+    const visitor = await run({ run: async () => ({ response: TEXT }) }, { gate: { allow: async () => false } });
+    expect(visitor.trace[0]!.text).toBe("Asking: your daily limit of model calls is spent, so template text is used.");
+    const trace: TraceStep[] = [];
+    await runModel(deps({ run: async () => ({}) }, { aiDailyCap: 0 }), "s", "u", trace, "Matching unrecognised theme names", 100, "those names stay unscored");
+    expect(trace[0]!.text).toBe("Matching unrecognised theme names: today's shared model budget is spent, so those names stay unscored.");
+  });
   it("stops at the per-client daily allowance without calling the model", async () => {
     let calls = 0;
     const r = await run({ run: async () => (calls++, { response: TEXT }) }, { gate: { allow: async () => false } });
     expect(calls).toBe(0);
     expect(r.text).toBeNull();
-    expect(r.trace[0]!.text).toContain("your daily model allowance is spent");
+    expect(r.trace[0]!.text).toContain("your daily limit of model calls is spent");
   });
 });

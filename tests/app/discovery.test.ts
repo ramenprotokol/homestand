@@ -38,20 +38,20 @@ describe("discovery z and ranking", () => {
 });
 
 describe("recognisable titles only", () => {
-  it("a swap needs popularity 0.90 and to stand out; an idea needs 0.85", () => {
-    expect(SWAP_POPULARITY).toBe(0.9);
-    expect(IDEA_POPULARITY).toBe(0.85);
-    expect(worthASwap({ z: 1, popularity: 0.9 })).toBe(true);
-    expect(worthASwap({ z: 1, popularity: 0.89 })).toBe(false);
+  it("a swap needs a big-studio name (0.97) and to stand out; an idea needs 0.90", () => {
+    expect(SWAP_POPULARITY).toBe(0.97);
+    expect(IDEA_POPULARITY).toBe(0.9);
+    expect(worthASwap({ z: 1, popularity: 0.97 })).toBe(true);
+    expect(worthASwap({ z: 1, popularity: 0.96 })).toBe(false);
     expect(worthASwap({ z: 0.2, popularity: 0.99 })).toBe(false);
     expect(worthASwap({ z: 1 })).toBe(false); // no popularity: not recognisable
-    expect(worthAnIdea({ z: 1, popularity: 0.85 })).toBe(true);
-    expect(worthAnIdea({ z: 1, popularity: 0.84 })).toBe(false);
+    expect(worthAnIdea({ z: 1, popularity: 0.9 })).toBe(true);
+    expect(worthAnIdea({ z: 1, popularity: 0.89 })).toBe(false);
     expect(worthAnIdea({ z: -1, popularity: 0.99 })).toBe(false);
   });
   it("the pool carries each title's popularity through the ranking", () => {
     const ref = syntheticDiscoveryReference();
-    expect(rankPool(new Map([["SYN-D-movie-0", 0.9]]), ref, "movie")[0]).toMatchObject({ popularity: 0.95 });
+    expect(rankPool(new Map([["SYN-D-movie-0", 0.9]]), ref, "movie")[0]).toMatchObject({ popularity: 0.99 });
   });
 });
 

@@ -2,7 +2,6 @@ import type { GeoHit } from "../../app/api-types";
 import { CSV_TEMPLATE, parseCalendar } from "../../app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../app/markets";
 import { exampleCsv, sampleCsv } from "../../app/samples";
-import { AUDIT_LINE } from "../../app/score";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
 import { Fireworks } from "../foil/fx";
@@ -104,14 +103,14 @@ function mountTease(section: HTMLElement, cards: HTMLElement[], canvas: HTMLCanv
 export function startView(): HTMLElement {
   const copy = [
     h("h1", { class: "sub", id: "sub", tabindex: "-1" }, "Your market, not the national chart."),
-    h("p", { class: "hero-lede", "data-testid": "hero-intro" }, "Planning next season's theme nights? Homestand checks each one against what fans in your town like, and suggests swaps for the weak ones. Your dates and sponsors stay put."),
+    h("p", { class: "hero-lede", "data-testid": "hero-intro" }, "Planning next season's theme nights? Homestand checks each one against what fans in your town like, and suggests swaps for the weak ones. Your dates and sponsors stay put. Every swap comes with a cited reason you can show a sponsor."),
     h(
       "div",
       { class: "hero-actions", id: "cta" },
       h("a", { class: "btn pri", href: "#/sample", "data-testid": "try-sample" }, "Try a sample club", icon("arrowRight")),
       h("a", { class: "btn ghost", href: "#/own", "data-testid": "use-own" }, "Use your own"),
     ),
-    h("p", { class: "tag honest", id: "tag", "data-testid": "hero-honest" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See how we tested it")),
+    h("p", { class: "tag honest", id: "tag", "data-testid": "hero-honest" }, "It reads what your town likes. It doesn't forecast ticket sales, and we tested that: ", h("a", { href: "#/study" }, "see The Study"), "."),
   ];
   return h("div", { class: "landing" }, heroShell(copy), ridge(), teaseSection());
 }

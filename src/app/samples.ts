@@ -10,7 +10,7 @@ const CALENDARS: Record<string, N[]> = {
     ["2027-04-10", "Bluey Day", "Sunrise Dental Group", false, "Day game"],
     ["2027-04-17", "Star Wars Night", "Harbor Credit Union"],
     ["2027-04-23", "Fireworks Friday", "Bayou Bright Energy"],
-    ["2027-04-24", "Princess Day", "", false, "Day game"],
+    ["2027-04-24", "Elvis Night"],
     ["2027-05-01", "Barbie Day", "Pinecrest Auto"],
     ["2027-05-08", "Harry Potter Night"],
     ["2027-05-14", "Military Appreciation Night", "Magnolia Mutual"],
@@ -21,7 +21,7 @@ const CALENDARS: Record<string, N[]> = {
     ["2027-06-12", "Super Mario Day"],
     ["2027-06-18", "Country Music Night", "Bayou Bright Energy", true, "Post-game concert booked"],
     ["2027-06-19", "Dollar Dog Night"],
-    ["2027-06-26", "Ghostbusters Day", "Sunrise Dental Group", false, "Day game"],
+    ["2027-06-26", "Taylor Swift Night", "Sunrise Dental Group"],
     ["2027-07-02", "Bad Bunny Night"],
     ["2027-07-10", "Stranger Things Night", "Pinecrest Auto"],
     ["2027-07-17", "Hot Sauce Showdown", "Bayou Bright Energy"],
@@ -117,8 +117,9 @@ export function sampleCsv(marketId: string): string {
 
 export const SAMPLE_CALENDAR_IDS = Object.keys(CALENDARS);
 
-// "Load an example" on the own-calendar page: 20 nights across kids, family, music, film and sports themes, one classic
-// night and one locked, sponsored night, so most US and Canadian cities get at least one swap to look at.
+// "Load an example" on the own-calendar page: 20 nights across kids, family, teen and adult themes, one classic night, one locked
+// and sponsored night, and exactly one recognised-but-unscored name (PAW Patrol) to show that the app says so. Every other
+// theme is scored live.
 const EXAMPLE: N[] = [
   ["2027-04-09", "Fireworks Friday", "Prairie Bank"],
   ["2027-04-10", "Bluey Day", "Sunrise Dental Group", false, "Day game"],
@@ -128,18 +129,18 @@ const EXAMPLE: N[] = [
   ["2027-05-08", "Barbie Day", "Pinecrest Auto", false, "Day game"],
   ["2027-05-14", "Country Music Night", "Prairie Bank", true, "Post-game concert booked"],
   ["2027-05-15", "Dinosaur Day", "", false, "Day game"],
-  ["2027-05-22", "Peanuts Day", "Pinecrest Auto"],
+  ["2027-05-22", "Super Mario Day", "Pinecrest Auto"],
   ["2027-05-29", "Princess Day", "Sunrise Dental Group", false, "Day game"],
   ["2027-06-04", "Beatles Night"],
-  ["2027-06-05", "Pokemon Day", "", false, "Day game"],
-  ["2027-06-12", "Batman Night", "Harbor Credit Union"],
+  ["2027-06-05", "Ghostbusters Day", "", false, "Day game"],
+  ["2027-06-12", "Star Trek Night", "Harbor Credit Union"],
   ["2027-06-19", "Stranger Things Night"],
   ["2027-06-26", "Bad Bunny Night", "Sunrise Dental Group"],
   ["2027-07-03", "Elvis Night", "Prairie Bank"],
   ["2027-07-10", "Margaritaville Night", "Pinecrest Auto"],
-  ["2027-07-17", "The Office Night"],
+  ["2027-07-17", "Grateful Dead Night"],
   ["2027-07-24", "Yellowstone Night", "Harbor Credit Union"],
-  ["2027-08-07", "Lord of the Rings Night"],
+  ["2027-08-07", "Pro Wrestling Night"],
 ];
 
 export function exampleCsv(): string {

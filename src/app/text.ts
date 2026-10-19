@@ -48,3 +48,17 @@ export function swapName(original: string, newLabel: string): string {
   const last = w[w.length - 1] ?? "";
   return `${newLabel} ${w.length > 1 && NIGHT_SUFFIXES.includes(last) ? last : "Night"}`;
 }
+
+/**
+ * A clean title for display. Qloo's book names carry series notes: "Harry Potter and the Sorcerer's Stone (Harry Potter, #1)"
+ * becomes "Harry Potter and the Sorcerer's Stone". Only a trailing series parenthetical is removed.
+ */
+export function cleanTitle(name: string): string {
+  let out = name.trim();
+  for (;;) {
+    const next = out.replace(/\s*\((?:[^()]*#\d+[^()]*|[^()]*\bSeries\b[^()]*|[^()]*\bBook \d+[^()]*)\)\s*$/i, "");
+    if (next === out) break;
+    out = next;
+  }
+  return out || name.trim();
+}

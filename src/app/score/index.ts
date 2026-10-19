@@ -119,6 +119,12 @@ export const METHOD_WORDS =
   "It describes local taste. It does not say a theme will raise attendance.";
 
 /** "stands out above this market's average (+1.1)": the cited comparison, in plain words plus the number. */
+export function vsAverageWords(index: number | null): string {
+  const b = pullBand(index);
+  if (b === null) return "not compared";
+  return b === "about" ? "is about in line with this market's average" : b === "above" || b === "well above" ? `stands out ${b === "well above" ? "well " : ""}above this market's average` : `sits ${b === "well below" ? "well " : ""}below this market's average`;
+}
+
 export function vsAverage(index: number | null): string {
   if (index === null) return "not compared";
   const words = index >= Z_CUT ? "stands out above this market's average" : index <= -Z_CUT ? "sits below this market's average" : "is about in line with this market's average";

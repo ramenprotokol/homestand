@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { AUDIT_LINE, bundleScore, centre, comparisonSentence, fitFor, labelForZ, marketLevelSentence, pullWords, vsAverage, zScore } from "../../src/app/score";
 import { checkCandidate, inWindow, isFamilySlot } from "../../src/app/propose/rules";
-import { propose, templateWhy, likeness, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
+import { BEST_OPTION_GAIN, propose, templateWhy, likeness, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
 import { numbersAreGrounded, numbersIn } from "../../src/app/guard";
 import { THEME_LIBRARY, themeById } from "../../src/app/themes/library";
 
@@ -146,6 +146,9 @@ describe("proposals", () => {
     "paw-patrol": fit("leans-in", 1.2), "grateful-dead": fit("leans-in", 1.9), "yellowstone": fit("leans-in", 1.0), grinch: fit("leans-in", 3), pokemon: fit("leans-in", 0.7),
   });
   const base = { library, fits, allowDuplicates: false, now: "2026-10-15T00:00:00.000Z" };
+  /** Every kids or family theme except the given ones is a weak one here, so no kids or family night has anything to move to. */
+  const weakYoung = (f: Record<string, ThemeFit>, keep: string[] = []): Record<string, ThemeFit> =>
+    ({ ...f, ...Object.fromEntries(library.filter((t) => (t.audience === "kids" || t.audience === "family") && !keep.includes(t.id)).map((t) => [t.id, fit("leans-away", -0.9)])) });
 
   it("never swaps a locked night; it offers a worded angle instead", () => {
     const res = propose({ ...base, nights: [night(0, "2026-07-03", "elvis", { locked: true, sponsor: "Harbor Credit Union" })] });
@@ -179,13 +182,13 @@ describe("proposals", () => {
     expect(res.proposals[0]!.toThemeId).toBe("paw-patrol");
   });
   it("leaves a night unfixed when nothing passes", () => {
-    const res = propose({ ...base, fits: { ...fits, "paw-patrol": fit("average", 0), pokemon: fit("average", 0) }, nights: [night(0, "2026-04-11", "bluey")] });
+    const res = propose({ ...base, fits: weakYoung({ ...fits, "paw-patrol": fit("average", 0), pokemon: fit("average", 0) }, ["bluey"]), nights: [night(0, "2026-04-11", "bluey")] });
     expect(res.proposals).toEqual([]);
     expect(res.unfixed).toHaveLength(1);
   });
   it("a family night with only adult themes leaning in is unfixed, with a family-specific reason", () => {
     const f2 = { ...fits, "paw-patrol": fit("average", 0), pokemon: fit("average", 0) };
-    const res = propose({ ...base, fits: { ...f2, "super-mario": fit("leans-away", -1) }, nights: [night(0, "2026-04-11", "super-mario")] });
+    const res = propose({ ...base, fits: weakYoung({ ...f2, "super-mario": fit("leans-away", -1) }), nights: [night(0, "2026-04-11", "super-mario")] });
     expect(res.proposals).toEqual([]);
     expect(res.unfixed[0]!.reason).toBe("No family theme leans in here that fits this date.");
   });
@@ -229,7 +232,7 @@ describe("proposals", () => {
     expect(ys.angles[0]!.text).not.toMatch(/Dinosaur|PAW Patrol|Bluey/);
   });
   it("Bluey Day is never turned into Star Trek or pro wrestling, however hard they lean in: Could not fix instead", () => {
-    const f5 = { ...fits, bluey: fit("leans-away", -2), "star-trek": fit("leans-in", 3), wrestling: fit("leans-in", 3), "taylor-swift": fit("leans-in", 3), "paw-patrol": fit("average", 0), pokemon: fit("average", 0) };
+    const f5 = weakYoung({ ...fits, bluey: fit("leans-away", -2), "star-trek": fit("leans-in", 3), wrestling: fit("leans-in", 3), "taylor-swift": fit("leans-in", 3), "paw-patrol": fit("average", 0), pokemon: fit("average", 0) }, ["bluey"]);
     const res = propose({ ...base, fits: f5, nights: [night(0, "2027-04-10", "bluey", { sponsor: "Sunrise Dental", notes: "Day game" })] });
     expect(res.proposals).toEqual([]);
     expect(res.unfixed).toHaveLength(1);
@@ -237,6 +240,68 @@ describe("proposals", () => {
     // The log never claims it ranked "any theme".
     expect(res.trace.map((t) => `${t.text} ${t.detail ?? ""}`).join(" ")).not.toMatch(/any theme/);
   });
+  describe("best option for the audience", () => {
+    const day = { sponsor: "Sunrise Dental", notes: "Day game" };
+    const kidsAway = (over: Record<string, ThemeFit>) => weakYoung({ ...fits, bluey: fit("leans-away", -2), ...over }, ["bluey", ...Object.keys(over)]);
+
+    it("offers the strongest kids theme, about the town's usual, when nothing in the audience leans in and it clearly beats the planned night", () => {
+      const f = kidsAway({ dinosaur: fit("average", -0.4), princess: fit("average", 0.3) });
+      const res = propose({ ...base, fits: f, nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(res.proposals).toHaveLength(1);
+      const p = res.proposals[0]!;
+      expect(p).toMatchObject({ toThemeId: "princess", kind: "best-option", sponsor: "Sunrise Dental" });
+      expect(p.to.label).toBe("average");
+      expect(p.why).toBe("Princess is the strongest kids choice here: about this town's usual, where Bluey sits well below it. The date and the sponsor stay the same.");
+      expect(p.why).not.toMatch(/leans in|stands out/);
+      expect(res.unfixed).toEqual([]);
+      expect(res.trace.some((t) => /best option for it is offered: Princess/.test(t.text))).toBe(true);
+    });
+
+    it("needs a gain of at least one full band over the planned night", () => {
+      expect(BEST_OPTION_GAIN).toBe(1);
+      const small = kidsAway({ princess: fit("average", -0.9) }); // gain 1.1 from -2: allowed
+      expect(propose({ ...base, fits: small, nights: [night(0, "2027-04-10", "bluey", day)] }).proposals).toHaveLength(1);
+      const tooClose = { ...kidsAway({ princess: fit("average", -0.4) }), bluey: fit("leans-away", -1.2) }; // gain 0.8: not enough
+      const res = propose({ ...base, fits: tooClose, nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(res.proposals).toEqual([]);
+      expect(res.unfixed).toHaveLength(1);
+    });
+
+    it("never offers a theme that itself leans away, however much better than the planned night", () => {
+      const f = kidsAway({ princess: fit("leans-away", -0.6) });
+      const res = propose({ ...base, fits: { ...f, bluey: fit("leans-away", -4) }, nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(res.proposals).toEqual([]);
+      expect(res.unfixed).toHaveLength(1);
+    });
+
+    it("never crosses the audience rule: Star Trek or wrestling, however typical, is not a kids option", () => {
+      const f = kidsAway({ "star-trek": fit("average", 0.4), wrestling: fit("average", 0.4) });
+      const res = propose({ ...base, fits: f, nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(res.proposals).toEqual([]);
+    });
+
+    it("uses a well-known discovered title as the best option only when it is at least typical here and the planned night is clearly weak", () => {
+      const f = kidsAway({});
+      const typical = { name: "Big Studio Movie", entityId: "m9", type: "movie" as const, affinity: 0.8, z: 0.2, popularity: 0.98 };
+      const weak = { name: "Odd Title", entityId: "m8", type: "movie" as const, affinity: 0.8, z: -0.6, popularity: 0.98 };
+      const ok = propose({ ...base, fits: f, discovered: [weak, typical], city: "Biloxi", nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(ok.proposals[0]).toMatchObject({ kind: "best-option", discovered: { name: "Big Studio Movie" } });
+      expect(ok.proposals[0]!.why).toBe("Nothing in this audience leans in near Biloxi, so Big Studio Movie is offered as a well-known family title that is at least typical here.");
+      const none = propose({ ...base, fits: f, discovered: [weak], nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(none.proposals).toEqual([]);
+      const mild = propose({ ...base, fits: { ...f, bluey: fit("leans-away", -0.7) }, discovered: [typical], nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(mild.proposals).toEqual([]);
+    });
+
+    it("a title that stands out still wins over a best option", () => {
+      const f = kidsAway({ princess: fit("average", 0.3) });
+      const star = { name: "Star Title", entityId: "m7", type: "movie" as const, affinity: 0.9, z: 1.4, popularity: 0.99 };
+      const res = propose({ ...base, fits: f, discovered: [star], nights: [night(0, "2027-04-10", "bluey", day)] });
+      expect(res.proposals[0]).toMatchObject({ discovered: { name: "Star Title" } });
+      expect(res.proposals[0]!.kind).toBeUndefined();
+    });
+  });
+
   it("only touches leans-away nights", () => {
     const res = propose({ ...base, nights: [night(0, "2026-07-03", "paw-patrol"), night(1, "2026-07-04", null)] });
     expect(res.proposals).toEqual([]);

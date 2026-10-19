@@ -65,7 +65,7 @@ export interface NightView {
   swappedFrom: string | null;
   needsChoice: boolean;
   /** Set when an approved swap replaced the night with a title Qloo found. */
-  discovered: { name: string; type: "movie" | "tv_show" } | null;
+  discovered: { name: string; type: "movie" | "tv_show"; z: number | null } | null;
 }
 
 /** What a night looks like right now: the director's choice and any approved swap applied. */
@@ -79,7 +79,7 @@ export function viewOf(n: NightOut): NightView {
   const disc = approved?.discovered ?? null;
   const fit: FitLabel = n.resolution.kind === "classic" ? "classic" : disc ? "found" : score ? score.label : "not-scored";
   const label = disc ? disc.name : themeId ? (themeById(themeId)?.label ?? themeId) : n.theme;
-  return { night: n, themeId, themeLabel: label, fit, z: score?.z ?? null, score, swappedFrom: approved ? (themeById(approved.fromThemeId)?.label ?? approved.fromThemeId) : null, needsChoice, discovered: disc ? { name: disc.name, type: disc.type } : null };
+  return { night: n, themeId, themeLabel: label, fit, z: score?.z ?? null, score, swappedFrom: approved ? (themeById(approved.fromThemeId)?.label ?? approved.fromThemeId) : null, needsChoice, discovered: disc ? { name: disc.name, type: disc.type, z: disc.z ?? null } : null };
 }
 
 export type ShownProposal = Proposal & { whySource: "model" | "template" };
@@ -101,4 +101,4 @@ export function approvedSwaps(): ShownProposal[] {
 }
 
 /** Transient screen status. */
-export const ui = { loading: false, error: null as string | null, proposing: false, proposeError: null as string | null };
+export const ui = { loading: false, error: null as string | null, proposing: false, proposeError: null as string | null, dupesBefore: null as string | null, dupesNote: null as string | null };

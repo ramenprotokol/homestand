@@ -141,7 +141,6 @@ function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
   );
 }
 
-const TYPE_WORDS: Record<string, string> = { tv_show: "TV show", movie: "movie", artist: "artist", book: "book", brand: "brand", place: "place" };
 
 export function whyHead(fit: CardFit, city: string): string {
   return fit === "leans-in" ? `Why it fits ${city}` : fit === "leans-away" ? `Why it misses ${city}` : `How ${city} reads it`;
@@ -156,14 +155,11 @@ const WHY_TEXT: Partial<Record<CardFit, string>> = {
 /** The cardboard stat back: taste match per item, the local pull, and the plain-words reason. */
 function backFace(b: BackSpec): HTMLElement {
   const pad = (n: number): string => String(n).padStart(2, "0");
-  // Names only: the raw readings sit behind "Show the numbers", and a plain-words comparison with other markets replaces them here.
-  const rows = b.rows.slice(0, 3).map((e) => h("div", { class: "bk-r bk-r--name" }, h("span", null, e.name, h("small", null, TYPE_WORDS[e.type] ?? e.type.replace("_", " ")))));
   const scored = b.rows.length > 0 || b.index !== null;
   const ix = b.index;
   const body: Node[] = [];
   if (scored && ix !== null) {
     body.push(
-      h("div", { class: "bk-tbl" }, h("div", { class: "bk-h" }, h("span", null, "What Qloo looked at")), ...rows),
       h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Local pull", h("b", null, pullWords(ix)))),
       h("div", { class: "bk-vs", "data-testid": "bk-vs" }, `${b.themeName} here: ${vsMarketsWords(b.z)}`),
       h("div", { class: "bk-why" }, h("b", null, whyHead(b.fit, b.city)), WHY_TEXT[b.fit] ?? ""),
