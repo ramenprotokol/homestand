@@ -192,7 +192,7 @@ interface StoredDiscovery {
   young: Discovered[];
 }
 
-const discoveryKey = (d: Deps, m: MarketIn): string => `disc:v1:${signature(d.library)}:${d.mode}:${marketKey(m)}`;
+const discoveryKey = (d: Deps, m: MarketIn): string => `disc:v2:${signature(d.library)}:${d.mode}:${marketKey(m)}`;
 const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
 /**
@@ -240,9 +240,9 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     };
     const base = { lon: m.lon, lat: m.lat, radiusM: RADIUS_M };
     const movies = keep(await client.discoverFamily({ ...base, type: "movie", take: 10 }));
-    trace.push(step(iso(d), "qloo", `Asked Qloo for top family movies near ${city} (80 km, family tag).`, `Live call at ${iso(d)}. ${movies.kept.length} kept, ${movies.dropped} already library themes dropped.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    trace.push(step(iso(d), "qloo", `Asked Qloo for top family movies near ${city} (80 km, family + animation tags).`, `Live call at ${iso(d)}. ${movies.kept.length} kept, ${movies.dropped} already library themes dropped.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
     const shows = keep(await client.discoverFamily({ ...base, type: "tv_show", take: 10 }));
-    trace.push(step(iso(d), "qloo", `Asked Qloo for top family shows near ${city} (80 km, family tag).`, `Live call at ${iso(d)}. ${shows.kept.length} kept, ${shows.dropped} already library themes dropped.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    trace.push(step(iso(d), "qloo", `Asked Qloo for top family shows near ${city} (80 km, family + animation tags).`, `Live call at ${iso(d)}. ${shows.kept.length} kept, ${shows.dropped} already library themes dropped.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
     const young = keep(await client.discoverFamily({ ...base, type: "tv_show", take: 6, age: "24_and_younger" }));
     trace.push(step(iso(d), "qloo", `Asked Qloo which family shows fans aged 24 and younger near ${city} lean toward.`, `Live call at ${iso(d)}. ${young.kept.length} kept.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
     const stored: StoredDiscovery = { v: 1, fetchedAt: iso(d), movies: movies.kept, shows: shows.kept, young: young.kept };

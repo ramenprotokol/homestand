@@ -47,6 +47,8 @@ export interface DiscoveredRow {
 
 /** Always sent with discovery: without it, local results include adult and explicit titles. */
 export const FAMILY_TAG = "urn:tag:genre:media:family";
+/** Family AND animation: family alone also returns faith films and sitcoms. Sent as an intersection. */
+export const KIDS_TAGS = `${FAMILY_TAG},urn:tag:genre:media:animation`;
 
 /** Only these three fields are kept from a discovery response. */
 export function discoveredFromBody(raw: unknown, type: DiscoverQuery["type"]): Array<DiscoveredRow & { type: DiscoverQuery["type"] }> {
@@ -175,7 +177,8 @@ export function createQlooClient(opts: ClientOptions) {
   async function discoverFamily(q: DiscoverQuery): Promise<Array<DiscoveredRow & { type: DiscoverQuery["type"] }>> {
     const params: Record<string, string> = {
       "filter.type": `urn:entity:${q.type}`,
-      "filter.tags": FAMILY_TAG,
+      "filter.tags": KIDS_TAGS,
+      "operator.filter.tags": "intersection",
       "signal.location": `POINT(${q.lon} ${q.lat})`,
       "signal.location.radius": String(q.radiusM ?? 40000),
       take: String(q.take),

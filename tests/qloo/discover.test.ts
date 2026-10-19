@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createQlooClient, discoveredFromBody, FAMILY_TAG } from "../../src/qloo/client";
+import { createQlooClient, discoveredFromBody, FAMILY_TAG, KIDS_TAGS } from "../../src/qloo/client";
 
 describe("discovery requests", () => {
   const seen: URL[] = [];
@@ -15,7 +15,9 @@ describe("discovery requests", () => {
     expect(seen).toHaveLength(2);
     for (const u of seen) {
       expect(u.pathname).toBe("/v2/insights");
-      expect(u.searchParams.get("filter.tags")).toBe(FAMILY_TAG);
+      expect(u.searchParams.get("filter.tags")).toBe("urn:tag:genre:media:family,urn:tag:genre:media:animation");
+      expect(KIDS_TAGS.split(",")).toContain(FAMILY_TAG);
+      expect(u.searchParams.get("operator.filter.tags")).toBe("intersection");
       expect(u.searchParams.get("signal.location")).toBe("POINT(-88.9 30.4)");
       expect(u.searchParams.get("signal.location.radius")).toBe("80000");
     }

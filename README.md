@@ -37,10 +37,10 @@ A promotions director plans dozens of theme nights a season, and most of them ar
   - `filter.release_year.min=1900` on movie calls only. Qloo hides older films without it.
 
   That is five batched calls per market to score the whole library, plus three discovery calls (below): eight Qloo calls for a new city, then none until it is asked again, because the answers are cached. This is the same request shape the Study fixed on Day 1 ([Amendment 4](study/PREREGISTRATION.md)).
-- **Discovered by Qloo.** The library is fixed, so a kids or family night can run out of library themes that fit. Then Homestand asks Qloo what families near the ballpark actually rank:
-  - `GET /v2/insights` with `filter.type` (movie, then tv_show), `filter.tags=urn:tag:genre:media:family`, the same `signal.location` POINT and 80 km radius, and `take=10`;
+- **Discovered by Qloo.** The library is fixed, so a kids or family night can run out of library themes that fit. Then Homestand asks Qloo what families near the ballpark actually rank, among family-friendly animated titles:
+  - `GET /v2/insights` with `filter.type` (movie, then tv_show), `filter.tags=urn:tag:genre:media:family,urn:tag:genre:media:animation` with `operator.filter.tags=intersection` (family-friendly animated titles; family alone also returns faith films and sitcoms), the same `signal.location` POINT and 80 km radius, and `take=10`;
   - a third call for family shows with `signal.demographics.age=24_and_younger`, which is Qloo's age signal and changes the ranking;
-  - the family tag is always sent. Without it, local results include adult and explicit titles, so there is no artist discovery.
+  - the family and animation tags are always sent. Without them, local results include adult and explicit titles, so there is no artist discovery.
   Titles that are already library themes are dropped. When no library theme can fix a kids or family night, the top unused discovered title is offered as a swap, marked "Discovered by Qloo". It has no local-pull number, because Qloo found it rather than measuring it against the library. The Fix screen also shows "Fresh family ideas from Qloo", and the memo repeats them. Only name, id, type and affinity are kept from each response.
 - **A market-relative index.**
   1. A theme's bundle score (the mean affinity of its entities) is compared with 40 reference ballpark markets: z = (score − typical) / spread. Only per-theme aggregates are stored (`src/app/data/reference-stats.json`).

@@ -363,7 +363,8 @@ describe("propose", () => {
       const discoveryUrls = h.qlooUrls.filter((u) => u.searchParams.has("filter.tags"));
       expect(discoveryUrls).toHaveLength(3);
       for (const u of discoveryUrls) {
-        expect(u.searchParams.get("filter.tags")).toBe("urn:tag:genre:media:family");
+        expect(u.searchParams.get("filter.tags")).toBe("urn:tag:genre:media:family,urn:tag:genre:media:animation");
+        expect(u.searchParams.get("operator.filter.tags")).toBe("intersection");
         expect(u.searchParams.get("signal.location")).toMatch(/^POINT\(/);
       }
       expect(discoveryUrls.filter((u) => u.searchParams.get("signal.demographics.age") === "24_and_younger")).toHaveLength(1);
