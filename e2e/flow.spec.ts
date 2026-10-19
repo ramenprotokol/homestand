@@ -1,5 +1,8 @@
 import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { createServer, request as httpRequest } from "node:http";
+
+const BASE = "http://127.0.0.1:5199";
 
 // Screenshots for each step land in test-results/screens/ (gitignored): <project>-<step>.png
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -82,8 +85,9 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await why.getByRole("button", { name: "Show the numbers" }).click();
   await expect(why.getByText(/Index = z - market average/)).toBeVisible();
   await why.getByTestId("recheck").click();
-  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again/);
-  await expect(why.getByTestId("source-line")).toContainText("Re-checked live at");
+  // One live re-check per theme and market per day: the first run asks Qloo, a repeat returns the saved answer.
+  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked with Qloo within the last day: same answer/);
+  await expect(why.getByTestId("source-line")).toContainText(/Re-checked live at|Saved result, pulled from Qloo|Synthetic test data/);
   await expect(why.getByTestId("recheck-message")).toBeInViewport();
   await shot(page, info, "04-why");
   await page.keyboard.press("Escape");
@@ -140,10 +144,10 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await shot(page, info, "06-carousel");
   await page.getByTestId("open-trace").click();
   const trace = page.getByRole("dialog");
-  await expect(trace).toContainText("Asked Qloo");
+  await expect(trace).toContainText(/Asked Qloo|Used the recorded scores/);
   await expect(trace).toContainText("constraint");
   await expect(trace).toContainText("model");
-  await expect(trace).toContainText("Re-checking");
+  await expect(trace).toContainText(/Re-checking|checked with Qloo within the last day/);
   await expect(trace).not.toContainText("No usable reply");
   await shot(page, info, "07-trace");
   await page.keyboard.press("Escape");
@@ -359,6 +363,84 @@ test("the step log shows the discovery calls to Qloo", async ({ page }) => {
   await expect(log).toContainText(/Asked Qloo for top family movies near Akron|Used the recorded top family movies, top family shows and under-25 picks near Akron/);
   await expect(log).toContainText(/Asked Qloo for top family shows near Akron|Used the recorded top family movies/);
 });
+
+test("the production CSP and security headers break nothing on any screen", async ({ page }) => {
+  // The headers from public/_headers, sent by a small proxy in front of the preview server, with the API origin swapped for the
+  // local Worker. (Rewriting the document inside the browser makes Chrome treat it as a public page and block the local API.)
+  const headersFile = await readFile("public/_headers", "utf8");
+  const policy: Record<string, string> = {};
+  for (const m of headersFile.matchAll(/^ {2}([A-Za-z-]+): (.+)$/gm)) policy[m[1]!.toLowerCase()] = m[2]!.replace("https://homestand-api.ramenprotokol.workers.dev", "http://127.0.0.1:8788");
+  expect(Object.keys(policy)).toEqual(expect.arrayContaining(["content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cross-origin-opener-policy"]));
+  const proxy = createServer((req, res) => {
+    const up = httpRequest({ host: "127.0.0.1", port: 5173, path: req.url, method: req.method, headers: req.headers }, (r) => {
+      res.writeHead(r.statusCode ?? 502, { ...r.headers, ...policy });
+      r.pipe(res);
+    });
+    req.pipe(up);
+  });
+  await new Promise<void>((resolve) => proxy.listen(5199, "127.0.0.1", resolve));
+  try {
+    await cspTour(page);
+  } finally {
+    proxy.close();
+  }
+});
+
+async function cspTour(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    (window as unknown as { __csp: string[] }).__csp = [];
+    document.addEventListener("securitypolicyviolation", (e) => (window as unknown as { __csp: string[] }).__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    window.print = () => undefined;
+  });
+  const messages: string[] = [];
+  page.on("console", (m) => {
+    if (/content security policy|refused to/i.test(m.text())) messages.push(m.text());
+  });
+  page.on("pageerror", (e) => messages.push(`pageerror: ${e.message}`));
+  const first = await page.goto(`${BASE}/`);
+  expect(first!.headers()["content-security-policy"]).toContain("default-src 'none'");
+  expect(first!.headers()["x-frame-options"]).toBe("DENY");
+  await expect(page.locator("#hero")).toBeVisible();
+  await page.goto(`${BASE}/#/check/akron`);
+  await expect(page.getByTestId("summary")).toBeVisible();
+  await page.locator(".card[role=button]").first().focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByTestId("to-fix").click();
+  await page.getByTestId("skip-pack").click();
+  await expect(page.locator("#carousel")).toBeVisible();
+  await page.getByTestId("approve").click();
+  await expect(page.locator(".decision")).toContainText("Approved");
+  await page.getByTestId("open-trace").click();
+  await page.keyboard.press("Escape");
+  await page.getByTestId("to-send").click();
+  await expect(page.getByTestId("memo")).toBeVisible();
+  const [csvDownload] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-csv").click()]);
+  expect(await csvDownload.path()).toBeTruthy();
+  const [memoDownload] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-memo").click()]);
+  expect(await memoDownload.path()).toBeTruthy();
+  await page.getByTestId("print-memo").click();
+  await page.getByTestId("to-study").click();
+  await page.getByTestId("call-yes").click();
+  await expect(page.getByTestId("verdict")).toBeVisible();
+  await page.goto(`${BASE}/#/own`);
+  await page.getByTestId("load-example").click();
+  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByRole("button", { name: "Search" }).click();
+  await expect(page.getByRole("button", { name: "Tulsa, OK" })).toBeVisible();
+  await page.waitForTimeout(300);
+  const violations = await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp);
+  expect(violations).toEqual([]);
+  expect(messages).toEqual([]);
+  // The policy really is on: a page-level probe that it forbids is reported.
+  await page.evaluate(() => {
+    const img = document.createElement("img");
+    img.src = "https://example.com/probe.png";
+    document.body.append(img);
+  });
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __csp: string[] }).__csp.length)).toBeGreaterThan(0);
+}
 
 test("deep links: a sample club opens cold, and a cold step with no club goes to the picker", async ({ page }) => {
   await page.goto("/#/check/biloxi");

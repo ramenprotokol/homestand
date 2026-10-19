@@ -4,7 +4,9 @@ const enc = new TextEncoder();
 
 /** RFC 5545 text escaping. */
 export function icsEscape(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  // Every kind of line break becomes a literal \n (a lone CR would otherwise end the property and start a new one), and other control characters go.
+  // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r\n|\r|\n/g, "\\n").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
 }
 
 /** Folds a content line at 75 octets, on character boundaries; continuation lines start with one space. */

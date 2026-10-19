@@ -13,8 +13,10 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props?: Props |
     if (v === undefined || v === null || v === false) continue;
     if (k === "class") el.className = String(v);
     else if (k === "text") el.textContent = String(v);
-    else if (k.startsWith("on") && typeof v === "function") el.addEventListener(k.slice(2), v as EventListener);
-    else el.setAttribute(k, v === true ? "" : String(v));
+    else if (k.startsWith("on")) {
+      // An event key with anything but a function is dropped, never turned into an inline handler attribute.
+      if (typeof v === "function") el.addEventListener(k.slice(2), v as EventListener);
+    } else el.setAttribute(k, v === true ? "" : String(v));
   }
   append(el, kids);
   return el;

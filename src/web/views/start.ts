@@ -223,7 +223,7 @@ export function ownView(): HTMLElement {
       errors.replaceChildren(...rowErrors.map((e) => h("p", null, `Line ${e.line}: ${e.message}`)));
       return;
     }
-    void startCheck({ label: chosen.label, lon: chosen.lon, lat: chosen.lat }, rows, rowErrors, null);
+    void startCheck({ label: chosen.label, lon: chosen.lon, lat: chosen.lat, sig: chosen.sig }, rows, rowErrors, null);
   });
 
   return h(

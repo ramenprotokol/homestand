@@ -74,9 +74,13 @@ npm test && npm run typecheck && npm run lint && npm run build
 npm run e2e                                         # Playwright against the local Worker
 ```
 
-Local runs show a "Synthetic demo data" banner. To use real Qloo data, put your own `QLOO_API_KEY` and `QLOO_API_URL` in `.dev.vars` (gitignored) and run the `qloo:*` scripts. Re-running the Study needs the 2025 schedules fetched locally (`npm run study:fetch`, see [`DATA_RIGHTS.md`](DATA_RIGHTS.md)).
+Local runs show a "Synthetic demo data" banner. To use real Qloo data, put your own `QLOO_API_KEY`, `QLOO_API_URL` and a random `MARKET_SIGNING_KEY` (16+ characters; it signs the cities the search returns, and the API only accepts searched cities and the sample clubs) in `.dev.vars` (gitignored) and run the `qloo:*` scripts. Re-running the Study needs the 2025 schedules fetched locally (`npm run study:fetch`, see [`DATA_RIGHTS.md`](DATA_RIGHTS.md)).
 
 **Stack:** Vite and vanilla TypeScript on Cloudflare Pages; a Cloudflare Worker (KV, Workers AI); Vitest and Playwright.
+
+## Abuse limits
+
+The public API is limited per client: a Cloudflare Rate Limiting binding per route (per minute, an IPv6 caller counted as its /64), per-client daily quotas (6 new-city lookups, 10 live re-checks, 30 model calls), one live re-check per market and theme per day, and shared daily caps on Qloo and model calls. Model answers are cached in KV, so a repeat costs nothing. A visit to a warm sample club writes nothing to KV.
 
 ## Data rights
 

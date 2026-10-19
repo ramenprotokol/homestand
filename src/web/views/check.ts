@@ -350,7 +350,7 @@ function whyInfo(index: number): Child {
             try {
               const r = await recheckTheme(v.themeId!);
               rechecked[v.themeId!] = new Date().toISOString();
-              recheckMessage = r === "changed" ? `Checked again: the answer changed to ${FIT_WORDS[state.analysis!.themes[v.themeId!]!.label]}. Earlier proposals were cleared.` : "Checked again: same answer.";
+              recheckMessage = r === "recent" ? "Checked with Qloo within the last day: same answer." : r === "changed" ? `Checked again: the answer changed to ${FIT_WORDS[state.analysis!.themes[v.themeId!]!.label]}. Earlier proposals were cleared.` : "Checked again: same answer.";
             } catch (err) {
               recheckMessage = err instanceof ApiFailure ? err.message : "Re-check failed. Try again.";
             }

@@ -106,13 +106,14 @@ export async function ensureProposals(): Promise<void> {
   window.dispatchEvent(new HashChangeEvent("hashchange"));
 }
 
-export async function recheckTheme(themeId: string): Promise<string> {
-  if (!state.analysis || !state.market) return "";
+export async function recheckTheme(themeId: string): Promise<"same" | "changed" | "recent"> {
+  if (!state.analysis || !state.market) return "same";
   const before = state.analysis.themes[themeId];
   const res = await api.recheck(state.market, themeId);
   state.analysis.themes = { ...res.themes, [themeId]: res.theme };
   state.analysis.caps = res.caps;
   invalidateProposals();
   addTrace(`Re-check live: ${themeId}`, res.trace);
+  if (res.withinDay) return "recent";
   return before && before.label !== res.theme.label ? "changed" : "same";
 }

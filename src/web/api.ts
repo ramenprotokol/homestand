@@ -1,4 +1,4 @@
-import type { AnalyzeResponse, ApiError, GeoHit, MarketIn, MemoResponse, ProposeNightIn, ProposeResponse, RecheckResponse } from "../app/api-types";
+import type { AnalyzeResponse, ApiError, GeoHit, MarketIn, ProposeNightIn, ProposeResponse, RecheckResponse } from "../app/api-types";
 import type { CalendarRow } from "../app/calendar/csv";
 
 const BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
@@ -30,7 +30,5 @@ export const api = {
   analyze: (market: MarketIn, rows: CalendarRow[]) => post<AnalyzeResponse>("/api/analyze", { market, rows }),
   propose: (market: MarketIn, nights: ProposeNightIn[], allowDuplicates: boolean) => post<ProposeResponse>("/api/propose", { market, nights, allowDuplicates }),
   recheck: (market: MarketIn, themeId: string) => post<RecheckResponse>("/api/recheck", { market, themeId }),
-  memo: (market: MarketIn, swaps: Array<{ date: string; fromThemeId: string; toThemeId: string }>, nights: number, classic: number) =>
-    post<MemoResponse>("/api/memo", { market, swaps, nights, classic }),
   geocode: (q: string) => call<{ results: GeoHit[] }>(`/api/geocode?q=${encodeURIComponent(q)}`),
 };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseCalendar } from "../../src/app/calendar/csv";
-import { exportCsv } from "../../src/app/export/csv";
+import { exportCsv, safeCell } from "../../src/app/export/csv";
 import { exportIcs, foldLine, icsEscape } from "../../src/app/export/ics";
 import { buildMemoHtml, memoDocument, memoOpener, type MemoData } from "../../src/app/export/memo";
 
@@ -43,6 +43,36 @@ describe("ICS export", () => {
     const folded = foldLine(long);
     for (const part of folded.split("\r\n")) expect(new TextEncoder().encode(part).length).toBeLessThanOrEqual(75);
     expect(folded.split("\r\n").map((p, i) => (i ? p.slice(1) : p)).join("")).toBe(long);
+  });
+});
+
+describe("export injection", () => {
+  it("a lone carriage return cannot start a new calendar property", () => {
+    const evil = "Bluey\rEND:VEVENT\rBEGIN:VEVENT\rSUMMARY:Injected";
+    expect(icsEscape(evil)).toBe("Bluey\\nEND:VEVENT\\nBEGIN:VEVENT\\nSUMMARY:Injected");
+    const ics = exportIcs([{ date: "2026-05-01", theme: evil, sponsor: "Co\u0007\u001b[0m", locked: false, notes: "line1\rline2\nline3\r\nline4" }], `Club\rX-EVIL:1`, "2026-10-18T00:00:00.000Z");
+    expect(ics).not.toMatch(/\r(?!\n)/);
+    const lines = ics.split("\r\n");
+    expect(lines.filter((l) => l.startsWith("BEGIN:VEVENT"))).toHaveLength(1);
+    expect(lines.some((l) => l.startsWith("SUMMARY:Injected") || l.startsWith("X-EVIL"))).toBe(false);
+    // eslint-disable-next-line no-control-regex -- stripping control characters is the point
+    expect(ics).not.toMatch(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/);
+  });
+  it("text columns that start like a formula are made plain text; numbers and the parse round-trip are untouched", () => {
+    const rows = [
+      { date: "2026-05-01", theme: "=HYPERLINK(\"http://evil\",\"x\")", sponsor: "+1 Bank", locked: false, notes: "@SUM(A1)" },
+      { date: "2026-05-02", theme: "-2 Night", sponsor: "\tTab", locked: true, notes: "\rCR" },
+      { date: "2026-05-03", theme: "Bluey Day", sponsor: "Fine Bank", locked: false, notes: "Normal, with comma" },
+    ];
+    const csv = exportCsv(rows);
+    expect(csv).toContain(`2026-05-01,"'=HYPERLINK(""http://evil"",""x"")",'+1 Bank,no,'@SUM(A1)`);
+    expect(csv).toContain("2026-05-02,'-2 Night,'\tTab,yes");
+    expect(csv).toContain('2026-05-03,Bluey Day,Fine Bank,no,"Normal, with comma"');
+    expect(safeCell("0.5")).toBe("0.5");
+    expect(safeCell("Bluey")).toBe("Bluey");
+    const back = parseCalendar(csv).rows;
+    expect(back).toHaveLength(3);
+    expect(back[2]).toMatchObject({ theme: "Bluey Day", sponsor: "Fine Bank", notes: "Normal, with comma" });
   });
 });
 

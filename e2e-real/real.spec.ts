@@ -57,7 +57,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Saved result, pulled from Qloo on/);
   await shot(page, info, "why");
   await why.getByTestId("recheck").click();
-  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again/);
+  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked with Qloo within the last day: same answer/);
   await expect(why.getByTestId("recheck-message")).toBeInViewport();
   await page.screenshot({ path: `test-results/screens-real/${info.project.name}-why-viewport.png` });
   await page.keyboard.press("Escape");
