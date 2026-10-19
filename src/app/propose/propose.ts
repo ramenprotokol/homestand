@@ -82,10 +82,13 @@ export function templateWhy(from: Theme, to: Theme, sponsor: string): string {
   return `${to.label} fits this market better than ${from.label}: measured against this market's own average, ${to.label} stands out above it and ${from.label} stands out below it. ${sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`;
 }
 
-export function angleText(night: PlanNight, from: Theme, to: Theme): string {
+export function angleText(night: PlanNight, from: Theme, to: Theme | null): string {
   const who = night.sponsor || "the sponsor";
+  if (!to) return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor-friendly angle: give ${who} a featured moment on the night (a PA read, the first pitch or a giveaway tied to ${from.label}).`;
   return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. If ${who} is open to it, a small ${to.label} touch (walk-up songs, PA clips or a photo spot) would sit closer to what this market leans toward.`;
 }
+
+const REJECT_WORDS: Record<RejectReason, string> = { duplicate: "already used in the season", window: "outside its date window", audience: "wrong audience for this night", "same-theme": "the planned theme" };
 
 /** Ranking and constraints are plain code. Locked nights are filtered out before any candidate is considered. */
 export function propose(input: ProposeInput): ProposeResult {
@@ -112,9 +115,9 @@ export function propose(input: ProposeInput): ProposeResult {
     const slot = { date: night.date, notes: night.notes };
     if (night.locked) {
       trace.push(step(now, "constraint", `${night.date} ${original.label}: locked, so it is never swapped.`));
-      const alt = leaning.find((t) => inWindow(night.date, t.window) && audienceFit(original, t, slot) && t.id !== original.id);
-      if (alt) angles.push({ index: night.index, date: night.date, themeId: original.id, sponsor: night.sponsor, toThemeId: alt.id, text: angleText(night, original, alt) });
-      else unfixed.push({ index: night.index, date: night.date, reason: "Locked, and no sponsor-compatible angle fits this date." });
+      // A cross-theme touch only when it is a natural pairing (same kind of theme or same audience) and fits the night; otherwise a generic angle.
+      const alt = leaning.find((t) => inWindow(night.date, t.window) && audienceFit(original, t, slot) && t.id !== original.id && likeness(original, t) <= 1);
+      angles.push({ index: night.index, date: night.date, themeId: original.id, sponsor: night.sponsor, toThemeId: alt?.id ?? original.id, text: angleText(night, original, alt ?? null) });
       continue;
     }
     const rejects: Record<RejectReason, number> = { duplicate: 0, window: 0, audience: 0, "same-theme": 0 };
@@ -128,14 +131,15 @@ export function propose(input: ProposeInput): ProposeResult {
     passing.sort((x, y) => likeness(original, x.theme) - likeness(original, y.theme));
     const chosen = passing[0]?.theme ?? null;
     const chosenDetail = passing[0]?.detail ?? "";
-    const rejected = Object.entries(rejects).filter(([, n]) => n > 0).map(([k, n]) => `${k} ${n}`).join(", ");
+    const rejected = Object.entries(rejects).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${REJECT_WORDS[k as RejectReason]}`).join(", ");
     if (!chosen) {
-      unfixed.push({ index: night.index, date: night.date, reason: "No theme that leans in passes the date, audience and no-repeat checks." });
+      const young = original.audience !== "adult";
+      unfixed.push({ index: night.index, date: night.date, reason: young ? "No family theme leans in here that fits this date." : "No theme that leans in passes the date, audience and no-repeat checks." });
       trace.push(step(now, "constraint", `${night.date} ${original.label}: no candidate passed (${rejected || "none left"}).`));
       continue;
     }
     const tier = ["same category", "same audience", "any theme"][likeness(original, chosen)]!;
-    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by ${tier} first, then local lean.${rejected ? ` Failed a check: ${rejected}.` : ""}`));
+    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by ${tier} first, then local lean.${rejected ? ` Other themes ruled out: ${rejected}.` : ""}`));
     ranked.set(`${night.date}-${night.index}`, passing.slice(1).map((x) => x.theme.id));
     if (!allowDuplicates) used.add(chosen.id);
     proposals.push({

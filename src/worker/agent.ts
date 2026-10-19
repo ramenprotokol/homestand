@@ -24,6 +24,8 @@ export interface Deps {
   aiDailyCap: number;
   /** Pause between Qloo calls, ms (0 in tests). */
   qlooDelayMs: number;
+  /** Longest wait for a model reply, ms. Default 6000. */
+  aiTimeoutMs?: number;
 }
 
 /** Thrown when a live Qloo call is needed and today's cap is spent. */
@@ -182,6 +184,23 @@ function allOut(d: Deps, s: Scores): Record<string, ThemeScoreOut> {
 
 // ---------- model ----------
 
+/**
+ * The text of a Workers AI reply. Models return different shapes: the OpenAI chat shape
+ * (`choices[0].message.content`), a `response` string, or a `response` already parsed into an object.
+ */
+export function replyText(res: unknown): string | null {
+  if (typeof res === "string") return res.trim() ? res : null;
+  if (typeof res !== "object" || res === null) return null;
+  const r = res as { choices?: Array<{ message?: { content?: unknown } }>; response?: unknown };
+  const content = r.choices?.[0]?.message?.content;
+  if (typeof content === "string" && content.trim()) return content;
+  if (typeof r.response === "string" && r.response.trim()) return r.response;
+  if (typeof r.response === "object" && r.response !== null) return JSON.stringify(r.response);
+  return null;
+}
+
+class ModelTimeout extends Error {}
+
 async function runModel(d: Deps, system: string, user: string, trace: TraceStep[], what: string, maxTokens = 900): Promise<string | null> {
   if (!d.ai) {
     trace.push(step(iso(d), "model", `${what}: no model attached here, so template text is used.`));
@@ -192,14 +211,21 @@ async function runModel(d: Deps, system: string, user: string, trace: TraceStep[
     return null;
   }
   await bump(d, "ai", 1);
+  const limit = d.aiTimeoutMs ?? 6000;
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const res = (await d.ai.run(AI_MODEL, { messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: 0.1, max_tokens: maxTokens })) as { response?: unknown };
-    const text = typeof res?.response === "string" ? res.response : null;
-    trace.push(step(iso(d), "model", `${what}: asked ${AI_MODEL} (one call).`, text === null ? "No usable reply." : undefined));
+    const call = d.ai.run(AI_MODEL, { messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: 0.1, max_tokens: maxTokens });
+    call.catch(() => undefined); // a late failure after the timeout must not surface
+    const res = await Promise.race([call, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new ModelTimeout()), limit); })]);
+    const text = replyText(res);
+    trace.push(step(iso(d), "model", text === null ? `${what}: the model's reply couldn't be used, so template text is used.` : `${what}: the model replied.`));
     return text;
   } catch (err) {
-    trace.push(step(iso(d), "model", `${what}: the model call failed (${err instanceof Error ? err.message.slice(0, 80) : "error"}), so template text is used.`));
+    if (err instanceof ModelTimeout) trace.push(step(iso(d), "model", `${what}: the model took too long (over ${Math.round(limit / 1000)} seconds), so template text is used.`));
+    else trace.push(step(iso(d), "model", `${what}: the model call failed (${err instanceof Error ? err.message.slice(0, 80) : "error"}), so template text is used.`));
     return null;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
 }
 
@@ -280,7 +306,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
   trace.push(step(iso(d), "score", `Flagged: ${count("leans-in")} lean in, ${count("average")} about average, ${count("leans-away")} lean away, ${count("not-scored")} not scored, ${count("classic")} classic.`));
 
   return {
-    market: input.market, mode: d.mode, recordedOn: scores.source === "cache" ? scores.stored.fetchedAt.slice(0, 10) : null, themes, nights,
+    market: input.market, mode: d.mode, recordedOn: scores.source === "cache" ? scores.stored.fetchedAt.slice(0, 10) : null, recordedAt: scores.source === "cache" ? scores.stored.fetchedAt : null, themes, nights,
     reference: { markets: d.reference.markets, synthetic: d.reference.synthetic, pulledAt: d.reference.pulledAt }, caps: await capsOf(d), trace,
   };
 }
@@ -310,7 +336,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
     }));
     const reply = await runModel(
       d,
-      "You write one or two plain-English sentences explaining a theme-night swap to a minor league promotions director. Use ONLY the facts given. Describe local taste only. Never say or imply a theme will raise attendance, sales or revenue. Use no digits at all. Answer with JSON only: an array of {\"id\": string, \"why\": string}.",
+      "You write one or two plain-English sentences explaining a theme-night swap to a minor league promotions director. Use ONLY the facts given: the two theme names, how each compares with the market's own average (plannedFit, proposedFit), and whether a sponsor stays. Do not add anything else about the shows, artists, games or the ballpark. Describe local taste only: people near the ballpark like one theme more or less than the average theme. Never say or imply a theme will raise attendance, ticket sales, sponsor value or revenue. Use no digits at all. Answer with JSON only: an array of {\"id\": string, \"why\": string}.",
       JSON.stringify(facts),
       trace,
       "Writing the reasons for the swaps",

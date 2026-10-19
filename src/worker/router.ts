@@ -1,6 +1,7 @@
 import type { ApiError, GeoHit, MarketIn, ProposeNightIn } from "../app/api-types";
 import { parseDate, type CalendarRow } from "../app/calendar/csv";
 import { analyze, capsOf, CappedError, memoSummary, proposeSwaps, recheck, type Deps } from "./agent";
+import { placeLabel } from "../app/geo";
 import type { KvPort } from "./ports";
 
 export interface RouterDeps {
@@ -86,10 +87,10 @@ function nightsOf(v: unknown): ProposeNightIn[] | null {
 }
 
 const STUB_PLACES: GeoHit[] = [
-  { label: "Fresno, California, US", lon: -119.78707, lat: 36.74773 },
-  { label: "Tulsa, Oklahoma, US", lon: -95.99278, lat: 36.15398 },
-  { label: "Boise, Idaho, US", lon: -116.20345, lat: 43.6135 },
-  { label: "Columbus, Ohio, US", lon: -83.00207, lat: 39.96118 },
+  { label: "Fresno, CA", lon: -119.78707, lat: 36.74773 },
+  { label: "Tulsa, OK", lon: -95.99278, lat: 36.15398 },
+  { label: "Boise, ID", lon: -116.20345, lat: 43.6135 },
+  { label: "Columbus, OH", lon: -83.00207, lat: 39.96118 },
 ];
 
 /**
@@ -109,14 +110,22 @@ async function fetchOnceMore(f: typeof fetch, url: string): Promise<Response> {
 
 async function geocode(deps: RouterDeps, q: string): Promise<GeoHit[]> {
   if (deps.agent.mode === "synthetic") return STUB_PLACES.filter((p) => p.label.toLowerCase().includes(q.toLowerCase()));
-  // Open-Meteo geocoding: public, no key (https://open-meteo.com/en/docs/geocoding-api).
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=6&language=en&format=json`;
+  // Open-Meteo geocoding: public, no key (https://open-meteo.com/en/docs/geocoding-api). Ask for plenty, keep the US and Canada.
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=30&language=en&format=json`;
   const res = await fetchOnceMore(deps.geocodeFetch, url);
   if (!res.ok) throw new Error(`geocoding HTTP ${res.status}`);
   const body = (await res.json()) as { results?: Array<{ name: string; admin1?: string; country_code?: string; latitude: number; longitude: number; feature_code?: string }> };
-  return (body.results ?? [])
-    .filter((r) => !r.feature_code || r.feature_code.startsWith("PPL") || r.feature_code.startsWith("ADM"))
-    .map((r) => ({ label: [r.name, r.admin1, r.country_code].filter(Boolean).join(", "), lon: r.longitude, lat: r.latitude }));
+  const seen = new Set<string>();
+  const out: GeoHit[] = [];
+  for (const r of body.results ?? []) {
+    if (r.feature_code && !r.feature_code.startsWith("PPL") && !r.feature_code.startsWith("ADM")) continue;
+    const label = placeLabel(r.name, r.admin1, r.country_code);
+    if (!label || seen.has(label)) continue;
+    seen.add(label);
+    out.push({ label, lon: r.longitude, lat: r.latitude });
+    if (out.length === 6) break;
+  }
+  return out;
 }
 
 export async function route(req: Request, deps: RouterDeps): Promise<Response> {

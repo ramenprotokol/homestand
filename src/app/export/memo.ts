@@ -1,4 +1,5 @@
 import { AUDIT_LINE, METHOD_WORDS } from "../score";
+import { longDate } from "../text";
 
 export interface MemoSwap {
   date: string;
@@ -11,6 +12,8 @@ export interface MemoSwap {
   fromScore: number | null;
   toScore: number | null;
   why: string;
+  /** Where the reason came from: the model, or the fixed template (identical wording for every swap). */
+  source?: "model" | "template";
 }
 
 export interface MemoData {
@@ -22,6 +25,8 @@ export interface MemoData {
   classic: number;
   synthetic: boolean;
   recordedOn: string | null;
+  /** Full timestamp of the saved scores, when the scores were a saved result. */
+  recordedAt?: string | null;
 }
 
 export function escapeHtml(s: string): string {
@@ -42,17 +47,21 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps">): stri
 export function buildMemoHtml(d: MemoData): string {
   const rows = d.swaps
     .map(
-      (s) => `<tr><td>${escapeHtml(s.weekday)} ${escapeHtml(s.date)}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
+      (s) => `<tr><td>${escapeHtml(s.weekday)} ${escapeHtml(longDate(s.date))}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
         `<td>${signed(s.fromZ)} to ${signed(s.toZ)}</td></tr>`,
     )
     .join("");
-  const whys = d.swaps.map((s) => `<li><strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}, ${escapeHtml(s.date)}.</strong> ${escapeHtml(s.why)}</li>`).join("");
+  // Template reasons are the same sentence with different names, so they are said once, not once per swap.
+  const templated = d.swaps.length > 1 && d.swaps.every((s) => s.source !== "model");
+  const whys = templated
+    ? d.swaps.map((s) => `<li><strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}, ${escapeHtml(longDate(s.date))}.</strong></li>`).join("") + `<li>In each case the new theme stands out above this market's own average and the planned one stands out below it. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>`
+    : d.swaps.map((s) => `<li><strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}, ${escapeHtml(longDate(s.date))}.</strong> ${escapeHtml(s.why)}</li>`).join("");
   const angles = d.angles.map((a) => `<li>${escapeHtml(a)}</li>`).join("");
   const banner = d.synthetic ? `<p class="warn">SYNTHETIC DEMO DATA. These numbers are made up for testing, not from Qloo.</p>` : "";
-  const recorded = d.recordedOn ? ` Scores recorded on ${escapeHtml(d.recordedOn)}.` : "";
+  const recorded = d.recordedOn ? ` Scores were pulled from Qloo on ${escapeHtml(longDate(d.recordedOn))}.` : "";
   return `<article class="memo">
 <h1>Theme-night rationale: ${escapeHtml(d.club)}</h1>
-<p class="meta">Prepared ${escapeHtml(d.generatedOn)} with Homestand.${recorded}</p>
+<p class="meta">Prepared ${escapeHtml(longDate(d.generatedOn))} with Homestand.${recorded}</p>
 ${banner}
 <p>${escapeHtml(memoOpener(d))}</p>
 ${d.swaps.length ? `<h2>Approved swaps</h2>

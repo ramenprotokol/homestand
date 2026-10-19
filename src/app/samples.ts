@@ -23,7 +23,7 @@ const CALENDARS: Record<string, N[]> = {
     ["2026-06-20", "Dollar Dog Night"],
     ["2026-06-27", "Ghostbusters Day", "Sunrise Dental Group", false, "Day game"],
     ["2026-07-03", "Bad Bunny Night"],
-    ["2026-07-11", "Wrestling Night", "Pinecrest Auto"],
+    ["2026-07-11", "Stranger Things Night", "Pinecrest Auto"],
     ["2026-07-18", "Hot Sauce Showdown", "Bayou Bright Energy"],
     ["2026-07-25", "Star Trek Day", "Harbor Credit Union", true, "Sponsor contract signed"],
     ["2026-08-01", "Kenny Chesney Night"],
@@ -116,3 +116,33 @@ export function sampleCsv(marketId: string): string {
 }
 
 export const SAMPLE_CALENDAR_IDS = Object.keys(CALENDARS);
+
+// "Load an example" on the own-calendar page: 20 nights across kids, family, music, film and sports themes, one classic
+// night and one locked, sponsored night, so most US and Canadian cities get at least one swap to look at.
+const EXAMPLE: N[] = [
+  ["2027-04-09", "Fireworks Friday", "Prairie Bank"],
+  ["2027-04-10", "Bluey Day", "Sunrise Dental Group", false, "Day game"],
+  ["2027-04-17", "Marvel Super Heroes Night", "Harbor Credit Union"],
+  ["2027-04-24", "PAW Patrol Day", "", false, "Day game"],
+  ["2027-05-01", "Taylor Swift Night"],
+  ["2027-05-08", "Barbie Day", "Pinecrest Auto", false, "Day game"],
+  ["2027-05-14", "Country Music Night", "Prairie Bank", true, "Post-game concert booked"],
+  ["2027-05-15", "Dinosaur Day", "", false, "Day game"],
+  ["2027-05-22", "Peanuts Day", "Pinecrest Auto"],
+  ["2027-05-29", "Princess Day", "Sunrise Dental Group", false, "Day game"],
+  ["2027-06-04", "Beatles Night"],
+  ["2027-06-05", "Pokemon Day", "", false, "Day game"],
+  ["2027-06-12", "Batman Night", "Harbor Credit Union"],
+  ["2027-06-19", "Stranger Things Night"],
+  ["2027-06-26", "Bad Bunny Night", "Sunrise Dental Group"],
+  ["2027-07-03", "Elvis Night", "Prairie Bank"],
+  ["2027-07-10", "Margaritaville Night", "Pinecrest Auto"],
+  ["2027-07-17", "The Office Night"],
+  ["2027-07-24", "Yellowstone Night", "Harbor Credit Union"],
+  ["2027-08-07", "Lord of the Rings Night"],
+];
+
+export function exampleCsv(): string {
+  const lines = EXAMPLE.map(([d, t, s = "", l = false, n = ""]) => [d, t, s, l ? "yes" : "no", n].map(csvField).join(","));
+  return `${CSV_HEADER}\n${lines.join("\n")}\n`;
+}

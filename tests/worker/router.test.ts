@@ -370,12 +370,20 @@ describe("geocode", () => {
       return new Response(JSON.stringify({ results: [{ name: "Tulsa", admin1: "Oklahoma", country_code: "US", latitude: 36.15, longitude: -95.99, feature_code: "PPLA2" }, { name: "Tulsa Airport", latitude: 1, longitude: 2, feature_code: "AIRP" }] }));
     };
     const res = await route(new Request("https://api.test/api/geocode?q=Tulsa", { headers: { origin: ORIGIN } }), h.deps);
-    expect(((await res.json()) as { results: unknown[] }).results).toEqual([{ label: "Tulsa, Oklahoma, US", lon: -95.99, lat: 36.15 }]);
+    expect(((await res.json()) as { results: unknown[] }).results).toEqual([{ label: "Tulsa, OK", lon: -95.99, lat: 36.15 }]);
     expect((await route(new Request("https://api.test/api/geocode?q=a"), h.deps)).status).toBe(400);
   });
 
   const geo = (h: Harness): Promise<Response> => route(new Request("https://api.test/api/geocode?q=Tulsa", { headers: { origin: ORIGIN } }), h.deps);
   const okBody = JSON.stringify({ results: [{ name: "Tulsa", admin1: "Oklahoma", country_code: "US", latitude: 36.15, longitude: -95.99, feature_code: "PPLA2" }] });
+
+  it("keeps only the US and Canada, writes labels like Tulsa, OK, and drops duplicates", async () => {
+    const h = harness();
+    const r = (name: string, admin1: string, cc: string, lat: number) => ({ name, admin1, country_code: cc, latitude: lat, longitude: -90, feature_code: "PPL" });
+    h.deps.geocodeFetch = async () => new Response(JSON.stringify({ results: [r("Tulsa", "Oklahoma", "US", 36.1), r("Tulsa", "Gujarat", "IN", 21.5), r("Tulsa", "Oklahoma", "US", 36.2), r("Calgary", "Alberta", "CA", 51), r("Tulsa", "Punjab", "PK", 33)] }));
+    const res = await geo(h);
+    expect(((await res.json()) as { results: Array<{ label: string }> }).results.map((x) => x.label)).toEqual(["Tulsa, OK", "Calgary, AB"]);
+  });
 
   it("calls geocodeFetch without the deps object as this (Workers throw Illegal invocation otherwise)", async () => {
     const h = harness();

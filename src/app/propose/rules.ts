@@ -33,12 +33,16 @@ export const isFamilySlot = (n: SlotNight): boolean => {
   return wd === 0 || wd === 6 || DAY_GAME.test(n.notes);
 };
 
-/** Keeps the weekday type sensible: kids' nights stay kid-friendly, kids' themes only land on weekend or day games. */
+/**
+ * Hard audience rule. A kids or family night is only ever replaced by a kids or family theme (a kids' show for a kids' show).
+ * An adult night may take an adult or a family theme. Kids' themes land on adult nights only at weekend or day games.
+ */
 export function audienceFit(original: Pick<Theme, "audience">, cand: Pick<Theme, "audience">, night: SlotNight): boolean {
-  if (original.audience === "kids") return cand.audience !== "adult";
-  if (cand.audience === "kids") return isFamilySlot(night);
-  if (original.audience === "family" && cand.audience === "adult") return !isDayGame(night);
-  return true;
+  if (original.audience !== "adult") {
+    if (cand.audience === "adult") return false;
+    return cand.audience !== "kids" || original.audience === "kids" || isFamilySlot(night);
+  }
+  return cand.audience !== "kids" || isFamilySlot(night);
 }
 
 /** The three hard rules for putting `cand` on `night` in place of `original`. Locks are checked by the caller, before any candidate is looked at. */

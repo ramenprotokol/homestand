@@ -73,6 +73,8 @@ export interface AnalyzeResponse {
   mode: "live" | "synthetic";
   /** Date the scores were recorded when they came from the cache. */
   recordedOn: string | null;
+  /** When those saved scores were pulled from Qloo (full timestamp), same condition as `recordedOn`. */
+  recordedAt: string | null;
   themes: Record<string, ThemeScoreOut>;
   nights: NightOut[];
   reference: ReferenceInfo;
