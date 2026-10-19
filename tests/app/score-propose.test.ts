@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bundleScore, centre, comparisonSentence, fitFor, labelForZ, marketLevelSentence, vsAverage, zScore } from "../../src/app/score";
+import { readFileSync } from "node:fs";
+import { AUDIT_LINE, bundleScore, centre, comparisonSentence, fitFor, labelForZ, marketLevelSentence, pullWords, vsAverage, zScore } from "../../src/app/score";
 import { checkCandidate, inWindow, isFamilySlot } from "../../src/app/propose/rules";
 import { propose, templateWhy, likeness, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
 import { numbersAreGrounded, numbersIn } from "../../src/app/guard";
@@ -233,5 +234,22 @@ describe("proposals", () => {
     expect(templateWhy(T("elvis"), T("grateful-dead"), "")).toContain("The date stays the same.");
     expect(templateWhy(T("elvis"), T("grateful-dead"), "")).not.toContain("stay the same");
     expect(templateWhy(T("elvis"), T("grateful-dead"), "Acme Bank")).toContain("The date and the sponsor stay the same.");
+  });
+});
+
+describe("plain-words copy", () => {
+  it("describes local pull from the sign and size of the index", () => {
+    expect(pullWords(-2.14)).toBe("well below this town's usual");
+    expect(pullWords(-0.7)).toBe("below this town's usual");
+    expect(pullWords(0.1)).toBe("about this town's usual");
+    expect(pullWords(0.8)).toBe("above this town's usual");
+    expect(pullWords(1.6)).toBe("well above this town's usual");
+    expect(pullWords(null)).toBe("not compared");
+  });
+  it("keeps the audit line in step with the published study", () => {
+    const r = JSON.parse(readFileSync("study/results.json", "utf8")) as { counts: { nightsInput: number }; h1: { accuracy: { estimate: number } } };
+    expect(AUDIT_LINE).toContain(`${r.counts.nightsInput} real 2025 nights`);
+    expect(AUDIT_LINE).toContain(`${Math.round(r.h1.accuracy.estimate * 100)} times in 100`);
+    expect(AUDIT_LINE).not.toMatch(/H1|found no link/);
   });
 });

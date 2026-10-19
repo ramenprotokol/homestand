@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseCalendar } from "../../src/app/calendar/csv";
 import { exportCsv } from "../../src/app/export/csv";
 import { exportIcs, foldLine, icsEscape } from "../../src/app/export/ics";
-import { buildMemoHtml, memoDocument, type MemoData } from "../../src/app/export/memo";
+import { buildMemoHtml, memoDocument, memoOpener, type MemoData } from "../../src/app/export/memo";
 
 const rows = [
   { date: "2026-05-02", theme: "Paw Patrol Day", sponsor: 'Smith, "Sons" & Co', locked: false, notes: "Swapped from Elvis Night" },
@@ -48,18 +48,25 @@ describe("ICS export", () => {
 
 describe("memo", () => {
   const data: MemoData = {
-    club: "Akron, OH sample club <b>", generatedOn: "2026-10-15", summary: "Two <script>alert(1)</script> swaps.",
+    club: "Akron, OH sample club <b>", generatedOn: "2026-10-15",
     swaps: [{ date: "2026-07-03", weekday: "Friday", from: "Elvis", to: "Grateful Dead", sponsor: "Tallmadge & Sons", fromZ: -1.24, toZ: 1.91, fromScore: 0.512, toScore: 0.731, why: "Closer to local taste." }],
     angles: ["Keep it."], nights: 24, classic: 3, synthetic: true, recordedOn: null,
   };
-  it("escapes everything and cites the index and bundle score, not raw affinities", () => {
+  it("escapes everything and cites the local pull, not raw affinities or the bundle score", () => {
     const html = buildMemoHtml(data);
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;b&gt;");
     expect(html).toContain("-1.2 to +1.9");
-    expect(html).toContain("0.51 to 0.73");
+    expect(html).not.toContain("0.51 to 0.73");
+    expect(html).not.toContain("Bundle score");
     expect(html).toContain("SYNTHETIC DEMO DATA");
     expect(html).toContain("does not say a theme will raise attendance");
+  });
+  it("opens with a fixed sentence built only from counts", () => {
+    expect(memoOpener(data)).toBe("Homestand checked 24 theme nights for Akron, OH sample club <b> against local taste data from Qloo and suggests 1 swap. Each swap keeps its original date and sponsor.");
+    expect(memoOpener({ ...data, swaps: [] })).toContain("suggests no swaps. The calendar is unchanged.");
+    expect(buildMemoHtml(data)).toContain("Homestand checked 24 theme nights for Akron, OH sample club &lt;b&gt; against local taste data from Qloo");
+    expect(buildMemoHtml(data)).not.toMatch(/preference for certain/i);
   });
   it("says so when nothing was approved", () => {
     expect(buildMemoHtml({ ...data, swaps: [], synthetic: false })).toContain("No swaps were approved");

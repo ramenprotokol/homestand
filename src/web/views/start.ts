@@ -19,12 +19,16 @@ import { loadStudy } from "../study-data";
 
 function teaser(): HTMLElement {
   const r = loadStudy().results;
-  const result = r === null ? "Results pending." : r.h1.verdict === "CONFIRMED" ? "Result: local taste beat the line we set." : r.h1.verdict === "OVERTURNED" ? "Result: local taste pointed the wrong way." : "Result: not detected at this sample size.";
   const nights = r?.counts.nightsInput ?? 385;
+  const text =
+    r === null ? `We are testing local taste against ${nights} real 2025 theme nights. Results are pending.`
+    : r.h1.verdict === "CONFIRMED" ? `We tested local taste against ${nights} real 2025 theme nights before building this. Result: local taste beat the line we set.`
+    : r.h1.verdict === "OVERTURNED" ? `We tested local taste against ${nights} real 2025 theme nights before building this. Result: local taste pointed the wrong way.`
+    : `Before building this, we tested it. ${AUDIT_LINE}`;
   return h(
     "div",
     { class: "teaser", "data-testid": "study-teaser" },
-    h("p", null, `We tested local taste against ${nights} real 2025 theme nights before building this. ${result}`),
+    h("p", null, text),
     h("a", { class: "btn gold", href: "#/study" }, "See The Study", icon("arrowRight")),
   );
 }
@@ -99,14 +103,14 @@ function mountTease(section: HTMLElement, cards: HTMLElement[], canvas: HTMLCanv
 export function startView(): HTMLElement {
   const copy = [
     h("h1", { class: "sub", id: "sub", tabindex: "-1" }, "Your market, not the national chart."),
-    h("p", { class: "hero-lede" }, "Check next season's theme nights against what your own ballpark market leans toward. Get swap suggestions that keep your sponsors and your dates."),
+    h("p", { class: "hero-lede", "data-testid": "hero-intro" }, "Planning next season's theme nights? Homestand checks each one against what fans in your town like, and suggests swaps for the weak ones. Your dates and sponsors stay put."),
     h(
       "div",
       { class: "hero-actions", id: "cta" },
       h("a", { class: "btn pri", href: "#/sample", "data-testid": "try-sample" }, "Try a sample club", icon("arrowRight")),
       h("a", { class: "btn ghost", href: "#/own", "data-testid": "use-own" }, "Use your own"),
     ),
-    h("p", { class: "tag", id: "tag" }, `Scores describe what a market leans toward. ${AUDIT_LINE} `, h("a", { href: "#/study" }, "See how we tested it")),
+    h("p", { class: "tag honest", id: "tag", "data-testid": "hero-honest" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See how we tested it")),
   ];
   return h("div", { class: "landing" }, heroShell(copy), ridge(), teaseSection());
 }
@@ -124,7 +128,7 @@ export function pickView(): HTMLElement {
     h(
       "div",
       { class: "wrap" },
-      sceneHead("Step 0 · Pick a club", "Pick a", "sample club", "Each is a real ballpark market with a season calendar we wrote. Sponsors are made up."),
+      sceneHead("Get started · Pick a club", "Pick a", "sample club", "Each is a real ballpark market with a season calendar we wrote. Sponsors are made up."),
       h(
         "div",
         { class: "tickets" },
@@ -141,10 +145,11 @@ export function pickView(): HTMLElement {
               },
             },
             h("span", { class: "tk-stub" }, h("span", { class: "tk-k" }, "Sample club"), h("span", { class: "tk-city" }, m.city)),
-            h("span", { class: "tk-main" }, h("b", null, m.label), h("span", null, `${m.region}. Starts with their next season's calendar.`), h("span", { class: "tk-go" }, "Deal the season", icon("arrowRight"))),
+            h("span", { class: "tk-main" }, h("b", null, m.label), h("span", null, `${m.region}. Starts with their next season's calendar.`), h("span", { class: "tk-go" }, "Open this club", icon("arrowRight"))),
           ),
         ),
       ),
+      h("p", { class: "own-link" }, "Have your own season? ", h("a", { href: "#/own", "data-testid": "use-own-schedule" }, "Use your own schedule"), "."),
     ),
   );
 }
@@ -155,7 +160,7 @@ export function ownView(): HTMLElement {
   const results = h("ul", { class: "results" });
   const q = h("input", { id: "city", type: "search", autocomplete: "off", placeholder: "For example, Tulsa" });
   const file = h("input", { id: "csvfile", type: "file", accept: ".csv,text/csv,.txt", "aria-label": "Upload a CSV file" });
-  const paste = h("textarea", { id: "csvtext", "aria-describedby": "csvhelp", spellcheck: "false" });
+  const paste = h("textarea", { id: "csvtext", "aria-describedby": "csvhelp", spellcheck: "false", placeholder: CSV_TEMPLATE });
   const errors = h("div", { role: "alert", class: "error" });
   const go = h("button", { type: "button", class: "btn pri", "data-testid": "check-mine" }, "Check my calendar", icon("arrowRight"));
 
@@ -227,7 +232,7 @@ export function ownView(): HTMLElement {
     h(
       "div",
       { class: "wrap" },
-      sceneHead("Step 0 · Bring your own", "Use your own", "calendar", "Two things: where your ballpark is, and your theme nights."),
+      sceneHead("Get started · Bring your own", "Use your own", "calendar", "Two things: where your ballpark is, and your theme nights."),
       h(
         "div",
         { class: "paper" },
@@ -236,8 +241,24 @@ export function ownView(): HTMLElement {
           "div",
           { class: "field" },
           h("label", { for: "csvtext" }, "2. Your theme nights"),
-          h("p", { id: "csvhelp", class: "help" }, "Columns: date, theme, sponsor, locked, notes. Upload a file or paste the rows here."),
-          h("div", { class: "actions" }, file, h("button", { type: "button", class: "btn ghost sm dark", onclick: () => download("homestand-template.csv", "text/csv", CSV_TEMPLATE) }, icon("download"), "Download the template")),
+          h("p", { id: "csvhelp", class: "help" }, "One row per theme night, with a header row on top. Upload a file or paste the rows here."),
+          h(
+            "dl",
+            { class: "cols" },
+            h("dt", null, "date"), h("dd", null, "The game date, like 2026-04-10 or 4/10/2026."),
+            h("dt", null, "theme"), h("dd", null, "The theme night's name, like Bluey Night or Fireworks Friday."),
+            h("dt", null, "sponsor"), h("dd", null, "Optional. Who presents the night. It stays on the date."),
+            h("dt", null, "locked"), h("dd", null, "yes if the night can't change (a signed deal), otherwise no."),
+            h("dt", null, "notes"), h("dd", null, "Optional. Anything you want to remember."),
+          ),
+          h("p", { class: "help" }, "Themes we don't recognise are left alone. They stay on your calendar as planned, marked \"Not scored\"."),
+          h(
+            "div",
+            { class: "actions" },
+            h("button", { type: "button", class: "btn gold sm", "data-testid": "load-example", onclick: () => { paste.value = CSV_TEMPLATE; errors.replaceChildren(); } }, "Load an example"),
+            h("button", { type: "button", class: "btn ghost sm dark", onclick: () => download("homestand-template.csv", "text/csv", CSV_TEMPLATE) }, icon("download"), "Download the template"),
+            file,
+          ),
           paste,
         ),
         errors,

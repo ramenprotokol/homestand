@@ -114,7 +114,7 @@ export function comparisonSentence(themeLabel: string, label: FitLabel): string 
 export const METHOD_WORDS =
   "We ask Qloo how strongly people near this ballpark lean toward each thing in a theme, and compare that with 40 other ballpark markets. " +
   "Then we compare each theme with this market's own average lean, the same within-market comparison The Study uses. " +
-  "Half a standard step or more above its own average is \"Leans in\". The same amount below is \"Leans away\". In between is \"About average\". " +
+  "A theme clearly above its own average (by at least half the usual spread between markets) is \"Leans in\". Clearly below is \"Leans away\". In between is \"About average\". " +
   "It describes local taste. It does not say a theme will raise attendance.";
 
 /** "stands out above this market's average (+1.1)": the cited comparison, in plain words plus the number. */
@@ -126,5 +126,18 @@ export function vsAverage(index: number | null): string {
 
 export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.";
 
-/** The pre-registered consequence of H1 not passing (study/PREREGISTRATION.md). Shown on the landing page, the Why panel and The Study. */
-export const AUDIT_LINE = "H1 did not pass, so Homestand is a reasoned, cited audit of local taste, not an attendance predictor.";
+/**
+ * What the study found, in plain words. Shown on the landing page, the Why panel, The Study and the memo.
+ * The numbers are the published ones (study/results.json); tests/app/score.test.ts keeps them in step.
+ */
+export const AUDIT_LINE = "It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.";
+
+/** "Local pull" in plain words from the sign and size of the index (z against the market's own average). */
+export function pullWords(index: number | null): string {
+  if (index === null) return "not compared";
+  if (index <= -2 * Z_CUT) return "well below this town's usual";
+  if (index <= -Z_CUT) return "below this town's usual";
+  if (index < Z_CUT) return "about this town's usual";
+  if (index < 2 * Z_CUT) return "above this town's usual";
+  return "well above this town's usual";
+}

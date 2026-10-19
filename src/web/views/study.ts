@@ -31,12 +31,26 @@ function saveCall(c: Call): void {
 }
 
 const pct = (x: number, d = 1): string => `${(x * 100).toFixed(d)}%`;
-const interval = (i: Interval): string => `${pct(i.estimate)} (95% interval ${pct(i.lo)} to ${pct(i.hi)})`;
+const interval = (i: Interval): string => `${pct(i.estimate)} (range we are confident in: ${pct(i.lo)} to ${pct(i.hi)})`;
 
 const VERDICT_WORDS: Record<Verdict, string> = {
-  CONFIRMED: "Local taste beat the line we set before looking. In pairs of theme nights at the same ballpark, it picked the better-drawing night at least 55% of the time, and the 95% interval stays above a coin flip.",
-  "CALL STANDS": "Not enough evidence either way. The result did not clear the pre-registered line, and the interval includes a coin flip. This is \"not detected at this sample size\", not \"disproved\": a real but small effect could still hide here.",
-  OVERTURNED: "The interval sits below a coin flip. At this sample size, local taste pointed the wrong way more often than the right way.",
+  CONFIRMED: "Local taste beat the line we set before looking. In pairs of theme nights at the same ballpark, it picked the better-drawing night at least 55% of the time, and the range we are confident in stays above a coin flip.",
+  "CALL STANDS": "Taste picked the bigger crowd about as often as a coin flip would, and the range we are confident in includes a coin flip. That does not prove taste never matters: a small real effect could still hide at this sample size.",
+  OVERTURNED: "The range we are confident in sits below a coin flip. At this sample size, local taste pointed the wrong way more often than the right way.",
+};
+
+/** One plain line directly under the stamp. */
+const STAMP_PLAIN: Record<Verdict, string> = {
+  CONFIRMED: "Taste did predict bigger crowds, more often than the line we set.",
+  "CALL STANDS": "Not enough evidence to overturn: taste didn't predict bigger crowds.",
+  OVERTURNED: "Taste pointed the wrong way: it picked the smaller crowd more often.",
+};
+
+/** The short version, before any numbers. */
+const SHORT_VERSION: Record<Verdict, string> = {
+  CONFIRMED: "The short version: local taste did predict which theme nights drew bigger crowds.",
+  "CALL STANDS": "The short version: local taste did not predict which theme nights drew bigger crowds.",
+  OVERTURNED: "The short version: local taste pointed the wrong way on which theme nights drew bigger crowds.",
 };
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -54,8 +68,8 @@ function chart(r: PublishedResults): SVGSVGElement {
   const x = (v: number): number => left + ((Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo)) * (W - left - right);
   const rows: Array<{ name: string; est: number; lo?: number; hi?: number; emph: boolean }> = [
     { name: "Local taste (Qloo)", est: r.h1.accuracy.estimate, lo: r.h1.accuracy.lo, hi: r.h1.accuracy.hi, emph: true },
-    { name: "LLM-only guess", est: r.h2.llmAccuracy.estimate, lo: r.h2.llmAccuracy.lo, hi: r.h2.llmAccuracy.hi, emph: false },
-    { name: "National popularity", est: r.rawLiftAccuracy.nationalPopularityCentred, emph: false },
+    { name: "AI guess, no local data", est: r.h2.llmAccuracy.estimate, lo: r.h2.llmAccuracy.lo, hi: r.h2.llmAccuracy.hi, emph: false },
+    { name: "What's popular nationally", est: r.rawLiftAccuracy.nationalPopularityCentred, emph: false },
   ];
   const H = top + rows.length * rowH + 34;
   const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": `Accuracy of three predictors against a 50% coin flip and the 55% pass line. ${rows.map((q) => `${q.name} ${pct(q.est)}`).join(". ")}.` });
@@ -115,7 +129,7 @@ export function studyView(): HTMLElement {
   const intro = h(
     "div",
     { class: "scene-head" },
-    h("div", { class: "eyebrow" }, "Scene 4 · The Study"),
+    h("div", { class: "eyebrow" }, "The Study"),
     h("h1", { class: "h2", tabindex: "-1" }, "The Study ", h("em", null, "did the umpires agree?")),
     h("p", { class: "lede wide" }, "Scores say what a market leans toward. They do not say a theme will raise attendance. So we tested it on real 2025 theme nights, with the method and the pass line written down before we looked at any result."),
   );
@@ -188,7 +202,7 @@ export function studyView(): HTMLElement {
     const under = h("div", { class: "under" }, h("i"), "Under review");
     canvas = h("canvas", { id: "dots", "aria-label": `${r.counts.pairs} dots, one per pair of theme nights`, role: "img" });
     const dls = h("div", { class: "dls" }, h("div", { class: "dl dl-a" }, h("b", null, String(a)), "taste picked the bigger crowd"), h("div", { class: "dl dl-b" }, h("b", null, String(b)), "it didn't"));
-    const dnote = h("p", { class: "dnote" }, `Each dot is one real pair from ${r.counts.nightsInput} theme nights at ${r.counts.clubsWithPairs} clubs in 2025. The counts are real; positions are illustrative.`);
+    const dnote = h("p", { class: "dnote" }, `${r.counts.nightsInput} theme nights at ${r.counts.clubsWithPairs} clubs made ${r.counts.pairs} same-ballpark pairs (any two nights at one club), so there are more pairs than nights. Each dot is one real pair. The counts are real; positions are illustrative.`);
     const nval = h("b", null, "0.0%");
     const needle = h("div", { class: "needle" }, nval);
     const ci = h("div", { class: "ci", style: `left:${(acc.lo * 100).toFixed(1)}%;width:${((acc.hi - acc.lo) * 100).toFixed(1)}%` });
@@ -197,20 +211,22 @@ export function studyView(): HTMLElement {
       { class: "meter" },
       h("div", { class: "mt" }, ci, h("div", { class: "ln l50" }, h("span", null, "Coin flip 50%")), h("div", { class: "ln l55" }, h("span", null, "Pass line 55%")), needle),
       h("div", { class: "ms" }, h("span", null, "0%"), h("span", null, "100%")),
-      h("p", { class: "mci" }, `95% interval ${pct(acc.lo)} to ${pct(acc.hi)}`),
+      h("p", { class: "mci" }, `Range we are confident in: ${pct(acc.lo)} to ${pct(acc.hi)}`),
     );
     const verdict = h(
       "div",
       { class: "verdict", "data-testid": "verdict" },
-      h("span", { class: "small" }, `You said ${c}. The pre-registered verdict:`),
+      h("span", { class: "small" }, `You said ${c}. The result:`),
       h("div", { class: "stampv" }, r.h1.verdict),
+      h("p", { class: "stamp-plain", "data-testid": "stamp-plain" }, STAMP_PLAIN[r.h1.verdict]),
       h("p", { class: "v1" }, VERDICT_WORDS[r.h1.verdict]),
-      r.h1.pass ? null : h("p", { class: "v2 audit-line", "data-testid": "audit-line" }, AUDIT_LINE),
+      r.h1.pass ? null : h("p", { class: "v2 audit-line honest", "data-testid": "audit-line" }, AUDIT_LINE),
       h("p", { class: "echo" }, `You said ${c}.`),
       h("button", { type: "button", class: "btn ghost sm", id: "again", onclick: () => { call = null; try { sessionStorage.removeItem("homestand.call"); } catch { /* ignore */ } paint(false); } }, "Make a different call"),
     );
     const skip = h("button", { type: "button", class: "skip", id: "skip", onclick: () => final() }, "Skip");
-    const block = h("div", { class: "review" }, under, h("div", { class: "dotsw" }, canvas), dls, dnote, meter, verdict, skip);
+    const lead = h("p", { class: "honest lead", "data-testid": "plain-result" }, SHORT_VERSION[r.h1.verdict]);
+    const block = h("div", { class: "review" }, under, lead, h("div", { class: "dotsw" }, canvas), dls, dnote, meter, verdict, skip);
 
     const setNeedle = (v: number): void => {
       needle.style.left = `${v}%`;
@@ -284,7 +300,7 @@ export function studyView(): HTMLElement {
       return;
     }
     if (view.results !== null) review(view.results, call, animate);
-    else stageEl.replaceChildren(h("div", { class: "pending", "data-testid": "results-pending" }, h("h2", null, "Results pending"), h("p", null, `You said ${call}. The final numbers are not published yet. They appear here as soon as the pre-registered analysis has run, whatever they show.`)));
+    else stageEl.replaceChildren(h("div", { class: "pending", "data-testid": "results-pending" }, h("h2", null, "Results pending"), h("p", null, `You said ${call}. The final numbers are not published yet. They appear here as soon as the planned analysis has run, whatever they show.`)));
     reveal.replaceChildren(...results(view));
     root.append(reveal);
   }
@@ -320,7 +336,7 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
       h("li", null, "Theme nights carry other promotions we could not control. That adds noise; it could also favour local taste if clubs stack promotions on themes their market loves."),
       h("li", null, "Princess nights are a proxy for children's dress-up nights."),
       h("li", null, "National popularity is the same for every club, so on this design it cannot rank two themes inside one club and scores exactly a coin flip."),
-      h("li", null, "A result that misses the line means \"not detected at this sample size\", not \"disproved\"."),
+      h("li", null, "A result that misses the line does not prove taste never matters. It means we could not show it at this sample size."),
     ),
   );
 
@@ -334,9 +350,9 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
     h(
       "section", { class: "sect" },
       h("h2", null, "How often local taste picked the bigger crowd"),
-      h("p", { "data-testid": "h1-text" }, `Between two theme nights at the same ballpark, local taste picked the better-drawing one ${interval(r.h1.accuracy)} of the time, over ${r.counts.pairs} pairs at ${r.counts.clubsWithPairs} clubs. The line to pass was 55%, with the interval above 50%. A coin flip gets 50%.`),
+      h("p", { "data-testid": "h1-text" }, `Between two theme nights at the same ballpark, local taste picked the better-drawing one ${interval(r.h1.accuracy)} of the time, over ${r.counts.pairs} pairs at ${r.counts.clubsWithPairs} clubs (${r.counts.nightsInput} theme nights make ${r.counts.pairs} same-ballpark pairs). The line to pass was 55%, with that range above 50%. A coin flip gets 50%.`),
       chart(r),
-      h("p", { class: "small" }, `Side by side: the LLM-only guess got ${interval(r.h2.llmAccuracy)}, but that is mostly ties: it gave the same rating for nearly every town (${r.flatThemes.llm.length} of 9 themes had no variation at all). National popularity gets ${pct(r.rawLiftAccuracy.nationalPopularityCentred)} by design, because it is the same for every club and so cannot rank two themes inside one club.`),
+      h("p", { class: "small" }, `Side by side: an AI guessing with no local data got ${interval(r.h2.llmAccuracy)}, but that is mostly ties: it gave the same rating for nearly every town (${r.flatThemes.llm.length} of 9 themes had no variation at all). National popularity gets ${pct(r.rawLiftAccuracy.nationalPopularityCentred)} by design, because it is the same for every club and so cannot rank two themes inside one club.`),
     ),
     h(
       "section", { class: "sect" },
@@ -344,7 +360,7 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
       h("p", { class: "small" }, "Theme nights sorted by how strongly their market leaned toward the theme, split into five equal groups."),
       h("div", { class: "table-wrap" },
         h("table", { class: "data" },
-          h("thead", null, h("tr", null, ["Group", "Club-themes", "Taste score range (z)", "Crowd vs club's usual"].map((t, i) => h("th", { class: i > 0 ? "num" : "" }, t)))),
+          h("thead", null, h("tr", null, ["Group", "Club-themes", "Taste score range", "Crowd vs club's usual"].map((t, i) => h("th", { class: i > 0 ? "num" : "" }, t)))),
           h("tbody", null, r.binnedByQlooZ.map((b, i) => h("tr", null, h("td", null, i === 0 ? "Least" : i === r.binnedByQlooZ.length - 1 ? "Most" : `Group ${i + 1}`), h("td", { class: "num" }, String(b.n)), h("td", { class: "num" }, `${b.zMin.toFixed(1)} to ${b.zMax.toFixed(1)}`), h("td", { class: "num" }, `${b.meanCentredLift >= 0 ? "+" : ""}${((Math.exp(b.meanCentredLift) - 1) * 100).toFixed(1)}%`)))),
         )),
     ),

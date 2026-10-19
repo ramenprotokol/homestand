@@ -1,4 +1,4 @@
-import type { AnalyzeResponse, MarketIn, MemoResponse, NightOut, ProposeResponse, ThemeScoreOut } from "../app/api-types";
+import type { AnalyzeResponse, MarketIn, NightOut, ProposeResponse, ThemeScoreOut } from "../app/api-types";
 import type { CalendarRow, RowError } from "../app/calendar/csv";
 import type { FitLabel } from "../app/score";
 import type { TraceStep } from "../app/trace";
@@ -27,13 +27,12 @@ export interface State {
   altChoice: Record<string, string>;
   allowDuplicates: boolean;
   traceGroups: TraceGroup[];
-  memo: MemoResponse | null;
 }
 
 export const state: State = blank();
 
 function blank(): State {
-  return { market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: {}, propose: null, decisions: {}, altChoice: {}, allowDuplicates: false, traceGroups: [], memo: null };
+  return { market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: {}, propose: null, decisions: {}, altChoice: {}, allowDuplicates: false, traceGroups: [] };
 }
 
 export function reset(): void {
@@ -49,7 +48,6 @@ export function invalidateProposals(): void {
   state.propose = null;
   state.decisions = {};
   state.altChoice = {};
-  state.memo = null;
 }
 
 export function effectiveThemeId(n: NightOut): string | null {
