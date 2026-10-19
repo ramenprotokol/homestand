@@ -296,6 +296,70 @@ test("own club: the example is a full season and the headings read naturally", a
   await expect(page.locator(".nav .club")).toHaveText("Fresno, CA");
 });
 
+test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Send, CSV, ICS and the memo", async ({ page }) => {
+  // Turn the first proposal into one Qloo found, as the Worker does for a family night the library cannot fix.
+  await page.route("**/api/propose", async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    const p = body.proposals[0];
+    Object.assign(p, {
+      toThemeId: "qloo:SYN-D-movie-0", to: { label: "found", z: null, score: null }, alternates: [],
+      discovered: { name: "Moonpie Pirates (made up)", entityId: "SYN-D-movie-0", type: "movie", affinity: 0.95 },
+      why: "Qloo ranks Moonpie Pirates (made up) among the top family movies for fans near Akron.", whySource: "template",
+    });
+    await route.fulfill({ response: res, json: body });
+  });
+  await page.goto("/#/check/akron");
+  await expect(page.getByTestId("summary")).toBeVisible();
+  await page.getByTestId("to-fix").click();
+  // The ideas panel: up to six titles, the under-25 line, and where they come from.
+  const ideas = page.getByTestId("ideas");
+  await expect(ideas).toContainText("Fresh family ideas from Qloo for Akron");
+  expect(await ideas.locator(".idea").count()).toBeLessThanOrEqual(6);
+  expect(await ideas.locator(".idea").count()).toBeGreaterThanOrEqual(4);
+  await expect(page.getByTestId("ideas-young")).toContainText("Under-25 fans here also lean toward:");
+  await expect(ideas).toContainText("These come from Qloo's taste data for this area");
+  await page.getByRole("button", { name: /Open the pack/ }).focus();
+  await page.keyboard.press("Enter");
+  const now = page.getByTestId("now-card");
+  await expect(page.getByTestId("disc-badge")).toHaveText("Discovered by Qloo");
+  await expect(page.getByTestId("swap-line")).toContainText("Moonpie Pirates (made up)");
+  await expect(page.getByTestId("cited")).toContainText("Found by Qloo");
+  await expect(now.locator(".fitword")).toHaveText("Found by Qloo");
+  await expect(page.locator(".swap-why")).toHaveText("Qloo ranks Moonpie Pirates (made up) among the top family movies for fans near Akron.");
+  await expect(page.locator("#steps")).toContainText("Discovered by Qloo");
+  await expect(page.locator(".idx")).toContainText("found by Qloo");
+  await page.getByTestId("approve").click();
+  await expect(page.locator(".decision")).toContainText("Approved: Moonpie Pirates (made up) now holds");
+  await expect(page.locator('.tally.mini [data-k="found"] b')).toHaveText("1");
+  await page.getByTestId("to-send").click();
+  await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
+  const memo = page.getByTestId("memo");
+  await expect(memo).toContainText("Moonpie Pirates (made up) (Discovered by Qloo)");
+  await expect(memo).toContainText("Found by Qloo");
+  await expect(memo).toContainText("Fresh family ideas from Qloo for Akron");
+  await expect(memo).toContainText("These come from Qloo's taste data for this area");
+  const [csv] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-csv").click()]);
+  const csvText = await readFile((await csv.path())!, "utf8");
+  expect(csvText).toContain("Moonpie Pirates (made up)");
+  expect(csvText).toContain("discovered by Qloo");
+  const [ics] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-ics").click()]);
+  expect(await readFile((await ics.path())!, "utf8")).toContain("Moonpie Pirates (made up)");
+  await expect(page.locator(".tile--swapped").first()).toBeVisible();
+});
+
+test("the step log shows the discovery calls to Qloo", async ({ page }) => {
+  await page.goto("/#/check/akron");
+  await expect(page.getByTestId("summary")).toBeVisible();
+  await page.getByTestId("to-fix").click();
+  await expect(page.getByTestId("ideas")).toBeVisible();
+  await page.getByTestId("open-trace").click();
+  const log = page.getByRole("dialog");
+  // The first Akron run in this server asks Qloo; later ones show the recorded answers. Either way the three calls are named.
+  await expect(log).toContainText(/Asked Qloo for top family movies near Akron|Used the recorded top family movies, top family shows and under-25 picks near Akron/);
+  await expect(log).toContainText(/Asked Qloo for top family shows near Akron|Used the recorded top family movies/);
+});
+
 test("deep links: a sample club opens cold, and a cold step with no club goes to the picker", async ({ page }) => {
   await page.goto("/#/check/biloxi");
   await expect(page.getByRole("heading", { name: /Check: Biloxi, MS sample club/ })).toBeVisible();

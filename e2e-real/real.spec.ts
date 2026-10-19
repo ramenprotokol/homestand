@@ -127,3 +127,26 @@ test("real data: a non-sample city with the example calendar gets swaps to look 
   await expect(page.getByTestId("proposal")).toBeVisible();
   await shot(page, info, "own-example-fix");
 });
+
+test("real data: Tulsa with the example calendar gets a swap, with Discovered by Qloo titles", async ({ page }, info) => {
+  await page.goto("/#/own");
+  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Tulsa, OK" }).click();
+  await page.getByTestId("load-example").click();
+  await page.getByTestId("check-mine").click();
+  await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
+  await page.getByTestId("to-fix").click();
+  const pack = page.getByRole("button", { name: /Open the pack/ });
+  await expect(pack).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByTestId("ideas")).toContainText("Fresh family ideas from Qloo for Tulsa");
+  await expect(page.getByTestId("ideas-young")).toContainText("Under-25 fans here also lean toward:");
+  await pack.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("proposal")).toBeVisible();
+  await expect(page.getByTestId("disc-badge")).toHaveText("Discovered by Qloo");
+  await expect(page.locator(".swap-why")).toContainText(/^Qloo ranks .+ among the top family (movies|shows) for fans near Tulsa\.$/);
+  await shot(page, info, "tulsa-discovered");
+  await page.getByTestId("open-trace").click();
+  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo for top family movies near Tulsa|Used the recorded top family movies, top family shows and under-25 picks near Tulsa/);
+});
