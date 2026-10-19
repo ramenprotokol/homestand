@@ -1,7 +1,9 @@
-import type { AnalyzeResponse, Caps, DiscoveryOut, MarketIn, MemoResponse, NightOut, ProposeNightIn, ProposeResponse, RecheckResponse, ThemeScoreOut } from "../app/api-types";
+import type { AnalyzeResponse, Caps, DiscoveryOut, MarketIn, NightOut, ProposeNightIn, ProposeResponse, RecheckResponse, ThemeScoreOut } from "../app/api-types";
 import { weekdayName, type CalendarRow } from "../app/calendar/csv";
 import { resolveTheme, type Resolution } from "../app/calendar/resolve";
-import { numbersAreGrounded, claimsOutcome } from "../app/guard";
+import { claimsOutcome, numbersAreGrounded } from "../app/guard";
+import type { QuotaKind } from "./limits";
+import { safeGet, safePut, sha256Hex } from "./safe";
 import { marketKey } from "../app/markets";
 import { propose, type Discovered, type PlanNight, type ThemeFit } from "../app/propose/propose";
 import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
@@ -27,6 +29,20 @@ export interface Deps {
   qlooDelayMs: number;
   /** Longest wait for a model reply, ms. Default 6000. */
   aiTimeoutMs?: number;
+  /** Per-client daily allowance, set per request by the router. Unset means no per-client limit (tests). */
+  gate?: Gate;
+}
+
+/** Counts one use of a per-client daily allowance and says whether it was still available. */
+export interface Gate {
+  allow(kind: QuotaKind): Promise<boolean>;
+}
+
+/** Thrown when this client's daily allowance for live lookups is used up. */
+export class QuotaError extends Error {
+  constructor(readonly kind: QuotaKind) {
+    super("This client's daily allowance is used up.");
+  }
 }
 
 /** Thrown when a live Qloo call is needed and today's cap is spent. */
@@ -44,13 +60,13 @@ const today = (d: Deps): string => iso(d).slice(0, 10);
 // ---------- daily counters ----------
 
 async function counter(d: Deps, name: string): Promise<number> {
-  const raw = await d.kv.get(`cap:${name}:${today(d)}`);
+  const raw = await safeGet(d.kv, `cap:${name}:${today(d)}`);
   const n = raw === null ? 0 : Number(raw);
   return Number.isFinite(n) ? n : 0;
 }
 
 async function bump(d: Deps, name: string, by: number): Promise<void> {
-  await d.kv.put(`cap:${name}:${today(d)}`, String((await counter(d, name)) + by), { expirationTtl: 2 * 24 * 3600 });
+  await safePut(d.kv, `cap:${name}:${today(d)}`, String((await counter(d, name)) + by), { expirationTtl: 2 * 24 * 3600 });
 }
 
 export async function capsOf(d: Deps): Promise<Caps> {
@@ -130,7 +146,7 @@ export interface Scores {
 
 export async function getScores(d: Deps, m: MarketIn, trace: TraceStep[]): Promise<Scores> {
   const key = cacheKey(d, m);
-  const hit = await d.kv.get(key);
+  const hit = await safeGet(d.kv, key);
   if (hit) {
     try {
       const stored = JSON.parse(hit) as StoredLibrary;
@@ -143,10 +159,11 @@ export async function getScores(d: Deps, m: MarketIn, trace: TraceStep[]): Promi
     }
   }
   const need = new Set(d.library.flatMap((t) => t.entities.map((e) => e.type))).size;
+  if (d.gate && !(await d.gate.allow("pull"))) throw new QuotaError("pull");
   if (!(await reserveQloo(d, need))) throw new CappedError();
   const themes = await askQloo(d, m, d.library, trace);
   const stored: StoredLibrary = { v: 1, fetchedAt: iso(d), themes };
-  await d.kv.put(key, JSON.stringify(stored), { expirationTtl: TTL });
+  await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
   return { stored, source: "live" };
 }
 
@@ -204,7 +221,7 @@ const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").
 export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promise<DiscoveryOut | null> {
   const city = m.label.split(",")[0]!.replace(/ (sample )?club$/, "");
   const key = discoveryKey(d, m);
-  const hit = await d.kv.get(key);
+  const hit = await safeGet(d.kv, key);
   if (hit) {
     try {
       const s = JSON.parse(hit) as StoredDiscovery;
@@ -247,10 +264,11 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     const young = keep(await client.discoverFamily({ ...base, type: "tv_show", take: 6, age: "24_and_younger" }));
     trace.push(step(iso(d), "qloo", `Asked Qloo which family shows fans aged 24 and younger near ${city} lean toward.`, `Live call at ${iso(d)}. ${young.kept.length} kept.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
     const stored: StoredDiscovery = { v: 1, fetchedAt: iso(d), movies: movies.kept, shows: shows.kept, young: young.kept };
-    await d.kv.put(key, JSON.stringify(stored), { expirationTtl: TTL });
+    await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
     return { movies: stored.movies, shows: stored.shows, young: stored.young, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
   } catch (err) {
-    trace.push(step(iso(d), "qloo", `Family ideas near ${city} were not available (${err instanceof Error ? err.message.slice(0, 80) : "error"}), so swaps use library themes only.`));
+    console.error("discovery failed", err instanceof Error ? err.message : String(err));
+    trace.push(step(iso(d), "qloo", `Family ideas near ${city} were not available right now, so swaps use library themes only.`));
     return null;
   }
 }
@@ -274,13 +292,17 @@ export function replyText(res: unknown): string | null {
 
 class ModelTimeout extends Error {}
 
-async function runModel(d: Deps, system: string, user: string, trace: TraceStep[], what: string, maxTokens = 900): Promise<string | null> {
+export async function runModel(d: Deps, system: string, user: string, trace: TraceStep[], what: string, maxTokens = 900): Promise<string | null> {
   if (!d.ai) {
     trace.push(step(iso(d), "model", `${what}: no model attached here, so template text is used.`));
     return null;
   }
   if ((await counter(d, "ai")) >= d.aiDailyCap) {
     trace.push(step(iso(d), "model", `${what}: today's model budget is spent, so template text is used.`));
+    return null;
+  }
+  if (d.gate && !(await d.gate.allow("model"))) {
+    trace.push(step(iso(d), "model", `${what}: your daily model allowance is spent, so template text is used.`));
     return null;
   }
   await bump(d, "ai", 1);
@@ -295,7 +317,10 @@ async function runModel(d: Deps, system: string, user: string, trace: TraceStep[
     return text;
   } catch (err) {
     if (err instanceof ModelTimeout) trace.push(step(iso(d), "model", `${what}: the model took too long (over ${Math.round(limit / 1000)} seconds), so template text is used.`));
-    else trace.push(step(iso(d), "model", `${what}: the model call failed (${err instanceof Error ? err.message.slice(0, 80) : "error"}), so template text is used.`));
+    else {
+      console.error("model call failed", err instanceof Error ? err.message : String(err));
+      trace.push(step(iso(d), "model", `${what}: the model call failed, so template text is used.`));
+    }
     return null;
   } finally {
     if (timer !== undefined) clearTimeout(timer);
@@ -337,18 +362,27 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
   });
   const unknownIdx = resolutions.flatMap((r, i) => (r.kind === "unknown" && recognised[i] === null ? [i] : []));
   if (unknownIdx.length > 0 && d.ai) {
-    const list = d.library.map((t) => `${t.id}: ${t.label}`).join("\n");
-    const texts = unknownIdx.map((i, n) => `${n}: ${input.rows[i]!.theme}`).join("\n");
-    const reply = await runModel(
-      d,
-      "You match minor league baseball promotion names to a fixed list of pop-culture themes. Answer with JSON only: an object mapping each number to an array of theme ids. Use an empty array unless the text clearly names that franchise, show, film, game, brand or artist. Never guess. Never invent ids.",
-      `Themes:\n${list}\n\nTexts:\n${texts}`,
-      trace,
-      "Matching unrecognised theme names",
-      600,
-    );
+    // Same unknown names, same answer: the reply is cached by the sorted, normalised texts, so a repeat costs no model call.
+    const norm1 = (t: string): string => t.toLowerCase().replace(/\s+/g, " ").trim();
+    const texts = [...new Set(unknownIdx.map((i) => norm1(input.rows[i]!.theme)))].sort();
+    const key = `ai:res:v1:${await sha256Hex(texts.join("\n"))}`;
+    let reply = await safeGet(d.kv, key);
+    if (reply !== null) trace.push(step(iso(d), "model", "Matching unrecognised theme names: used the saved answer (no model call)."));
+    else {
+      const list = d.library.map((t) => `${t.id}: ${t.label}`).join("\n");
+      reply = await runModel(
+        d,
+        "You match minor league baseball promotion names to a fixed list of pop-culture themes. Answer with JSON only: an object mapping each number to an array of theme ids. Use an empty array unless the text clearly names that franchise, show, film, game, brand or artist. Never guess. Never invent ids.",
+        `Themes:\n${list}\n\nTexts:\n${texts.map((t, n) => `${n}: ${t}`).join("\n")}`,
+        trace,
+        "Matching unrecognised theme names",
+        600,
+      );
+      if (reply !== null) await safePut(d.kv, key, reply, { expirationTtl: TTL });
+    }
     const parsed = jsonIn(reply) as Record<string, unknown> | null;
-    unknownIdx.forEach((rowIdx, n) => {
+    unknownIdx.forEach((rowIdx) => {
+      const n = texts.indexOf(norm1(input.rows[rowIdx]!.theme));
       const ids = parsed && Array.isArray(parsed[String(n)]) ? (parsed[String(n)] as unknown[]).filter((x): x is string => typeof x === "string" && activeIds.has(x)) : [];
       const uniq = [...new Set(ids)];
       if (uniq.length === 1) resolutions[rowIdx] = { kind: "theme", themeId: uniq[0]!, method: "model" };
@@ -406,7 +440,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   const themes = allOut(d, scores);
   const discovery = await discover(d, input.market, trace);
   const city = input.market.label.split(",")[0]!.replace(/ (sample )?club$/, "");
-  const nights: PlanNight[] = input.nights.map((n) => ({ ...n, themeId: n.themeId && themes[n.themeId] ? n.themeId : null }));
+  const nights: PlanNight[] = input.nights.map((n) => ({ ...n, themeId: n.themeId && Object.hasOwn(themes, n.themeId) ? n.themeId : null }));
   const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows] : [], city });
   trace.push(...res.trace);
 
@@ -414,27 +448,48 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   const libraryProposals = res.proposals.filter((p) => !p.discovered);
   if (libraryProposals.length > 0) {
     const label = (id: string): string => d.library.find((t) => t.id === id)?.label ?? id;
-    // Opaque ids: the real ones contain the date, which the model has no business seeing.
-    const facts = libraryProposals.map((p, i) => ({ id: String(i + 1), planned: label(p.fromThemeId), proposed: label(p.toThemeId) }));
-    const reply = await runModel(
-      d,
-      "For each swap write ONE sentence of at most 20 words saying people near the ballpark like the proposed theme more than the average theme and the planned theme less. Use only the two theme names given. No digits. Never mention sponsors, dates, tickets, sales, attendance or revenue. Reply with JSON only: [{\"id\": string, \"why\": string}].",
-      JSON.stringify(facts),
-      trace,
-      "Writing the reasons for the swaps",
-      300,
-    );
-    const parsed = jsonIn(reply);
-    if (Array.isArray(parsed)) {
-      for (const item of parsed as Array<{ id?: unknown; why?: unknown }>) {
-        if (typeof item?.id !== "string" || typeof item.why !== "string") continue;
-        const p = libraryProposals[Number(item.id) - 1];
-        const text = item.why.trim();
-        if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text)) {
-          // The code, not the model, says what stays: the date and the sponsor always do.
-          whys.set(p.id, `${/[.!?]$/.test(text) ? text : `${text}.`} ${p.sponsor ? "The date and sponsor stay the same." : "The date stays the same."}`);
-        } else trace.push(step(iso(d), "model", `Dropped the model's reason for swap ${item.id}: it went beyond the taste comparison, so the template text is used.`));
+    const pairOf = (p: (typeof libraryProposals)[number]): string => `${label(p.fromThemeId)}>${label(p.toThemeId)}`;
+    // The wording depends only on the two theme names, so it is cached by the sorted pairs and shared across markets.
+    const key = `ai:why:v1:${await sha256Hex(libraryProposals.map(pairOf).sort().join("\n"))}`;
+    const saved = await safeGet(d.kv, key);
+    let byPair: Record<string, string> | null = null;
+    if (saved !== null) {
+      try {
+        byPair = JSON.parse(saved) as Record<string, string>;
+        trace.push(step(iso(d), "model", "Writing the reasons for the swaps: used the saved wording (no model call)."));
+      } catch {
+        byPair = null;
       }
+    }
+    if (byPair === null) {
+      byPair = {};
+      // Opaque ids: the real ones contain the date, which the model has no business seeing.
+      const facts = libraryProposals.map((p, i) => ({ id: String(i + 1), planned: label(p.fromThemeId), proposed: label(p.toThemeId) }));
+      const reply = await runModel(
+        d,
+        "For each swap write ONE sentence of at most 22 words, in this shape: \"Fans here lean toward <proposed> more than <planned>, compared with this market's usual.\" Use only the two theme names given. No digits. Never mention sponsors, dates, tickets, sales, attendance or revenue. Reply with JSON only: [{\"id\": string, \"why\": string}].",
+        JSON.stringify(facts),
+        trace,
+        "Writing the reasons for the swaps",
+        300,
+      );
+      const parsed = jsonIn(reply);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed as Array<{ id?: unknown; why?: unknown }>) {
+          if (typeof item?.id !== "string" || typeof item.why !== "string") continue;
+          const p = libraryProposals[Number(item.id) - 1];
+          const text = item.why.trim();
+          if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text)) byPair[pairOf(p)] = text;
+          else trace.push(step(iso(d), "model", `Dropped the model's reason for swap ${item.id}: it went beyond the taste comparison, so the template text is used.`));
+        }
+      }
+      // Only a real reply is saved, good or not, so the same swaps never ask the model twice. A skipped call (no model, cap) is not.
+      if (reply !== null) await safePut(d.kv, key, JSON.stringify(byPair), { expirationTtl: TTL });
+    }
+    for (const p of libraryProposals) {
+      const text = byPair[pairOf(p)];
+      // The code, not the model, says what stays: the date and the sponsor always do.
+      if (typeof text === "string" && text.length > 0) whys.set(p.id, `${/[.!?]$/.test(text) ? text : `${text}.`} ${p.sponsor ? "The date and sponsor stay the same." : "The date stays the same."}`);
     }
   }
   return {
@@ -449,6 +504,15 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   const trace: TraceStep[] = [];
   const theme = d.library.find((t) => t.id === input.themeId);
   if (!theme) throw new Error(`Unknown theme ${input.themeId}`);
+  // One live re-check per market and theme per day: a repeat returns the answer already on file.
+  const rcKey = `rc:v1:${marketKey(input.market)}:${theme.id}`;
+  if ((await safeGet(d.kv, rcKey)) !== null) {
+    const scores = await getScores(d, input.market, trace);
+    const all = allOut(d, scores);
+    trace.push(step(iso(d), "note", `Re-check ${theme.label}: checked with Qloo within the last day, so the saved answer is returned.`));
+    return { theme: all[theme.id]!, themes: all, trace, caps: await capsOf(d), withinDay: true };
+  }
+  if (d.gate && !(await d.gate.allow("recheck"))) throw new QuotaError("recheck");
   const need = new Set(theme.entities.map((e) => e.type)).size;
   if (!(await reserveQloo(d, need))) throw new CappedError();
   trace.push(step(iso(d), "note", `Re-checking ${theme.label} live, ignoring the recorded result.`));
@@ -456,40 +520,10 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   // The market's own average moves when one theme is re-read, so every index is recomputed from the updated record.
   const scores = await getScores(d, input.market, trace);
   scores.stored.themes[theme.id] = fresh;
-  await d.kv.put(cacheKey(d, input.market), JSON.stringify(scores.stored), { expirationTtl: TTL });
+  await safePut(d.kv, cacheKey(d, input.market), JSON.stringify(scores.stored), { expirationTtl: TTL });
+  await safePut(d.kv, rcKey, iso(d), { expirationTtl: 86400 });
   const all = allOut(d, scores);
   const out = all[theme.id]!;
   if (d.mode !== "synthetic") out.source = "live";
   return { theme: out, themes: all, trace, caps: await capsOf(d) };
-}
-
-// ---------- memo ----------
-
-export async function memoSummary(
-  d: Deps,
-  input: { market: MarketIn; swaps: Array<{ date: string; fromThemeId: string; toThemeId: string }>; nights: number; classic: number },
-): Promise<MemoResponse> {
-  const trace: TraceStep[] = [];
-  const scores = await getScores(d, input.market, trace);
-  const themes = allOut(d, scores);
-  const facts = input.swaps.map((s) => ({ date: s.date, fromThemeId: s.fromThemeId, toThemeId: s.toThemeId, fromZ: themes[s.fromThemeId]?.index ?? null, toZ: themes[s.toThemeId]?.index ?? null, fromScore: themes[s.fromThemeId]?.score ?? null, toScore: themes[s.toThemeId]?.score ?? null }));
-  const k = input.swaps.length;
-  const template = `For ${input.market.label}, we compared ${input.nights} planned theme nights with what this market leans toward. ${k === 0 ? "No swaps were approved, so the calendar is unchanged." : `${k} swap${k === 1 ? " was" : "s were"} approved; each keeps its date and sponsor.`} Classic nights stay as planned. This describes local taste; it is not a forecast of attendance.`;
-  let summary = template;
-  let summarySource: "model" | "template" = "template";
-  if (k > 0) {
-    const label = (id: string): string => d.library.find((t) => t.id === id)?.label ?? id;
-    const reply = await runModel(
-      d,
-      "You write a two-sentence summary for a sponsor memo about approved theme-night swaps. Use ONLY the facts given. Describe local taste only; never say or imply a swap will raise attendance, sales or revenue. Use no digits except the counts you are given. Reply with plain text only.",
-      JSON.stringify({ club: input.market.label, nightsReviewed: input.nights, swapsApproved: k, swaps: input.swaps.map((s) => `${label(s.fromThemeId)} to ${label(s.toThemeId)}`) }),
-      trace, "Writing the memo summary", 300,
-    );
-    const text = reply?.trim() ?? "";
-    if (text && text.length <= 600 && numbersAreGrounded(text, [input.nights, k]) && !claimsOutcome(text)) {
-      summary = text;
-      summarySource = "model";
-    } else if (text) trace.push(step(iso(d), "model", "Dropped the model's memo summary: it broke the grounding rules, so the template text is used."));
-  }
-  return { summary, summarySource, swaps: facts, recordedOn: scores.source === "cache" ? scores.stored.fetchedAt.slice(0, 10) : null, trace };
 }

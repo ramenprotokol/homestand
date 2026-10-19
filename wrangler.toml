@@ -11,7 +11,30 @@ binding = "AI"
 binding = "CACHE"
 id = "4447d78d27ae4134966ec9bac7984b85"
 
-# Production. Secrets (not here): QLOO_API_KEY. Non-secret values only.
+# Per-client request limits per minute (Cloudflare Rate Limiting binding; period must be 10 or 60). Keys are hashed client ids,
+# an IPv6 caller counting as its /64. These mirror LIMITS in src/worker/limits.ts. Not inherited by [env.check], which sets its own.
+[[ratelimits]]
+name = "LIMIT_GEOCODE"
+namespace_id = "41001"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "LIMIT_ANALYZE"
+namespace_id = "41002"
+simple = { limit = 12, period = 60 }
+
+[[ratelimits]]
+name = "LIMIT_PROPOSE"
+namespace_id = "41003"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "LIMIT_RECHECK"
+namespace_id = "41004"
+simple = { limit = 6, period = 60 }
+
+# Production. Secrets (not here): QLOO_API_KEY and MARKET_SIGNING_KEY (any random string of 16+ characters; without it only the
+# sample clubs work). Non-secret values only.
 [vars]
 ALLOWED_ORIGINS = "https://homestand-6az.pages.dev"
 QLOO_API_URL = "https://hackathon.api.qloo.com"
@@ -23,12 +46,35 @@ AI_DAILY_CAP = "150"
 # (No [ai] here on purpose: wrangler warns that "ai" is not inherited. That is the point.)
 [env.check]
 [env.check.vars]
-ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+ALLOWED_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173,http://127.0.0.1:5199"
 QLOO_API_URL = "https://hackathon.api.qloo.com"
 QLOO_MODE = "synthetic"
+# A fixed, non-secret key: local runs and e2e only. Production sets its own secret.
+MARKET_SIGNING_KEY = "local-dev-signing-key-not-a-secret"
 QLOO_DAILY_CAP = "400"
 AI_DAILY_CAP = "150"
 
 [[env.check.kv_namespaces]]
 binding = "CACHE"
 id = "00000000000000000000000000000000"
+
+# Local runs and e2e get roomy limits so a whole test run does not trip them.
+[[env.check.ratelimits]]
+name = "LIMIT_GEOCODE"
+namespace_id = "41011"
+simple = { limit = 600, period = 60 }
+
+[[env.check.ratelimits]]
+name = "LIMIT_ANALYZE"
+namespace_id = "41012"
+simple = { limit = 600, period = 60 }
+
+[[env.check.ratelimits]]
+name = "LIMIT_PROPOSE"
+namespace_id = "41013"
+simple = { limit = 600, period = 60 }
+
+[[env.check.ratelimits]]
+name = "LIMIT_RECHECK"
+namespace_id = "41014"
+simple = { limit = 600, period = 60 }

@@ -7,6 +7,8 @@ export interface MarketIn {
   label: string;
   lon: number;
   lat: number;
+  /** Signature from /api/geocode. Sample clubs need none. */
+  sig?: string;
 }
 
 export interface EntityOut {
@@ -119,30 +121,16 @@ export interface RecheckResponse {
   themes: Record<string, ThemeScoreOut>;
   trace: TraceStep[];
   caps: Caps;
-}
-
-export interface MemoSwapFacts {
-  date: string;
-  fromThemeId: string;
-  toThemeId: string;
-  fromZ: number | null;
-  toZ: number | null;
-  fromScore: number | null;
-  toScore: number | null;
-}
-
-export interface MemoResponse {
-  summary: string;
-  summarySource: "model" | "template";
-  swaps: MemoSwapFacts[];
-  recordedOn: string | null;
-  trace: TraceStep[];
+  /** True when this theme was already re-checked live in the last 24 hours and the saved answer came back. */
+  withinDay?: boolean;
 }
 
 export interface GeoHit {
   label: string;
   lon: number;
   lat: number;
+  /** HMAC the search endpoint issued for this place; the API only accepts searched places and the sample clubs. */
+  sig: string;
 }
 
 export interface ApiError {

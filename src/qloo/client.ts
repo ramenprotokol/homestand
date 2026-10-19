@@ -135,7 +135,11 @@ export function createQlooClient(opts: ClientOptions) {
         await sleep(1000 * 2 ** attempt);
         continue;
       }
-      if (!res.ok) throw new Error(`Qloo ${path}: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+      if (!res.ok) {
+        // The body stays in the server log; it never reaches an error message the app might show.
+        console.error("Qloo error body", path, (await res.text()).slice(0, 200));
+        throw new Error(`Qloo ${path}: HTTP ${res.status}`);
+      }
       const body: unknown = await res.json();
       opts.onResponse?.(path, params, body);
       return body;

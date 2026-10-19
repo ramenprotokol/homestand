@@ -1,13 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/app/score";
-import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { activeLibrary } from "../../src/app/themes/ids";
-import { memoSummary, replyText, type Deps } from "../../src/worker/agent";
+import type { TraceStep } from "../../src/app/trace";
+import { replyText, runModel, type Deps } from "../../src/worker/agent";
 import { memoryKv, type AiPort } from "../../src/worker/ports";
 import { syntheticQlooFetch } from "../../src/worker/synthetic";
 
-const biloxi = SAMPLE_MARKETS[0]!;
-const market = { label: biloxi.label, lon: biloxi.lon, lat: biloxi.lat };
 const TEXT = "The new theme sits closer to what people near the ballpark like than the planned one.";
 
 function deps(ai: AiPort | null, over: Partial<Deps> = {}): Deps {
@@ -16,8 +14,12 @@ function deps(ai: AiPort | null, over: Partial<Deps> = {}): Deps {
     now: () => new Date("2026-10-15T12:00:00.000Z"), qlooDailyCap: 400, aiDailyCap: 150, qlooDelayMs: 0, ...over,
   };
 }
-const swap = { date: "2026-07-03", fromThemeId: "elvis", toThemeId: "grateful-dead" };
-const run = (ai: AiPort, over: Partial<Deps> = {}) => memoSummary(deps(ai, over), { market, swaps: [swap], nights: 24, classic: 3 });
+
+async function run(ai: AiPort, over: Partial<Deps> = {}): Promise<{ text: string | null; trace: TraceStep[] }> {
+  const trace: TraceStep[] = [];
+  const text = await runModel(deps(ai, over), "system", "user", trace, "Asking", 100);
+  return { text, trace };
+}
 
 describe("model reply shapes", () => {
   it("reads every shape Workers AI has returned", () => {
@@ -29,30 +31,37 @@ describe("model reply shapes", () => {
     expect(replyText({ response: "  " })).toBeNull();
     expect(replyText(null)).toBeNull();
   });
-  it("uses the model's text from the OpenAI chat shape", async () => {
-    const m = await run({ run: async () => ({ choices: [{ message: { content: TEXT } }] }) });
-    expect(m.summarySource).toBe("model");
-    expect(m.summary).toBe(TEXT);
-    expect(m.trace.some((t) => t.text.includes("the model replied"))).toBe(true);
-  });
-  it("uses the model's text from a response string and from a parsed object", async () => {
-    expect((await run({ run: async () => ({ response: TEXT }) })).summarySource).toBe("model");
-    // A model that returns JSON already parsed gives text via JSON.stringify, which the guard may reject; the reply itself is still read.
-    const m = await run({ run: async () => ({ response: { note: "x" } }) });
-    expect(m.trace.some((t) => t.text.includes("the model replied"))).toBe(true);
+  it("uses the model's text from the OpenAI chat shape, a response string and a parsed object", async () => {
+    expect((await run({ run: async () => ({ choices: [{ message: { content: TEXT } }] }) })).text).toBe(TEXT);
+    expect((await run({ run: async () => ({ response: TEXT }) })).text).toBe(TEXT);
+    const r = await run({ run: async () => ({ response: { note: "x" } }) });
+    expect(r.text).toBe('{"note":"x"}');
+    expect(r.trace.some((t) => t.text.includes("the model replied"))).toBe(true);
   });
   it("says plainly when a reply can't be used", async () => {
-    const m = await run({ run: async () => ({}) });
-    expect(m.summarySource).toBe("template");
-    const line = m.trace.find((t) => t.kind === "model")!;
-    expect(line.text).toContain("the model's reply couldn't be used, so template text is used");
-    expect(line.text).not.toContain("one call");
+    const r = await run({ run: async () => ({}) });
+    expect(r.text).toBeNull();
+    expect(r.trace[0]!.text).toContain("the model's reply couldn't be used, so template text is used");
+    expect(r.trace[0]!.text).not.toContain("one call");
   });
   it("gives up on a slow model after the time limit and uses the template", async () => {
     const started = Date.now();
-    const m = await run({ run: () => new Promise(() => undefined) }, { aiTimeoutMs: 30 });
+    const r = await run({ run: () => new Promise(() => undefined) }, { aiTimeoutMs: 30 });
     expect(Date.now() - started).toBeLessThan(2000);
-    expect(m.summarySource).toBe("template");
-    expect(m.trace.some((t) => t.text.includes("the model took too long"))).toBe(true);
+    expect(r.text).toBeNull();
+    expect(r.trace.some((t) => t.text.includes("the model took too long"))).toBe(true);
+  });
+  it("keeps upstream error text out of the trace", async () => {
+    const r = await run({ run: async () => { throw new Error("secret upstream detail: token=abc123"); } });
+    expect(r.text).toBeNull();
+    expect(JSON.stringify(r.trace)).not.toMatch(/secret upstream|abc123/);
+    expect(r.trace[0]!.text).toContain("the model call failed, so template text is used");
+  });
+  it("stops at the per-client daily allowance without calling the model", async () => {
+    let calls = 0;
+    const r = await run({ run: async () => (calls++, { response: TEXT }) }, { gate: { allow: async () => false } });
+    expect(calls).toBe(0);
+    expect(r.text).toBeNull();
+    expect(r.trace[0]!.text).toContain("your daily model allowance is spent");
   });
 });

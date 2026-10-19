@@ -2,13 +2,33 @@ import { activeLibrary, COMMITTED_IDS } from "../app/themes/ids";
 import { REFERENCE, SYNTHETIC_REFERENCE } from "../app/score";
 import type { Deps } from "./agent";
 import type { Env } from "./env";
+import { memoryLimiter, ipBucket, type Limiter } from "./limits";
 import { route, type RouterDeps } from "./router";
 import { syntheticQlooFetch } from "./synthetic";
 
 async function clientId(req: Request): Promise<string> {
-  const ip = req.headers.get("cf-connecting-ip") ?? "local";
+  const ip = ipBucket(req.headers.get("cf-connecting-ip") ?? "local");
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(ip));
   return [...new Uint8Array(buf).slice(0, 8)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+let fallback: { scale: number; limiter: Limiter } | null = null;
+
+/** Cloudflare's Rate Limiting binding per route; the in-memory counter when a binding is absent. A binding error lets the request through. */
+function limiterFor(env: Env, scale: number): Limiter {
+  const bound: Record<string, RateLimit | undefined> = { geocode: env.LIMIT_GEOCODE, analyze: env.LIMIT_ANALYZE, propose: env.LIMIT_PROPOSE, recheck: env.LIMIT_RECHECK };
+  if (!fallback || fallback.scale !== scale) fallback = { scale, limiter: memoryLimiter(scale) };
+  const mem = fallback.limiter;
+  return async (route, id) => {
+    const b = bound[route];
+    if (!b) return mem(route, id);
+    try {
+      return (await b.limit({ key: `${route}:${id}` })).success;
+    } catch (err) {
+      console.error("rate limit binding failed", err instanceof Error ? err.message : String(err));
+      return true;
+    }
+  };
 }
 
 const num = (v: string | undefined, fallback: number): number => {
@@ -34,12 +54,12 @@ function depsFor(env: Env): RouterDeps {
   };
   return {
     agent,
-    kv: env.CACHE,
     allowedOrigins: (env.ALLOWED_ORIGINS ?? "").split(",").map((s) => s.trim()).filter(Boolean),
     // Wrapped: a bare `fetch` called as `deps.geocodeFetch(...)` has the wrong `this` in Workers ("Illegal invocation").
     geocodeFetch: (input, init) => fetch(input, init),
     clientId,
-    limitScale: num(env.RATE_LIMIT_SCALE, 1),
+    limiter: limiterFor(env, num(env.RATE_LIMIT_SCALE, 1)),
+    signingKey: env.MARKET_SIGNING_KEY && env.MARKET_SIGNING_KEY.length >= 16 ? env.MARKET_SIGNING_KEY : null,
   };
 }
 

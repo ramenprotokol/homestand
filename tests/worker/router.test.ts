@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AnalyzeResponse, ApiError, ProposeResponse, RecheckResponse, MemoResponse } from "../../src/app/api-types";
+import type { AnalyzeResponse, ApiError, ProposeResponse, RecheckResponse } from "../../src/app/api-types";
 import { parseCalendar } from "../../src/app/calendar/csv";
 import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/app/score";
 import { sampleCsv } from "../../src/app/samples";
@@ -7,10 +7,13 @@ import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { activeLibrary, COMMITTED_IDS } from "../../src/app/themes/ids";
 import type { Deps } from "../../src/worker/agent";
 import { memoryKv, type AiPort } from "../../src/worker/ports";
+import { memoryLimiter } from "../../src/worker/limits";
 import { route, type RouterDeps } from "../../src/worker/router";
+import { signMarket } from "../../src/worker/sign";
 import { syntheticQlooFetch } from "../../src/worker/synthetic";
 
 const KEY = "SECRET-QLOO-KEY-123";
+const SIGNING_KEY = "test-signing-key-0123456789abcdef";
 const ORIGIN = "http://127.0.0.1:5173";
 
 interface Harness {
@@ -35,7 +38,7 @@ function harness(over: Partial<Deps> = {}, ai: AiPort | null = null, qloo: typeo
     now: () => new Date("2026-10-15T12:00:00.000Z"), qlooDailyCap: 400, aiDailyCap: 150, qlooDelayMs: 0, ...over,
   };
   let ip = "a";
-  const deps: RouterDeps = { agent, kv, allowedOrigins: [ORIGIN], geocodeFetch: async () => new Response("{}"), clientId: async () => ip };
+  const deps: RouterDeps = { agent, allowedOrigins: [ORIGIN], geocodeFetch: async () => new Response("{}"), clientId: async () => ip, limiter: memoryLimiter(1, () => agent.now().getTime()), signingKey: SIGNING_KEY };
   Object.defineProperty(deps, "ip", { set: (v: string) => (ip = v) });
   return { deps, kv, qlooUrls, aiCalls };
 }
@@ -150,7 +153,8 @@ describe("analyze", () => {
   it("stops at the daily cap: cached markets still work, a cold one gets a clear message", async () => {
     const h = harness({ qlooDailyCap: 7 });
     await analyzeOk(h); // uses 5 of 7
-    const cold = await route(post("/api/analyze", { market: { label: "Elsewhere", lon: -100, lat: 40 }, rows }), h.deps);
+    const elsewhere = { label: "Elsewhere, KS", lon: -100, lat: 40 };
+    const cold = await route(post("/api/analyze", { market: { ...elsewhere, sig: await signMarket(SIGNING_KEY, elsewhere) }, rows }), h.deps);
     expect(cold.status).toBe(429);
     expect(((await cold.json()) as ApiError).error).toBe("capped");
     expect(h.qlooUrls).toHaveLength(5);
@@ -439,7 +443,7 @@ describe("propose", () => {
   });
 });
 
-describe("recheck and memo", () => {
+describe("recheck", () => {
   it("re-checks one theme live, bypassing the cache, and updates it", async () => {
     const h = harness();
     await analyzeOk(h);
@@ -463,18 +467,6 @@ describe("recheck and memo", () => {
   it("rejects an unknown theme", async () => {
     expect((await route(post("/api/recheck", { market, themeId: "nope" }), harness().deps)).status).toBe(400);
   });
-  it("builds the memo summary from computed facts", async () => {
-    const h = harness();
-    const out = await analyzeOk(h);
-    const away = out.nights.find((n) => n.label === "leans-away" && !n.locked)!;
-    const res = await route(post("/api/memo", { market, swaps: [{ date: away.date, fromThemeId: away.themeId, toThemeId: "paw-patrol" }], nights: out.nights.length, classic: 4 }), h.deps);
-    const m = (await res.json()) as MemoResponse;
-    expect(m.summary).toContain("1 swap was approved");
-    expect(m.summarySource).toBe("template");
-    expect(m.swaps[0]).toMatchObject({ date: away.date, fromThemeId: away.themeId });
-    expect(m.swaps[0]!.toScore).not.toBeNull();
-    expect(m.summary).not.toMatch(/attendance (will|to)/i);
-  });
 });
 
 describe("geocode", () => {
@@ -485,7 +477,7 @@ describe("geocode", () => {
       return new Response(JSON.stringify({ results: [{ name: "Tulsa", admin1: "Oklahoma", country_code: "US", latitude: 36.15, longitude: -95.99, feature_code: "PPLA2" }, { name: "Tulsa Airport", latitude: 1, longitude: 2, feature_code: "AIRP" }] }));
     };
     const res = await route(new Request("https://api.test/api/geocode?q=Tulsa", { headers: { origin: ORIGIN } }), h.deps);
-    expect(((await res.json()) as { results: unknown[] }).results).toEqual([{ label: "Tulsa, OK", lon: -95.99, lat: 36.15 }]);
+    expect(((await res.json()) as { results: unknown[] }).results).toEqual([{ label: "Tulsa, OK", lon: -95.99, lat: 36.15, sig: await signMarket(SIGNING_KEY, { label: "Tulsa, OK", lon: -95.99, lat: 36.15 }) }]);
     expect((await route(new Request("https://api.test/api/geocode?q=a"), h.deps)).status).toBe(400);
   });
 
@@ -539,5 +531,233 @@ describe("geocode", () => {
     };
     expect((await geo(h3)).status).toBe(502);
     expect(calls3).toBe(1);
+  });
+});
+
+// ---------- security ----------
+
+const signed = async (m: { label: string; lon: number; lat: number }) => ({ ...m, sig: await signMarket(SIGNING_KEY, m) });
+const analyzeWith = (h: Harness, m: unknown) => route(post("/api/analyze", { market: m, rows }), h.deps);
+
+describe("markets must come from the search", () => {
+  it("accepts a searched place, rejects a tampered or unsigned one, and lets the sample clubs through without a signature", async () => {
+    const h = harness();
+    const tulsa = await signed({ label: "Tulsa, OK", lon: -95.99, lat: 36.15 });
+    expect((await analyzeWith(h, tulsa)).status).toBe(200);
+    for (const bad of [{ ...tulsa, lon: tulsa.lon + 0.001 }, { ...tulsa, label: "Tulsa, KS" }, { ...tulsa, sig: "0".repeat(64) }, { label: tulsa.label, lon: tulsa.lon, lat: tulsa.lat }]) {
+      const res = await analyzeWith(h, bad);
+      expect(res.status).toBe(400);
+      expect(((await res.json()) as ApiError).error).toBe("bad-market");
+    }
+    expect((await analyzeWith(h, market)).status).toBe(200);
+    // propose and recheck are guarded the same way
+    expect((await route(post("/api/propose", { market: { ...tulsa, lat: 0 }, nights: [{ index: 0, date: "2026-05-01", themeId: null, sponsor: "", locked: false, notes: "" }], allowDuplicates: false }), h.deps)).status).toBe(400);
+    expect((await route(post("/api/recheck", { market: { ...tulsa, lat: 0 }, themeId: "bluey" }), h.deps)).status).toBe(400);
+  });
+
+  it("fails closed for searched places when the signing key is missing, but still serves the sample clubs", async () => {
+    const h = harness();
+    h.deps.signingKey = null;
+    const tulsa = await signed({ label: "Tulsa, OK", lon: -95.99, lat: 36.15 });
+    expect((await analyzeWith(h, tulsa)).status).toBe(400);
+    expect((await analyzeWith(h, market)).status).toBe(200);
+  });
+
+  it("signs every geocode hit, and the signature verifies", async () => {
+    const h = harness();
+    h.deps.agent.mode = "synthetic";
+    const res = await route(new Request("https://api.test/api/geocode?q=Tulsa", { headers: { origin: ORIGIN } }), h.deps);
+    const hit = ((await res.json()) as { results: Array<{ label: string; lon: number; lat: number; sig: string }> }).results[0]!;
+    expect(hit.sig).toMatch(/^[0-9a-f]{64}$/);
+    h.deps.agent.mode = "live";
+    expect((await analyzeWith(h, hit)).status).toBe(200);
+  });
+
+  it("strips control characters from the label", async () => {
+    const h = harness();
+    const m = { label: "Tul\u0000sa\r\nOK", lon: -95.99, lat: 36.15 };
+    const clean = { label: "TulsaOK", lon: m.lon, lat: m.lat };
+    const res = await analyzeWith(h, { ...m, sig: await signMarket(SIGNING_KEY, clean) });
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as AnalyzeResponse).market.label).toBe("TulsaOK");
+  });
+});
+
+describe("per-client daily quotas", () => {
+  const city = (i: number) => signed({ label: `City ${i}, KS`, lon: -100 + i * 0.5, lat: 38 });
+
+  it("allows 6 new-city pulls a day per client, never counts sample clubs or cached cities, and is per client", async () => {
+    const h = harness();
+    for (let i = 0; i < 6; i++) expect((await analyzeWith(h, await city(i))).status).toBe(200);
+    const seventh = await analyzeWith(h, await city(6));
+    expect(seventh.status).toBe(429);
+    const body = (await seventh.json()) as ApiError;
+    expect(body.error).toBe("quota");
+    expect(body.message).toContain("sample clubs still work");
+    // sample clubs and a city already pulled are still fine
+    expect((await analyzeWith(h, market)).status).toBe(200);
+    expect((await analyzeWith(h, await city(0))).status).toBe(200);
+    // another client has its own allowance
+    (h.deps as unknown as { ip: string }).ip = "b";
+    expect((await analyzeWith(h, await city(6))).status).toBe(200);
+  });
+
+  it("allows 10 live re-checks a day per client", async () => {
+    const h = harness();
+    h.deps.limiter = memoryLimiter(10, () => h.deps.agent.now().getTime()); // the per-minute limit is a separate guard
+    const ids = activeLibrary({}, true).map((t) => t.id).slice(0, 11);
+    await analyzeOk(h);
+    const statuses: number[] = [];
+    for (const themeId of ids) statuses.push((await route(post("/api/recheck", { market, themeId }), h.deps)).status);
+    expect(statuses.slice(0, 10).every((x) => x === 200)).toBe(true);
+    expect(statuses[10]).toBe(429);
+  });
+});
+
+describe("model answers are cached", () => {
+  const names = (...t: string[]) => t.map((theme, i) => ({ line: i + 2, date: `2026-04-${10 + i}`, theme, sponsor: "", locked: false, notes: "" }));
+
+  it("a repeat of the same unknown names costs no model call, whatever their order", async () => {
+    const ai: AiPort = { run: async () => ({ response: '{"0": [], "1": []}' }) };
+    const h = harness({}, ai);
+    await route(post("/api/analyze", { market, rows: names("Blue Heeler Pups Night", "Mystery Night") }), h.deps);
+    expect(h.aiCalls).toHaveLength(1);
+    await route(post("/api/analyze", { market, rows: names("mystery  night", "Blue Heeler Pups Night") }), h.deps);
+    expect(h.aiCalls).toHaveLength(1);
+    await route(post("/api/analyze", { market, rows: names("Another Mystery") }), h.deps);
+    expect(h.aiCalls).toHaveLength(2);
+  });
+
+  it("the same swaps ask the model for reasons once, and share the answer across markets", async () => {
+    const ai: AiPort = {
+      run: async (_m, input) => {
+        const msgs = (input as { messages: Array<{ content: string }> }).messages;
+        if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
+        const user = JSON.parse(msgs[1]!.content) as Array<{ id: string; planned: string; proposed: string }>;
+        return { response: JSON.stringify(user.map((f) => ({ id: f.id, why: `Fans here lean toward ${f.proposed} more than ${f.planned}, compared with this market's usual.` }))) };
+      },
+    };
+    const h = harness({}, ai);
+    const out = await analyzeOk(h, akronBody);
+    const plan = out.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
+    const swapCalls = () => h.aiCalls.filter((c) => /swap/.test((c as { messages: Array<{ content: string }> }).messages[0]!.content)).length;
+    const first = (await (await route(post("/api/propose", { market: akronBody.market, nights: plan, allowDuplicates: false }), h.deps)).json()) as ProposeResponse;
+    expect(swapCalls()).toBe(1);
+    expect(first.proposals.some((p) => p.whySource === "model")).toBe(true);
+    const second = (await (await route(post("/api/propose", { market: akronBody.market, nights: plan, allowDuplicates: false }), h.deps)).json()) as ProposeResponse;
+    expect(swapCalls()).toBe(1);
+    expect(second.proposals.map((p) => p.why)).toEqual(first.proposals.map((p) => p.why));
+    expect(second.trace.some((t) => /saved wording \(no model call\)/.test(t.text))).toBe(true);
+  });
+});
+
+describe("recheck once a day per market and theme", () => {
+  it("returns the saved answer within a day, with no Qloo call, and writes the marker with a 24 hour life", async () => {
+    const h = harness();
+    await analyzeOk(h);
+    const puts: Array<[string, number | undefined]> = [];
+    const put = h.deps.agent.kv.put.bind(h.deps.agent.kv);
+    h.deps.agent.kv.put = async (k, v, o) => (puts.push([k, o?.expirationTtl]), put(k, v, o));
+    h.qlooUrls.length = 0;
+    const first = (await (await route(post("/api/recheck", { market, themeId: "bluey" }), h.deps)).json()) as RecheckResponse;
+    expect(first.withinDay).toBeUndefined();
+    expect(h.qlooUrls.length).toBeGreaterThan(0);
+    expect(puts.find(([k]) => k.startsWith("rc:v1:"))![1]).toBe(86400);
+    h.qlooUrls.length = 0;
+    const again = (await (await route(post("/api/recheck", { market, themeId: "bluey" }), h.deps)).json()) as RecheckResponse;
+    expect(again.withinDay).toBe(true);
+    expect(h.qlooUrls).toHaveLength(0);
+    expect(again.trace.some((t) => /within the last day/.test(t.text))).toBe(true);
+    // a different theme is a separate re-check
+    expect(((await (await route(post("/api/recheck", { market, themeId: "star-wars" }), h.deps)).json()) as RecheckResponse).withinDay).toBeUndefined();
+  });
+});
+
+describe("closed doors", () => {
+  it("has no memo route", async () => {
+    const h = harness();
+    const res = await route(post("/api/memo", { market, swaps: [], nights: 1, classic: 0 }), h.deps);
+    expect(res.status).toBe(404);
+  });
+
+  it("rejects an oversized body early, by declared length and by streaming, without reading it all", async () => {
+    const h = harness();
+    const declared = new Request("https://api.test/api/analyze", { method: "POST", body: "{}", headers: { origin: ORIGIN, "content-type": "application/json", "content-length": "5000000" } });
+    expect((await route(declared, h.deps)).status).toBe(413);
+    let pulled = 0;
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(c) {
+        pulled++;
+        c.enqueue(new Uint8Array(100_000));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const chunked = new Request("https://api.test/api/analyze", { method: "POST", body: stream, headers: { origin: ORIGIN, "content-type": "application/json" }, duplex: "half" } as RequestInit);
+    expect((await route(chunked, h.deps)).status).toBe(413);
+    expect(cancelled).toBe(true);
+    expect(pulled).toBeLessThan(10);
+  });
+
+  it("refuses __proto__ and other non-library theme ids", async () => {
+    const h = harness();
+    for (const themeId of ["__proto__", "constructor", "toString", "nope"]) {
+      const res = await route(post("/api/propose", { market, nights: [{ index: 0, date: "2026-05-01", themeId, sponsor: "", locked: false, notes: "" }], allowDuplicates: false }), h.deps);
+      expect(res.status, themeId).toBe(400);
+    }
+    expect((await route(post("/api/recheck", { market, themeId: "__proto__" }), h.deps)).status).toBe(400);
+  });
+
+  it("answers with nosniff and a locked-down CSP", async () => {
+    const res = await route(post("/api/analyze", analyzeBody), harness().deps);
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; frame-ancestors 'none'");
+  });
+
+  it("keeps upstream error text out of the trace, and out of the response", async () => {
+    const h = harness({}, null, async (input, init) => (new URL(String(input)).searchParams.has("filter.tags") ? new Response("SECRET-UPSTREAM-BODY", { status: 400 }) : syntheticQlooFetch(input, init)));
+    const out = await analyzeOk(h, akronBody);
+    const plan = out.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
+    const res = await route(post("/api/propose", { market: akronBody.market, nights: plan, allowDuplicates: false }), h.deps);
+    const text = await res.text();
+    expect(text).not.toContain("SECRET-UPSTREAM-BODY");
+    expect(text).toContain("were not available right now");
+  });
+
+  it("serves the request even when KV writes fail", async () => {
+    const h = harness();
+    h.deps.agent.kv.put = async () => {
+      throw new Error("KV put() limit exceeded for the day");
+    };
+    const res = await route(post("/api/analyze", analyzeBody), h.deps);
+    expect(res.status).toBe(200);
+  });
+});
+
+describe("KV writes per visit (the free plan allows about 1,000 a day)", () => {
+  async function visit(h: Harness): Promise<void> {
+    const out = await analyzeOk(h, akronBody);
+    const plan = out.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
+    expect((await route(post("/api/propose", { market: akronBody.market, nights: plan, allowDuplicates: false }), h.deps)).status).toBe(200);
+  }
+  it("a visit to a warm sample club writes nothing; the first visit writes a handful", async () => {
+    const ai: AiPort = { run: async (_m, input) => {
+      const msgs = (input as { messages: Array<{ content: string }> }).messages;
+      if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
+      const user = JSON.parse(msgs[1]!.content) as Array<{ id: string }>;
+      return { response: JSON.stringify(user.map((f) => ({ id: f.id, why: "Fans here lean toward the new theme more than the planned one, compared with this market's usual." }))) };
+    } };
+    const h = harness({}, ai);
+    const puts: string[] = [];
+    const put = h.deps.agent.kv.put.bind(h.deps.agent.kv);
+    h.deps.agent.kv.put = async (k, v, o) => (puts.push(k.split(":")[0]!), put(k, v, o));
+    await visit(h);
+    const cold = puts.length;
+    expect(cold).toBeLessThanOrEqual(10);
+    puts.length = 0;
+    await visit(h);
+    expect(puts).toEqual([]); // everything is read from the saved answers: no scores, ideas or model calls to record
   });
 });
