@@ -430,7 +430,7 @@ body.why-open .nav{visibility:hidden}
 .best-badge{display:inline-block;margin-top:2px;padding:3px 9px;border-radius:99px;border:1px solid rgba(255,217,122,.55);font-family:var(--cond);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold2);line-height:1.25;white-space:nowrap}
 .now-card .best-badge{margin:0}
 .advanced{flex:1 1 100%;font-size:13.5px;color:#cfd3ee}
-.advanced summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-family:var(--cond);letter-spacing:.2em;text-transform:uppercase;font-size:12px;color:var(--gold2);list-style-position:inside}
+.advanced summary{cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:600;color:var(--gold2)}
 .advanced-body{display:flex;gap:6px 18px;flex-wrap:wrap;align-items:center;padding:4px 0 8px}
 .dupes-note{flex:1 1 100%;margin:0;font-weight:600;color:#ffe9c4}
 .nofix{max-width:880px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12)}
@@ -446,3 +446,8 @@ body.why-open .nav{visibility:hidden}
 @media (max-width:420px){.swap-card{grid-template-columns:96px minmax(0,1fr)}}
 .venue-eyebrow{margin-top:clamp(28px,4vw,44px)}
 .venue-lede{margin:6px 0 16px;max-width:60ch}
+.bk-bridge{margin-top:1.4cqw;font-size:3.5cqw;line-height:1.3;font-style:italic;color:#5a3a12;text-align:center}
+.ideas--lead{margin:0 0 clamp(16px,2vw,24px);padding:18px 20px;max-width:none;border-color:rgba(255,217,122,.55)}
+.ideas--lead h2{font-size:clamp(22px,2.4vw,30px)}
+.ideas--lead .idea{font-size:15.5px;padding:7px 14px}
+.ideas-lede{margin:0 0 12px;font-size:15px;color:#e2e5f6;max-width:62ch}

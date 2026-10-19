@@ -54,7 +54,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(why).toContainText(/Compared with other ballpark markets, this market scores/);
   await expect(why.getByTestId("why-footer")).toContainText("See how we tested this");
   await expect(why).not.toContainText("coin flip");
-  await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Saved result, pulled from Qloo on|Re-checked live/);
+  await expect(why.getByTestId("source-line")).toContainText(/Pulled from Qloo|Re-checked live/);
   await shot(page, info, "why");
   await why.getByTestId("recheck").click();
   await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked with Qloo within the last day: same answer/);

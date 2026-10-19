@@ -5,7 +5,7 @@ import type { Kind } from "../app/kind";
 import { sampleById } from "../app/markets";
 import { sampleCsv } from "../app/samples";
 import { api, ApiFailure } from "./api";
-import { addTrace, invalidateProposals, reset, state, ui, viewOf } from "./store";
+import { addTrace, invalidateProposals, loadWork, reset, state, ui, viewOf } from "./store";
 
 export const navigate = (hash: string): void => {
   if (location.hash === hash) window.dispatchEvent(new HashChangeEvent("hashchange"));
@@ -60,6 +60,7 @@ export function resumeClub(): void {
   if (!c || state.analysis || ui.loading) return;
   reset();
   Object.assign(state, c);
+  loadWork();
   ui.loading = true;
   ui.error = null;
   void analyzeClub(c);
@@ -87,6 +88,7 @@ export function openSample(id: string): boolean {
   if (state.sampleId === id && (state.analysis || ui.loading || ui.error)) return true;
   const { rows, errors } = parseCalendar(sampleCsv(id));
   void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, id, false, m.kind);
+  loadWork();
   return true;
 }
 
@@ -106,7 +108,6 @@ export async function ensureProposals(): Promise<void> {
       ui.dupesNote = ui.dupesBefore === JSON.stringify(res.proposals.map((x) => x.toThemeId)) ? "No change: no other theme qualifies for these nights." : null;
       ui.dupesBefore = null;
     }
-    state.altChoice = {};
     state.analysis.caps = res.caps;
     addTrace("Fix: propose swaps", res.trace);
   } catch (err) {

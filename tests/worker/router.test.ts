@@ -405,8 +405,8 @@ describe("propose", () => {
       }
       // The under-25 call is gone: nothing asks for a demographic.
       expect(h.qlooUrls.filter((u) => u.searchParams.has("filter.tags") || u.searchParams.has("signal.demographics.age"))).toHaveLength(0);
-      expect(p.discovery!.movies[0]).toMatchObject({ entityId: "SYN-D-movie-3", z: expect.closeTo(2, 5) });
-      expect(p.discovery!.movies[1]!.z).toBeCloseTo(0.6, 5);
+      expect(p.discovery!.movies[0]).toMatchObject({ entityId: "SYN-D-movie-3", z: expect.closeTo(1.795, 5) });
+      expect(p.discovery!.movies[1]!.z).toBeCloseTo(0.395, 5); // 0.6 against the 40 markets, less this market's own pool average (0.205)
       expect(p.discovery!.shows[0]).toMatchObject({ entityId: "SYN-D-tv_show-2" });
       expect(p.discovery).not.toHaveProperty("young");
       expect(p.discovery!.scored).toBe(20);

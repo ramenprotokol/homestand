@@ -71,6 +71,8 @@ export interface NightOut {
   z: number | null;
   /** Set when the name is a library theme we recognise but have no live Qloo scores for. The night is left alone. */
   recognisedAs: string | null;
+  /** Set when the name is a family-title pool entry: scored from that title's own reading near the ballpark. It is never swapped. */
+  pool?: { entityId: string; name: string; type: "movie" | "tv_show"; z: number | null; zRaw: number | null; affinity: number | null };
 }
 
 export interface AnalyzeResponse {
@@ -100,6 +102,8 @@ export interface ProposeNightIn {
 
 /** Qloo's local family ranking for a market: only name, id, type and affinity are kept. */
 export interface DiscoveryOut {
+  /** Server side only (stripped from the response): every scored pool title, for scoring a night named after one. */
+  all?: Discovered[];
   movies: Discovered[];
   shows: Discovered[];
   /** How many of the pool's titles Qloo had a local reading for here, and how big the pool is. */

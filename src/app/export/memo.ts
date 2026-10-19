@@ -17,6 +17,9 @@ export interface MemoSwap {
   source?: "model" | "template";
   /** The new night is a title Qloo found, not a library theme: no local-pull number. */
   discovered?: boolean;
+  /** The Qloo entities that were checked for the planned theme and for the new one (names only). */
+  fromEntities?: string[];
+  toEntities?: string[];
 }
 
 export interface MemoData {
@@ -57,7 +60,7 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "sugg
   const suggested = Math.max(d.suggested, approved);
   const head = `Homestand checked ${d.nights} ${copyFor(d.kind).themeNights} for ${d.club} against local taste data from Qloo.`;
   if (suggested === 0) return `${head} It suggested no swaps, so the calendar is unchanged.`;
-  const said = `It suggested ${suggested} swap${suggested === 1 ? "" : "s"}; you approved ${approved === 0 ? "none" : approved}.`;
+  const said = `It suggested ${suggested} swap${suggested === 1 ? "" : "s"}; ${approved === 0 ? "none is" : approved === 1 ? "1 is" : `${approved} are`} in the revised calendar.`;
   return `${head} ${said} ${approved === 0 ? "The calendar is unchanged." : "Each approved swap keeps its original date and sponsor."}`;
 }
 
@@ -75,7 +78,10 @@ export function buildMemoHtml(d: MemoData): string {
     d.swaps
       .map((s) => {
         const head = `<strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}${s.discovered ? " (Discovered by Qloo)" : ""}, ${escapeHtml(longDate(s.date))}.</strong>`;
-        return collapse && !s.discovered && s.source !== "model" ? `<li>${head}</li>` : `<li>${head} ${escapeHtml(s.why)}</li>`;
+        const checked = s.fromEntities?.length || s.toEntities?.length
+          ? ` Qloo checked ${s.fromEntities?.length ? `${escapeHtml(s.fromEntities.join(", "))} for the planned ${C.night} (${bandText(s.fromZ)})` : ""}${s.fromEntities?.length && s.toEntities?.length ? " and " : ""}${s.toEntities?.length ? `${escapeHtml(s.toEntities.join(", "))} for the swap (${s.discovered ? "found by Qloo, not scored against the library" : bandText(s.toZ)})` : ""}.`
+          : "";
+        return collapse && !s.discovered && s.source !== "model" ? `<li>${head}${checked}</li>` : `<li>${head} ${escapeHtml(s.why)}${checked}</li>`;
       })
       .join("") + (collapse ? `<li>For the library themes, the new theme stands out above this market's own average and the planned one stands out below it. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>` : "");
   const ideas = d.ideas && d.ideas.titles.length > 0
@@ -101,7 +107,6 @@ ${venue ? acts : ideas}
 ${d.angles.length ? `<h2>${venue ? "Locked headliners: support-act ideas" : "Locked nights: sponsor-friendly angles"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
 <p>${escapeHtml(methodWords(d.kind))}</p>
-<p>This describes local taste, not an attendance forecast.</p>
 <p>${d.nights} ${C.nights} were reviewed; ${d.classic} classic ${d.classic === 1 ? C.night : C.nights} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : "(fireworks, giveaways, heritage and similar)"} ${d.classic === 1 ? "was" : "were"} left as planned because they are not a ${venue ? "music" : "pop-culture"} taste. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
 </article>`;
 }

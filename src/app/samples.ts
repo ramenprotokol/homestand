@@ -109,28 +109,28 @@ const CALENDARS: Record<string, N[]> = {
 };
 
 // A made-up summer concert calendar for a sample amphitheatre (venue mode): May to September 2027, fictional sponsors, no real venue or
-// company. Four signed headliners (locked), ten tentative holds naming touring acts, two tribute nights and two classic dates.
+// company. Every act is one that plays amphitheatres (our declared booking tier). Five signed headliners (locked), nine tentative holds naming touring acts, two tribute nights and two classic dates.
 // The holds are ours: they are not anyone's real offers.
 const VENUE_CALENDARS: Record<string, N[]> = {
   raleigh: [
-    ["2027-05-07", "Kenny Chesney", "Longleaf Mutual", true, "Contract signed"],
-    ["2027-05-15", "Stevie Nicks", "", false, "Tentative hold, offer out"],
-    ["2027-05-22", "Kendrick Lamar", "Triangle Taproom", false, "Tentative hold, offer out"],
+    ["2027-05-07", "Dave Matthews Band", "Sunbelt Cooling", true, "Contract signed"],
+    ["2027-05-15", "Zac Brown Band", "", false, "Tentative hold, offer out"],
+    ["2027-05-22", "Hozier", "Triangle Taproom", false, "Tentative hold, offer out"],
     ["2027-05-29", "Yacht Rock Night", "Brightwater Bank", false, "Tribute night"],
-    ["2027-06-05", "Luke Bryan", "", false, "Tentative hold"],
+    ["2027-06-05", "Luke Bryan", "Longleaf Mutual", true, "Contract signed"],
     ["2027-06-12", "Fireworks & Symphony", "Oakleaf Credit Union"],
-    ["2027-06-18", "Dave Matthews Band", "Sunbelt Cooling", true, "Contract signed"],
-    ["2027-06-26", "Green Day", "Triangle Taproom", false, "Tentative hold, offer out"],
-    ["2027-07-02", "Ed Sheeran", "", false, "Tentative hold"],
-    ["2027-07-10", "Bruno Mars", "Longleaf Mutual", true, "Contract signed"],
-    ["2027-07-17", "Zach Bryan", "", false, "Tentative hold"],
-    ["2027-07-24", "Journey", "Oakleaf Credit Union", false, "Tentative hold, offer out"],
+    ["2027-06-18", "Brad Paisley", "", false, "Tentative hold, offer out"],
+    ["2027-06-26", "Journey", "Triangle Taproom", false, "Tentative hold, offer out"],
+    ["2027-07-02", "Old Dominion", "", false, "Tentative hold"],
+    ["2027-07-10", "Phish", "Sunbelt Cooling", true, "Contract signed"],
+    ["2027-07-17", "The Revivalists", "", false, "Tentative hold"],
+    ["2027-07-24", "Stevie Nicks", "Oakleaf Credit Union", false, "Tentative hold, offer out"],
     ["2027-07-31", "Local Battle of the Bands", "Brightwater Bank"],
-    ["2027-08-07", "Phish", "", false, "Tentative hold"],
-    ["2027-08-14", "Karol G", "Sunbelt Cooling", true, "Contract signed"],
+    ["2027-08-07", "Widespread Panic", "", false, "Tentative hold"],
+    ["2027-08-14", "The Lumineers", "Longleaf Mutual", true, "Contract signed"],
     ["2027-08-21", "Emo Night", "Triangle Taproom", false, "Tribute night"],
-    ["2027-08-28", "SZA", "", false, "Tentative hold"],
-    ["2027-09-04", "Foo Fighters", "Oakleaf Credit Union", false, "Tentative hold, offer out"],
+    ["2027-08-28", "Darius Rucker", "", false, "Tentative hold, offer out"],
+    ["2027-09-04", "Jason Aldean", "Oakleaf Credit Union", true, "Contract signed"],
   ],
 };
 

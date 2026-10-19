@@ -1,5 +1,5 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { classicReason, comparisonSentence, fitWord, marketLevelSentence, methodWords, NEAR_TOP_NOTE, vsMarketsWords } from "../../app/score";
+import { bridgeSentence, classicReason, comparisonSentence, fitWord, marketLevelSentence, methodWords, NEAR_TOP_NOTE, vsMarketsWords } from "../../app/score";
 import { cityOfLabel } from "../../app/kind";
 import { themeById } from "../../app/themes/artists";
 import { checkResultLine, cleanTitle, fitSummary, lockedLine } from "../../app/text";
@@ -24,7 +24,7 @@ const legend = (): ReadonlyArray<readonly [CardFit, string, string]> => [
   ["average", "About average", `Liked about as much as the average ${copy().night === "date" ? "act" : "theme"}.`],
   ["leans-away", "Leans away", `Fans here like it less than the average ${copy().night === "date" ? "act" : "theme"}.`],
   ["classic", fitWord("classic", state.kind), copy().night === "date" ? "A proven staple, left alone." : "A proven promo, left alone."],
-  ["not-scored", "Not scored", "No theme match, so no reading."],
+  ["not-scored", "Not scored", copy().night === "date" ? "No act match, so no reading." : "No theme match, so no reading."],
 ];
 
 const city = (): string => cityOfLabel(state.analysis?.market.label ?? "");
@@ -79,7 +79,7 @@ export function checkView(): HTMLElement {
   }
   if (a.recordedAt) {
     const when = formatDateTime(a.recordedAt);
-    notices.push(h("div", { class: "notice", role: "note", "data-testid": "recorded" }, icon("clock"), h("span", null, a.recordedOn ? `These scores were pulled from Qloo on ${when} and saved. "Re-check live" on any night asks Qloo again.` : `These scores were just pulled from Qloo (${when}). "Re-check live" on any night asks Qloo again.`)));
+    notices.push(h("div", { class: "notice", role: "note", "data-testid": "recorded" }, icon("clock"), h("span", null, a.recordedOn ? `These scores were pulled from Qloo on ${when} and saved. "Re-check live" on any ${copy().night} asks Qloo again.` : `These scores were just pulled from Qloo (${when}). "Re-check live" on any ${copy().night} asks Qloo again.`)));
   }
 
   const months = new Map<string, NightView[]>();
@@ -227,10 +227,9 @@ const rel = (z: number | null): string => (z === null ? "n/a" : `${z >= 0 ? "+" 
 
 function sourceLine(s: ThemeScoreOut, boardAt: string | null): string {
   if (s.source === "synthetic") return `Synthetic test data generated ${formatDateTime(s.fetchedAt)}. Not from Qloo.`;
-  // One theme can be re-read after the board was pulled: say so, so the two times read as consistent.
-  if (boardAt && s.fetchedAt !== boardAt) return `Re-checked live ${formatDateTime(s.fetchedAt)} (the board was pulled ${formatDateTime(boardAt)}). "Re-check live" asks Qloo again.`;
-  if (s.source === "cache") return `Saved result, pulled from Qloo on ${formatDateTime(s.fetchedAt)}. "Re-check live" asks Qloo again.`;
-  return `Fetched from Qloo ${formatDateTime(s.fetchedAt)}.`;
+  // "Re-checked live" is said only after this director has asked for a re-check; until then it is when the score was pulled.
+  if (rechecked[s.themeId]) return `Re-checked live ${formatDateTime(s.fetchedAt)}${boardAt && s.fetchedAt !== boardAt ? ` (the board was pulled ${formatDateTime(boardAt)})` : ""}. "Re-check live" asks Qloo again.`;
+  return `Pulled from Qloo ${formatDateTime(s.fetchedAt)}. "Re-check live" asks Qloo again.`;
 }
 
 const rechecked: Record<string, string> = {};
@@ -242,6 +241,7 @@ function backOf(v: NightView): BackSpec {
   const n = v.night;
   const s = v.score;
   const scored = !!s && s.label !== "not-scored";
+  const pool = n.pool && n.pool.z !== null ? n.pool : null;
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
   const reason = v.discovered ? `${v.discovered.name} stands out near ${city()}: ${vsMarketsWords(v.discovered.z, state.kind)}. It is not scored against the library, so there is no local-pull rating.` : v.fit === "classic" ? classicReason(state.kind) : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone.` : `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
   return {
@@ -250,10 +250,10 @@ function backOf(v: NightView): BackSpec {
     city: city(),
     title: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme,
     dateLine: `${formatDate(n.date)} · ${n.weekday}`,
-    rows: scored ? s.entities.map((e) => ({ name: e.name, type: e.type, affinity: e.affinity })) : [],
-    index: scored ? s.index : null,
-    z: scored ? s.z : null,
-    themeName: v.themeId ? (themeById(v.themeId)?.label ?? n.theme) : n.theme,
+    rows: scored ? s.entities.map((e) => ({ name: e.name, type: e.type, affinity: e.affinity })) : pool ? [{ name: pool.name, type: pool.type, affinity: pool.affinity }] : [],
+    index: scored ? s.index : pool ? pool.z : null,
+    z: scored ? s.z : pool ? pool.zRaw : null,
+    themeName: pool ? pool.name : v.themeId ? (themeById(v.themeId)?.label ?? n.theme) : n.theme,
     fit,
     reason,
   };
@@ -303,6 +303,11 @@ function whyInfo(index: number): Child {
     out.push(h("p", { class: "panel-box" }, `"${n.theme}" fits more than one theme (${n.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}). Close this panel and pick one on the deck.`));
     return out;
   }
+  if (n.pool) {
+    out.push(h("p", { class: "panel-box" }, n.pool.z === null ? `${n.pool.name} is a family title we know, but Qloo had no local reading for it here, so it is not scored.` : `${n.pool.name} is scored from Qloo's local reading near ${city()} against its own spread over the 40 reference markets, centred on this market's own average over our family-title pool. It is not a library theme, so Homestand leaves it as planned and does not propose a swap for it.`));
+    if (n.pool.z !== null) out.push(h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, h("li", null, `${n.pool.name} (${n.pool.type.replace("_", " ")})`))));
+    return out;
+  }
   if (!v.themeId || !v.score) {
     out.push(h("p", { class: "panel-box" }, n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone. It stays as planned.` : `"${n.theme}" is not one of the ${Object.keys(a.themes).length} themes we score with Qloo, so it is not scored. It stays as planned.`));
     return out;
@@ -317,8 +322,9 @@ function whyInfo(index: number): Child {
       h(
         "div",
         { class: "panel-box" },
-        s.score !== null && s.score >= 0.9 ? h("p", { class: "small" }, NEAR_TOP_NOTE) : null,
+        s.score !== null && s.score >= 0.9 && s.ref && s.ref.sd < 0.01 ? h("p", { class: "small" }, NEAR_TOP_NOTE) : null,
         h("p", null, marketLevelSentence(s.marketMeanZ, state.kind)),
+        bridgeSentence(s.label, s.z, city()) ? h("p", { style: "font-weight:650" }, bridgeSentence(s.label, s.z, city())) : null,
         h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label)),
       ),
     );
@@ -341,7 +347,7 @@ function whyInfo(index: number): Child {
         h(
           "dl",
           { class: "kv kv--sum" },
-          h("dt", null, "This market's overall taste match (mean)"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
+          h("dt", null, "This theme's score here"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
           h("dt", null, `Typical ${copy().markets.replace(/s$/, "")} (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
           h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
           h("dt", null, "z = (score - typical) / spread"), h("dd", null, rel(s.z)),

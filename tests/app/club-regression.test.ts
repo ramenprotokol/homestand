@@ -14,7 +14,7 @@ import { syntheticQlooFetch } from "../../src/worker/synthetic";
 // Club runs must not change when new features are added. This runs the four baseball samples (and "Load an example" at two
 // markets) end to end on the synthetic data (analyze, then propose) and compares every band, swap, alternate, angle,
 // unfixed night and step-log line with a snapshot recorded before venue mode was added.
-const FILE = new URL("../fixtures/club-baseline.json", import.meta.url);
+const FILE = process.env.CLUB_BASELINE_FILE ? new URL(`file://${process.env.CLUB_BASELINE_FILE}`) : new URL("../fixtures/club-baseline.json", import.meta.url);
 
 function deps(): Deps {
   return {

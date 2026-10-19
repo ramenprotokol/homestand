@@ -137,6 +137,17 @@ export function vsAverage(index: number | null): string {
   return `${words} (${index >= 0 ? "+" : "-"}${Math.abs(index).toFixed(1)})`;
 }
 
+/**
+ * When the market-centred label and the comparison with the other markets point opposite ways, say so in plain words, so "Leans in" never
+ * sits beside "well below most markets" unexplained. Empty when they agree (or the theme is about average either way).
+ */
+export function bridgeSentence(fit: FitLabel | "pick", z: number | null, city: string): string {
+  if (z === null) return "";
+  if (fit === "leans-in" && z <= -Z_CUT) return `Below most markets, but strong for ${city}'s own usual taste.`;
+  if (fit === "leans-away" && z >= Z_CUT) return `Above most markets, but weak for ${city}'s own usual taste.`;
+  return "";
+}
+
 export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.";
 export const classicReason = (kind?: Kind): string => (kind === "venue" ? "Classic dates (fireworks, symphony nights, local showcases) aren't a music taste, so Qloo doesn't score them. They stay as planned." : CLASSIC_REASON);
 

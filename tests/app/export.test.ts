@@ -95,12 +95,12 @@ describe("memo", () => {
   });
   it("opens with a fixed sentence built only from counts: what was suggested and what was approved", () => {
     const head = "Homestand checked 24 theme nights for Akron, OH sample club <b> against local taste data from Qloo.";
-    expect(memoOpener(data)).toBe(`${head} It suggested 1 swap; you approved 1. Each approved swap keeps its original date and sponsor.`);
-    expect(memoOpener({ ...data, suggested: 2 })).toBe(`${head} It suggested 2 swaps; you approved 1. Each approved swap keeps its original date and sponsor.`);
-    expect(memoOpener({ ...data, swaps: [], suggested: 2 })).toBe(`${head} It suggested 2 swaps; you approved none. The calendar is unchanged.`);
+    expect(memoOpener(data)).toBe(`${head} It suggested 1 swap; 1 is in the revised calendar. Each approved swap keeps its original date and sponsor.`);
+    expect(memoOpener({ ...data, suggested: 2 })).toBe(`${head} It suggested 2 swaps; 1 is in the revised calendar. Each approved swap keeps its original date and sponsor.`);
+    expect(memoOpener({ ...data, swaps: [], suggested: 2 })).toBe(`${head} It suggested 2 swaps; none is in the revised calendar. The calendar is unchanged.`);
     expect(memoOpener({ ...data, swaps: [], suggested: 0 })).toBe(`${head} It suggested no swaps, so the calendar is unchanged.`);
     // The approved count can never read higher than the suggested one.
-    expect(memoOpener({ ...data, suggested: 0 })).toContain("It suggested 1 swap; you approved 1.");
+    expect(memoOpener({ ...data, suggested: 0 })).toContain("It suggested 1 swap; 1 is in the revised calendar.");
     expect(buildMemoHtml(data)).toContain("Homestand checked 24 theme nights for Akron, OH sample club &lt;b&gt; against local taste data from Qloo.");
     expect(buildMemoHtml(data)).not.toMatch(/preference for certain/i);
   });

@@ -17,7 +17,7 @@ import { GENRE_WORDS } from "../../app/themes/library";
 import { cityOfLabel } from "../../app/kind";
 import { DISCOVERY_REFERENCE, worthAnIdea } from "../../app/discovery";
 import type { Discovered } from "../../app/propose/propose";
-import { approvedSwaps, copy, effective, state, swapTitle, ui, viewOf, type ShownProposal } from "../store";
+import { approvedSwaps, copy, effective, invalidateProposals, pack, saveWork, shownAngles, state, swapTitle, ui, viewOf, type ShownProposal } from "../store";
 
 const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hashchange"));
 const label = (id: string): string => themeById(id)?.label ?? id;
@@ -41,6 +41,12 @@ const TYPE_WORDS: Record<string, string> = { tv_show: "TV show", movie: "movie",
 
 /** Where the carousel is, kept across redraws so a re-render never tears the pack again. */
 const stage = { forPropose: null as object | null, opened: false, cur: 0 };
+/** Mirrors the carousel position into the saved work, so a reload puts the director back where they were. */
+const syncPack = (): void => {
+  pack.opened = stage.opened;
+  pack.cur = stage.cur;
+  saveWork();
+};
 
 export function fixView(): HTMLElement {
   const a = state.analysis;
@@ -65,7 +71,7 @@ export function fixView(): HTMLElement {
     return h("section", { class: "scene" }, h("div", { class: "wrap narrow" }, h("h1", { class: "h2", tabindex: "-1" }, "That did not work"), h("p", { class: "error", role: "alert" }, ui.proposeError ?? "Try again."), h("div", { class: "actions" }, h("button", { type: "button", class: "btn pri", onclick: () => { ui.proposeError = null; rerender(); } }, "Try again"), h("a", { class: "btn ghost", href: "#/check" }, "Back to Check"))));
   }
   const p = state.propose;
-  if (stage.forPropose !== p) Object.assign(stage, { forPropose: p, opened: false, cur: 0 });
+  if (stage.forPropose !== p) Object.assign(stage, { forPropose: p, opened: pack.opened, cur: Math.min(pack.cur, Math.max(0, p.proposals.length - 1)) });
   const swaps = p.proposals;
   const synth = syntheticBanner();
   const headTally = tally(a.nights.map(viewOf), true);
@@ -85,7 +91,7 @@ export function fixView(): HTMLElement {
   const advanced = h(
     "details",
     { class: "advanced", "data-testid": "advanced", open: state.allowDuplicates || ui.dupesNote ? "" : null },
-    h("summary", null, "Advanced"),
+    h("summary", null, icon("caretDown"), "Repeat options: let a theme repeat"),
     h(
       "div",
       { class: "advanced-body" },
@@ -99,9 +105,8 @@ export function fixView(): HTMLElement {
             ui.dupesNote = null;
             ui.dupesBefore = JSON.stringify(state.propose?.proposals.map((x) => x.toThemeId) ?? []);
             state.allowDuplicates = (e.target as HTMLInputElement).checked;
-            state.propose = null;
-            state.decisions = {};
-            state.altChoice = {};
+            invalidateProposals();
+            saveWork();
             rerender();
           },
         }),
@@ -113,22 +118,21 @@ export function fixView(): HTMLElement {
   );
   const tools = h("div", { class: "fix-tools" }, h("button", { type: "button", class: "btn ghost sm", "data-testid": "open-trace", onclick: openTrace }, icon("list"), "Full step log"), advanced);
 
-  const lead = swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
+  const lead = swaps.length > 0 && state.kind === "venue" ? `${swaps.length} open date${swaps.length === 1 ? "" : "s"}: here is who to send an offer to instead of the hold that leans away. Nothing changes until you approve it. Locked dates are never touched, and every date keeps its sponsor.` : swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
   const section = h(
     "section",
     { class: "fix", id: "fix" },
     h(
       "div",
       { class: "wrap" },
-      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `${copy().nights} that lean away`)), h("p", { class: "lede" }, lead)), headTally),
+      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, state.kind === "venue" ? "who to send an offer to" : `${copy().nights} that lean away`)), h("p", { class: "lede" }, lead)), headTally),
       synth,
+      state.kind === "venue" ? actsPanel(p.acts, a.market.label) : null,
       tools,
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
-      state.kind === "venue" ? actsPanel(p.acts, a.market.label) : ideasPanel(p.discovery, a.market.label),
-      p.angles.length > 0
-        ? h("section", { class: "sect side" }, h("h2", null, state.kind === "venue" ? "Locked headliners: keep them, add a support act" : `Locked ${copy().nights}: keep them, add an angle`), h("div", { class: "side-list" }, p.angles.map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))))
-        : null,
+      state.kind === "venue" ? null : ideasPanel(p.discovery, a.market.label),
+      shownAngles().length > 0 ? anglesSection() : null,
       p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
     ),
   );
@@ -137,9 +141,19 @@ export function fixView(): HTMLElement {
   return h("div", { class: "page" }, section);
 }
 
+/** The locked-night ideas. Redrawn when the director switches a swap, so an act or theme that has become a swap is never also offered as an add-on. */
+function anglesSection(): HTMLElement {
+  return h("section", { class: "sect side", id: "angles" }, h("h2", null, state.kind === "venue" ? "Locked headliners: keep them, add a support act" : `Locked ${copy().nights}: keep them, add an angle`), h("div", { class: "side-list" }, shownAngles().map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))));
+}
+
+function repaintAngles(): void {
+  const el = document.getElementById("angles");
+  if (el) el.replaceWith(anglesSection());
+}
+
 /** The family titles that stand out most near this ballpark, best first, up to six. Only titles that clear the "Leans in" bar. */
-export function ideaTitles(d: { movies: Discovered[]; shows: Discovered[] }, max = 6): string[] {
-  return [...d.movies, ...d.shows].filter(worthAnIdea).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max).map((x) => x.name);
+export function ideaTitles(d: { movies: Discovered[]; shows: Discovered[] }, max = 3): string[] {
+  return [...d.movies, ...d.shows].filter((x) => x.major === true && worthAnIdea(x)).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max).map((x) => x.name);
 }
 
 function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLElement | null {
@@ -166,12 +180,13 @@ function actsPanel(d: ActsOut | null | undefined, marketLabel: string): HTMLElem
   const city = cityOfLabel(marketLabel);
   const acts = actIdeas(d);
   if (acts.length === 0) {
-    return h("section", { class: "ideas", "data-testid": "ideas", "aria-label": `Touring acts near ${city}` }, h("h2", null, `Touring acts near ${city}`), h("p", { class: "small", "data-testid": "ideas-note" }, `No act in our pool of ${d.poolSize} stands out near ${city} right now: none is clearly above its own usual here. That happens, and we say so rather than pad the list.`));
+    return h("section", { class: "ideas ideas--lead", "data-testid": "ideas", "aria-label": `Touring acts near ${city}` }, h("h2", null, `Touring acts near ${city}`), h("p", { class: "small", "data-testid": "ideas-note" }, `No act in our pool of ${d.poolSize} stands out near ${city} right now: none is clearly above its own usual here. That happens, and we say so rather than pad the list.`));
   }
   return h(
     "section",
-    { class: "ideas", "data-testid": "ideas", "aria-label": `Acts that stand out near ${city}` },
+    { class: "ideas ideas--lead", "data-testid": "ideas", "aria-label": `Acts that stand out near ${city}` },
     h("h2", null, `Acts that stand out near ${city}`),
+    h("p", { class: "ideas-lede" }, "A talent buyer's shortlist: acts this market likes more than its usual, well known nationally. Offer one of them an open date."),
     h("ul", { class: "idea-chips" }, acts.map((x) => h("li", { class: "idea" }, x.name, x.genre ? h("small", null, ` · ${GENRE_WORDS[x.genre]}`) : null))),
     h("p", { class: "small", "data-testid": "ideas-note" }, `Qloo had local data for ${d.scored} of our ${d.poolSize} touring acts near ${city}. These stand out against ${ACTS_REFERENCE.markets} reference markets and are nationally well known. They come from Qloo's taste data for this area.${d.fetchedAt ? ` Pulled from Qloo ${formatDateTime(d.fetchedAt)}.` : ""}`),
   );
@@ -262,6 +277,7 @@ class FixStage {
     this.buildPack();
     if (stage.opened || reduced()) {
       stage.opened = true;
+      syncPack();
       this.reveal(false);
     } else this.idleAgent();
   }
@@ -286,6 +302,7 @@ class FixStage {
   private open(animate: boolean): void {
     if (stage.opened) return;
     stage.opened = true;
+    syncPack();
     const wrap = this.root.querySelector<HTMLElement>("#packWrap")!;
     const pk = wrap.querySelector<HTMLElement>(".pack")!;
     wrap.querySelectorAll("button").forEach((b) => b.setAttribute("disabled", ""));
@@ -355,7 +372,7 @@ class FixStage {
     const p = effective(top);
     const base = specOf(viewOf(state.analysis!.nights[p.index]!));
     const night = state.analysis!.nights[p.index]!;
-    return { front: specForSwap(base, p.fromThemeId, swapTitle(night.theme, label(p.fromThemeId)), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "artist" ? "music" : p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, swapTitle(night.theme, toLabel(p)), p.to.label) };
+    return { front: specForSwap(base, p.fromThemeId, swapTitle(night.theme, label(p.fromThemeId)), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "artist" ? "music" : p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, swapTitle(night.theme, toLabel(p)), p.to.label, p.discovered?.genre) };
   }
 
   private buildSlides(): void {
@@ -432,6 +449,7 @@ class FixStage {
 
   private show(j: number, instant = false): void {
     stage.cur = Math.max(0, Math.min(this.slides.length - 1, j));
+    syncPack();
     this.layout();
     this.paintConsole();
     void this.paintAgent(instant);
@@ -473,7 +491,7 @@ class FixStage {
     const acts: Child =
       d === undefined
         ? [
-            h("button", { type: "button", class: "btn gold", "data-testid": "approve", "data-focus": "", onclick: () => this.approve(s) }, "Approve swap"),
+            h("button", { type: "button", class: "btn gold", "data-testid": "approve", "data-focus": "", onclick: () => this.approve(s) }, state.kind === "venue" ? "Approve offer" : "Approve swap"),
             h("button", { type: "button", class: "btn ghost", "data-testid": "reject", onclick: () => this.reject(s) }, "Reject"),
           ]
         : [
@@ -493,13 +511,13 @@ class FixStage {
         "div",
         { class: "swap-card", "data-proposal": p.id, "data-decision": d ?? "open", "data-testid": "proposal" },
         // The new night, shown before approval: the big card above is the night as planned.
-        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : "Would be"), p.kind === "best-option" ? h("span", { class: "best-badge", "data-testid": "best-badge" }, bestLabel(p)) : null, found ? h("span", { class: "disc-badge", "data-testid": "disc-badge" }, "Discovered by Qloo") : null, nowCard),
+        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : state.kind === "venue" ? "Send an offer to" : "Would be"), p.kind === "best-option" ? h("span", { class: "best-badge", "data-testid": "best-badge" }, bestLabel(p)) : null, found ? h("span", { class: "disc-badge", "data-testid": "disc-badge" }, "Discovered by Qloo") : null, nowCard),
         h(
           "div",
           { class: "swap-body" },
           h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), toLabel(p)),
           h("p", { class: "swap-why" }, p.why),
-          h("p", { class: "small", "data-testid": "cited" }, cited, p.whySource === "model" ? ". Wording drafted by an AI from the checked facts." : ""),
+          h("p", { class: "small", "data-testid": "cited" }, cited, p.whySource === "model" ? " Wording drafted by an AI from the checked facts." : ""),
           chips,
         ),
       ),
@@ -514,6 +532,7 @@ class FixStage {
 
   private switchAlt(top: ShownProposal, id: string): void {
     state.altChoice[top.id] = id;
+    repaintAngles();
     const s = this.slides.find((x) => x.top.id === top.id)!;
     const { alt } = this.specs(top);
     const back = makeCard(alt, { inert: true });

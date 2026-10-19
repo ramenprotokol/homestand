@@ -21,6 +21,13 @@ export interface DateWindow {
 /** Music genre of a theme, for concert venues. Swaps for a music night stay in the same genre where they can. */
 export type Genre = "country" | "rock" | "pop" | "hip-hop" | "latin" | "classic-rock" | "jam" | "indie" | "r&b" | "emo" | "yacht-rock";
 
+/**
+ * Our declared booking tier for an act: the size of room it headlines (not Qloo data, and not a forecast). A support act must be at least one
+ * tier below the headliner, and a swap must be within one tier of the date it replaces.
+ */
+export type Tier = "stadium" | "arena" | "amphitheatre" | "theatre";
+export const TIER_RANK: Record<Tier, number> = { theatre: 0, amphitheatre: 1, arena: 2, stadium: 3 };
+
 export const GENRE_WORDS: Record<Genre, string> = {
   country: "country", rock: "rock", pop: "pop", "hip-hop": "hip-hop", latin: "Latin", "classic-rock": "classic rock", jam: "jam band", indie: "indie", "r&b": "R&B", emo: "emo", "yacht-rock": "yacht rock",
 };
@@ -36,6 +43,8 @@ export interface Theme {
   genre?: Genre;
   /** False for an act that no longer tours (venue runs never offer it as a swap or a support act). Left out means it tours. */
   touring?: boolean;
+  /** Music acts for a venue run: declared booking tier. */
+  tier?: Tier;
   /** A tribute or theme night (Yacht Rock, Emo Night): only a tribute date may be swapped to one. */
   tribute?: boolean;
   window?: DateWindow;
@@ -52,7 +61,7 @@ const e = (key: string, type: QlooType, query: string, year?: number, ...alt: st
 export const THEME_LIBRARY: readonly Theme[] = [
   { id: "star-wars", label: "Star Wars", category: "film", audience: "family", aliases: ["star wars", "may the 4th", "may the fourth", "jedi", "mandalorian"],
     entities: [e("star-wars:film", "movie", "Star Wars", 1977, "Star Wars: Episode IV - A New Hope"), e("star-wars:tv", "tv_show", "The Mandalorian")] },
-  { id: "princess", label: "Princess", category: "kids tv", audience: "kids", aliases: ["princess", "princesses"],
+  { id: "princess", label: "Princess", category: "kids tv", audience: "kids", aliases: ["princess", "princesses", "frozen", "moana"],
     entities: [e("princess:frozen", "movie", "Frozen", 2013), e("princess:moana", "movie", "Moana", 2016)] },
   { id: "bluey", label: "Bluey", category: "kids tv", audience: "kids", aliases: ["bluey"], entities: [e("bluey:tv", "tv_show", "Bluey")] },
   { id: "harry-potter", label: "Harry Potter", category: "film", audience: "family", aliases: ["harry potter", "hogwarts", "wizarding"],

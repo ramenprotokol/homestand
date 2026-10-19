@@ -13,16 +13,18 @@ import { gsap, reduced } from "../foil/motion";
 import { crowdBar } from "../foil/scenery";
 import { download, formatDate, formatDateTime, h } from "../dom";
 import { navigate } from "../flow";
-import { localDay } from "../../app/text";
+import { cleanTitle, localDay } from "../../app/text";
 import { icon } from "../icons";
-import { approvedSwaps, state, swapTitle, viewOf } from "../store";
+import { approvedSwaps, shownAngles, state, swapTitle, viewOf } from "../store";
 
 
 function exportRows(): ExportRow[] {
   const a = state.analysis!;
   return a.nights.map((n) => {
     const v = viewOf(n);
-    return { date: n.date, theme: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: v.swappedFrom ? [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", discovered by Qloo" : ""})`].filter(Boolean).join(". ") : n.notes };
+    // A venue's swapped date is a new hold: the old note ("offer out") belongs to the act that was dropped, so it is never inherited.
+    const note = !v.swappedFrom ? n.notes : state.kind === "venue" ? `New hold${v.discovered ? " (found by Qloo)" : ""}: withdraw the offer to ${n.theme}` : [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", discovered by Qloo" : ""})`].filter(Boolean).join(". ");
+    return { date: n.date, theme: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: note };
   });
 }
 
@@ -44,11 +46,11 @@ function memoData(): MemoData {
   const a = state.analysis!;
   const swaps = approvedSwaps().map((p) => ({
     date: p.date, weekday: p.weekday, from: a.nights[p.index]!.theme, to: swapTitle(a.nights[p.index]!.theme, p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId), sponsor: p.sponsor,
-    fromZ: p.from.z, toZ: p.to.z, fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
+    fromZ: p.from.z, toZ: p.to.z, fromEntities: (a.themes[p.fromThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), toEntities: p.discovered ? [p.discovered.name] : (a.themes[p.toThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
   }));
   return {
     ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : {}), club: a.market.label, generatedOn: localDay(), swaps,
-    angles: (state.propose?.angles ?? []).map((x) => x.text), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
+    angles: shownAngles().map((x) => x.text), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
     ...(state.kind === "venue" ? { acts: actsOf(a.market.label) } : {}),
     synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedLabel: a.recordedAt ? formatDateTime(a.recordedAt) : null,
@@ -118,7 +120,7 @@ export function sendView(): HTMLElement {
           h(
             "div",
             { class: "exp" },
-            h("button", { type: "button", class: "btn gold", "data-testid": "dl-csv", onclick: () => download(`${stem}.csv`, "text/csv", exportCsv(rows)) }, icon("download"), "Download CSV"),
+            h("button", { type: "button", class: "btn gold", "data-testid": "dl-csv", onclick: () => download(`${stem}.csv`, "text/csv", exportCsv(rows, state.kind)) }, icon("download"), "Download CSV"),
             h("button", { type: "button", class: "btn gold", "data-testid": "dl-ics", onclick: () => download(`${stem}.ics`, "text/calendar", exportIcs(rows, a.market.label, new Date().toISOString(), state.kind)) }, icon("download"), "Download calendar (.ics)"),
             h("button", { type: "button", class: "btn ghost", "data-testid": "dl-memo", onclick: () => download(`${stem}-memo.html`, "text/html", memoDocument(memoData())) }, icon("download"), "Download memo (HTML)"),
             h("button", { type: "button", class: "btn ghost", "data-testid": "print-memo", onclick: () => window.print() }, icon("printer"), "Print memo"),

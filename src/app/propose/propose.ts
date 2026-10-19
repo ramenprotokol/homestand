@@ -1,9 +1,10 @@
 import { weekdayName } from "../calendar/csv";
 import { copyFor } from "../kind";
+import { withArticle } from "../text";
 import { shortDate } from "../dates";
 import { labelForZ, type FitLabel } from "../score";
 import { step, type TraceStep } from "../trace";
-import { GENRE_WORDS, type Genre, type Theme } from "../themes/library";
+import { GENRE_WORDS, TIER_RANK, type Genre, type Theme, type Tier } from "../themes/library";
 import { audienceBand, checkCandidate, inWindow, audienceFit, isYoung, type RejectReason } from "./rules";
 
 export interface PlanNight {
@@ -29,11 +30,17 @@ export interface Discovered {
   type: "movie" | "tv_show" | "artist";
   /** Acts only: the genre we declared for the artist. */
   genre?: Genre;
+  /** Acts only: our declared booking tier. */
+  tier?: Tier;
   affinity: number | null;
-  /** How far this title's reading here sits above or below its spread over the 40 reference markets. */
+  /** How far this title's reading here sits above or below its spread over the 40 reference markets, centred on this market's own average over the pool. */
   z?: number | null;
+  /** The same z before centring (against the 40 markets only). */
+  zRaw?: number | null;
   /** National popularity of the title, 0 to 1. */
   popularity?: number;
+  /** A big theatrical title any family knows (declared by us). */
+  major?: boolean;
 }
 
 export const discoveredId = (d: Pick<Discovered, "entityId">): string => `qloo:${d.entityId}`;
@@ -86,7 +93,27 @@ export function categoryGroup(c: Theme["category"]): string {
   return c === "film" || c === "tv" || c === "kids tv" ? "screen" : c;
 }
 
+/** One candidate for a locked night's add-on or support act, with its finished sentence. The client picks the first one not already used as a swap. */
+export interface AngleOption {
+  toThemeId: string;
+  text: string;
+  act?: { name: string; discovered: boolean };
+}
+
+/** The angle as it should read now: the first option that is not already a proposed or approved swap, else the generic wording. */
+export function pickAngle(angle: SponsorAngle, taken: ReadonlySet<string>): SponsorAngle {
+  if (!angle.options || angle.options.length === 0) return angle;
+  const hit = angle.options.find((o) => !taken.has(o.toThemeId));
+  const { act: _drop, ...rest } = angle;
+  void _drop;
+  return hit ? { ...rest, toThemeId: hit.toThemeId, text: hit.text, ...(hit.act ? { act: hit.act } : {}) } : { ...rest, toThemeId: angle.themeId, text: angle.generic ?? angle.text };
+}
+
 export interface SponsorAngle {
+  /** The ranked candidates (best first) the taste graph returned, each with its finished sentence. */
+  options?: AngleOption[];
+  /** The wording when every option is taken by a swap. */
+  generic?: string;
   /** Venue runs: the support act the taste graph picked, and whether it is a discovered act rather than a library theme. */
   act?: { name: string; discovered: boolean };
   index: number;
@@ -139,8 +166,11 @@ const TIER_WORDS = ["same genre", "related genre", "another genre"] as const;
 export const genreRank = (original: Pick<Theme, "genre" | "audience">, cand: Pick<Theme, "genre" | "audience">): number => genreTier(original.genre, cand.genre) * 2 + (cand.audience === original.audience ? 0 : 1);
 
 /** In a venue run only an act can fill a date: a solo artist, or a tribute night for a tribute date. Never a genre bundle such as "Country music", never an act that no longer tours. */
-export const venueEligible = (original: Pick<Theme, "tribute">, cand: Pick<Theme, "entities" | "touring" | "tribute">): boolean =>
-  cand.touring !== false && (cand.entities.length === 1 || (cand.tribute === true && original.tribute === true));
+/** Within one booking tier of each other (when both tiers are declared). */
+export const withinOneTier = (a: Tier | undefined, b: Tier | undefined): boolean => a === undefined || b === undefined || Math.abs(TIER_RANK[a] - TIER_RANK[b]) <= 1;
+
+export const venueEligible = (original: Pick<Theme, "tribute" | "tier">, cand: Pick<Theme, "entities" | "touring" | "tribute" | "tier">): boolean =>
+  cand.touring !== false && withinOneTier(original.tier, cand.tier) && (cand.entities.length === 1 || (cand.tribute === true && original.tribute === true));
 
 export function venueAngleText(night: Pick<PlanNight, "date" | "sponsor">, from: Theme): string {
   const who = night.sponsor || "the sponsor";
@@ -156,6 +186,57 @@ export function angleText(night: PlanNight, from: Theme, to: Theme | null): stri
   if (!to) return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor-friendly angle: give ${who} a featured moment on the night (a PA read, the first pitch or a giveaway tied to ${from.label}).`;
   return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. If ${who} is open to it, a small ${to.label} touch (walk-up songs, PA clips or a photo spot) would sit closer to what this market leans toward.`;
 }
+
+/** Minimum-cost assignment (Hungarian method) for a matrix with at least as many columns as rows: the column chosen for each row. */
+export function hungarian(cost: number[][]): number[] {
+  const n = cost.length;
+  const m = cost[0]?.length ?? 0;
+  const u = new Array<number>(n + 1).fill(0);
+  const v = new Array<number>(m + 1).fill(0);
+  const p = new Array<number>(m + 1).fill(0);
+  const way = new Array<number>(m + 1).fill(0);
+  for (let i = 1; i <= n; i++) {
+    p[0] = i;
+    let j0 = 0;
+    const minv = new Array<number>(m + 1).fill(Infinity);
+    const used = new Array<boolean>(m + 1).fill(false);
+    do {
+      used[j0] = true;
+      const i0 = p[j0]!;
+      let delta = Infinity;
+      let j1 = 0;
+      for (let j = 1; j <= m; j++) {
+        if (used[j]) continue;
+        const cur = cost[i0 - 1]![j - 1]! - u[i0]! - v[j]!;
+        if (cur < minv[j]!) {
+          minv[j] = cur;
+          way[j] = j0;
+        }
+        if (minv[j]! < delta) {
+          delta = minv[j]!;
+          j1 = j;
+        }
+      }
+      for (let j = 0; j <= m; j++) {
+        if (used[j]) {
+          u[p[j]!] = u[p[j]!]! + delta;
+          v[j] = v[j]! - delta;
+        } else minv[j] = minv[j]! - delta;
+      }
+      j0 = j1;
+    } while (p[j0] !== 0);
+    do {
+      const j1 = way[j0]!;
+      p[j0] = p[j1]!;
+      j0 = j1;
+    } while (j0 !== 0);
+  }
+  const out = new Array<number>(n).fill(-1);
+  for (let j = 1; j <= m; j++) if (p[j]! > 0) out[p[j]! - 1] = j - 1;
+  return out;
+}
+
+const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
 const REJECT_WORDS: Record<RejectReason, string> = { duplicate: "already used in the season", window: "outside its date window", audience: "wrong audience for this night", "same-theme": "the planned theme" };
 
@@ -183,8 +264,77 @@ export function propose(input: ProposeInput): ProposeResult {
     .sort((a, b) => (fits[b.id]!.z ?? 0) - (fits[a.id]!.z ?? 0) || a.id.localeCompare(b.id));
   trace.push(step(now, "propose", `${leaning.length} library theme${leaning.length === 1 ? "" : "s"} lean in here and can be offered.`));
 
-  // Worst first, so the weakest nights get first pick of the best themes.
+  // Worst first, so the weakest nights are handled first (the order the trace and the pack read in).
   const ordered = [...away].sort((a, b) => (fits[a.themeId!]!.z ?? 0) - (fits[b.themeId!]!.z ?? 0) || a.index - b.index);
+
+  /** Rank of a candidate for a night: lower is better. A music night (club or venue) prefers the same genre, then a related one. */
+  const rankOf = (original: Theme, cand: Theme): number => {
+    if (venue) return genreRank(original, cand);
+    if (original.category === "music" && original.genre) return (cand.category === "music" ? genreTier(original.genre, cand.genre) : 3) * 2 + (cand.audience === original.audience ? 0 : 1);
+    return likeness(original, cand);
+  };
+
+  interface Gathered {
+    passing: Array<{ theme: Theme; detail: string }>;
+    rejected: string;
+  }
+  /** Every library theme that passes the rules for one night, best first. Uses the themes on the calendar as "used", so all nights see the same pool. */
+  const gather = (night: PlanNight, original: Theme): Gathered => {
+    const slot = { date: night.date, notes: night.notes };
+    const rejects: Record<RejectReason, number> = { duplicate: 0, window: 0, audience: 0, "same-theme": 0 };
+    const passing: Gathered["passing"] = [];
+    for (const cand of leaning) {
+      if (venue && !venueEligible(original, cand)) continue;
+      const r = checkCandidate(slot, original, cand, used, allowDuplicates);
+      if (r.ok) passing.push({ theme: cand, detail: r.detail });
+      else rejects[r.reason!]++;
+    }
+    const rejected = Object.entries(rejects).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${REJECT_WORDS[k as RejectReason]}`).join(", ");
+    // `leaning` is already sorted by z, and sort is stable: best rank first, then how strongly the market leans in.
+    passing.sort((x, y) => rankOf(original, x.theme) - rankOf(original, y.theme));
+    // A venue run never crosses into another genre family: only the same genre or a related one.
+    if (venue) passing.splice(0, passing.length, ...passing.filter((x) => genreTier(original.genre, x.theme.genre) <= 1));
+    return { passing, rejected };
+  };
+
+  // Assign swaps jointly, not first come first served: the set of swaps with the best total fit wins, so a night that has one good
+  // candidate is not robbed of it by a night that could do almost as well with another.
+  type Pick = { kind: "theme"; theme: Theme; detail: string } | { kind: "act"; idx: number; tier: number };
+  const gathered = new Map<number, Gathered>();
+  const unlocked = ordered.filter((n) => !n.locked);
+  for (const n of unlocked) gathered.set(n.index, gather(n, byId.get(n.themeId!)!));
+  const assigned = new Map<number, Pick>();
+  if (!allowDuplicates) {
+    const colKeys: string[] = [];
+    const colOf = (k: string): number => {
+      const at = colKeys.indexOf(k);
+      if (at >= 0) return at;
+      colKeys.push(k);
+      return colKeys.length - 1;
+    };
+    const entries = unlocked.map((n) => {
+      const original = byId.get(n.themeId!)!;
+      const g = gathered.get(n.index)!;
+      const list: Array<{ col: number; cost: number; pick: Pick }> = g.passing.map((x) => ({ col: colOf(`t:${x.theme.id}`), cost: rankOf(original, x.theme) * 100 - (fits[x.theme.id]!.z ?? 0) * 10, pick: { kind: "theme", theme: x.theme, detail: x.detail } }));
+      if (venue) actPool.forEach((a, i) => { const t = genreTier(original.genre, a.genre); if (t <= 1 && withinOneTier(original.tier, a.tier)) list.push({ col: colOf(`a:${i}`), cost: t * 200 + 50 - (a.z ?? 0) * 10, pick: { kind: "act", idx: i, tier: t } }); });
+      return list;
+    });
+    const rows = entries.length;
+    if (rows > 0 && colKeys.length > 0) {
+      const cols = colKeys.length + rows; // one "no swap" column per night
+      const NONE = 100000;
+      const cost = entries.map((list, i) => Array.from({ length: cols }, (_, j) => (j >= colKeys.length ? (j - colKeys.length === i ? NONE : NONE * 2) : (list.find((e) => e.col === j)?.cost ?? NONE * 4))));
+      const pickCol = hungarian(cost);
+      pickCol.forEach((j, i) => {
+        if (j >= colKeys.length) return;
+        const hit = entries[i]!.find((e) => e.col === j);
+        if (hit) assigned.set(unlocked[i]!.index, hit.pick);
+      });
+    }
+    for (const pk of assigned.values()) if (pk.kind === "theme") used.add(pk.theme.id);
+  }
+  const takenElsewhere = (index: number): Set<string> => new Set([...assigned.entries()].filter(([k, pk]) => k !== index && pk.kind === "theme").map(([, pk]) => (pk as { theme: Theme }).theme.id));
+
   for (const night of ordered) {
     const original = byId.get(night.themeId!)!;
     const slot = { date: night.date, notes: night.notes };
@@ -196,50 +346,31 @@ export function propose(input: ProposeInput): ProposeResult {
       angles.push({ index: night.index, date: night.date, themeId: original.id, sponsor: night.sponsor, toThemeId: alt?.id ?? original.id, text: angleText(night, original, alt ?? null) });
       continue;
     }
-    const rejects: Record<RejectReason, number> = { duplicate: 0, window: 0, audience: 0, "same-theme": 0 };
-    const passing: Array<{ theme: Theme; detail: string }> = [];
-    for (const cand of leaning) {
-      if (venue && !venueEligible(original, cand)) continue;
-      const r = checkCandidate(slot, original, cand, used, allowDuplicates);
-      if (r.ok) passing.push({ theme: cand, detail: r.detail });
-      else rejects[r.reason!]++;
+    const g = gathered.get(night.index)!;
+    const rejected = g.rejected;
+    const mine = assigned.get(night.index);
+    const others = takenElsewhere(night.index);
+    let passing = g.passing.filter((x) => !others.has(x.theme.id));
+    if (!allowDuplicates) {
+      passing = mine?.kind === "theme" ? [passing.find((x) => x.theme.id === mine.theme.id)!, ...passing.filter((x) => x.theme.id !== mine.theme.id)].filter(Boolean) : [];
     }
-    // Like for like first, then by how strongly the market leans in. `leaning` is already sorted by z, and sort is stable.
-    // A venue run ranks by genre first (same genre, then same audience), then by how strongly the market leans in.
-    const rejected = Object.entries(rejects).filter(([, n]) => n > 0).map(([k, n]) => `${n} ${REJECT_WORDS[k as RejectReason]}`).join(", ");
-    const rank = (t: Theme): number => (venue ? genreRank(original, t) : likeness(original, t));
-    passing.sort((x, y) => rank(x.theme) - rank(y.theme));
-    // A venue run never crosses into another genre family: only the same genre or a related one.
-    if (venue) passing.splice(0, passing.length, ...passing.filter((x) => genreTier(original.genre, x.theme.genre) <= 1));
-    if (venue) {
-      // A discovered act competes at its genre tier (same genre, then a related genre, then anything). A library theme wins a tie.
-      const libTier = passing.length > 0 ? Math.min(...passing.map((x) => genreTier(original.genre, x.theme.genre))) : 3;
-      let pick = -1;
-      let actTier = 3;
-      actPool.forEach((x, i) => {
-        const t = genreTier(original.genre, x.genre);
-        if (t < actTier) {
-          actTier = t;
-          pick = i;
-        }
+    if (mine?.kind === "act") {
+      const found = actPool[mine.idx]!;
+      const actTier = mine.tier;
+      trace.push(step(now, "constraint", `${night.date} ${original.label}: ${g.passing.length === 0 ? "no library theme passed" : "no library theme that close in genre was as good a fit"}, so an act of ${actTier === 0 ? "the same genre" : "a related genre"} that stands out near ${city} is offered: ${found.name}.`, `Found by Qloo, not scored against the library.${rejected ? ` Library themes ruled out: ${rejected}.` : ""}`));
+      proposals.push({
+        id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor,
+        fromThemeId: original.id, toThemeId: discoveredId(found), alternates: [], from: fits[original.id]!, to: { label: "found", z: null, score: null },
+        checks: [
+          "Date is not locked.",
+          actTier === 0 ? `${cap(withArticle(`${GENRE_WORDS[found.genre!]} act`))}, the same genre as the planned date.` : `${cap(withArticle(`${GENRE_WORDS[found.genre!]} act`))}, a related genre to the planned ${original.genre ? `${GENRE_WORDS[original.genre]} ` : ""}date.`,
+          "Not used anywhere else in the summer series.",
+          night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
+        ],
+        why: `${found.name} stands out near ${city}: fans here like them more than at most of the 40 reference markets we compare against. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
+        discovered: found,
       });
-      if (pick >= 0 && actTier <= 1 && actTier < libTier) {
-        const found = actPool.splice(pick, 1)[0]!;
-        trace.push(step(now, "constraint", `${night.date} ${original.label}: ${libTier === 3 ? "no library theme passed" : "no library theme in a genre that close leans in and fits"}, so an act of ${actTier === 0 ? "the same genre" : actTier === 1 ? "a related genre" : "another genre"} that stands out near ${city} is offered: ${found.name}.`, `Found by Qloo, not scored against the library.${rejected ? ` Library themes ruled out: ${rejected}.` : ""}`));
-        proposals.push({
-          id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor,
-          fromThemeId: original.id, toThemeId: discoveredId(found), alternates: [], from: fits[original.id]!, to: { label: "found", z: null, score: null },
-          checks: [
-            "Date is not locked.",
-            actTier === 0 ? `A ${GENRE_WORDS[found.genre!]} act, the same genre as the planned date.` : actTier === 1 ? `A ${GENRE_WORDS[found.genre!]} act, a related genre to the planned ${original.genre ? GENRE_WORDS[original.genre] : ""} date.`.replace("planned  date", "planned date") : "A touring act people near the venue know.",
-            "Not used anywhere else in the summer series.",
-            night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
-          ],
-          why: `${found.name} stands out near ${city}: fans here like them more than at most of the 40 reference markets we compare against. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
-          discovered: found,
-        });
-        continue;
-      }
+      continue;
     }
     const chosen = passing[0]?.theme ?? null;
     const chosenDetail = passing[0]?.detail ?? "";

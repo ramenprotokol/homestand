@@ -1,11 +1,12 @@
 import type { ActsOut, AnalyzeResponse, Caps, DiscoveryOut, MarketIn, NightOut, ProposeNightIn, ProposeResponse, RecheckResponse, ThemeScoreOut } from "../app/api-types";
 import { weekdayName, type CalendarRow } from "../app/calendar/csv";
 import { resolveTheme, type Resolution } from "../app/calendar/resolve";
+import { matchPoolTitle } from "../app/calendar/pooltitle";
 import { claimsOutcome, numbersAreGrounded } from "../app/guard";
 import type { QuotaKind } from "./limits";
 import { safeGet, safePut, sha256Hex } from "./safe";
 import { marketKey } from "../app/markets";
-import { categoryGroup, propose, type Discovered, type PlanNight, type SponsorAngle, type ThemeFit } from "../app/propose/propose";
+import { angleText, categoryGroup, pickAngle, propose, type AngleOption, type Discovered, type PlanNight, type SponsorAngle, type ThemeFit } from "../app/propose/propose";
 import { audienceBand, audienceFit, inWindow } from "../app/propose/rules";
 import { shortDate } from "../app/dates";
 import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
@@ -15,8 +16,8 @@ import { VENUE_CLASSIC_PHRASES, VENUE_LIBRARY } from "../app/themes/artists";
 import { ACT_POPULARITY, ACTS_REFERENCE, actBatches, rankActs, worthABooking, type ActsReference } from "../app/acts";
 import { cityOfLabel, copyFor, type Kind } from "../app/kind";
 import popularityFile from "../app/data/artist-popularity.json";
-import type { Genre } from "../app/themes/library";
-import { DISCOVERY_REFERENCE, IDEA_POPULARITY, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
+import { TIER_RANK, type Genre, type Tier } from "../app/themes/library";
+import { DISCOVERY_REFERENCE, IDEA_POPULARITY, poolOffset, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
 import { step, type TraceStep } from "../app/trace";
 import { createQlooClient, type QlooType } from "../qloo/client";
 import { AI_MODEL, type AiPort, type KvPort } from "./ports";
@@ -297,13 +298,16 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
         continue;
       }
     }
-    const top = stored.ranked[0] ? d.library.find((t) => t.id === stored!.ranked[0]!.themeId) : undefined;
-    if (!top) {
+    const who = angle.sponsor || "the sponsor";
+    const options: AngleOption[] = stored.ranked.slice(0, 6).flatMap((r) => {
+      const t = d.library.find((x) => x.id === r.themeId);
+      return t ? [{ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${t.label}, so if ${who} is open to it, a small ${t.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` }] : [];
+    });
+    if (options.length === 0) {
       out.push(angle);
       continue;
     }
-    const who = angle.sponsor || "the sponsor";
-    out.push({ ...angle, toThemeId: top.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${top.label}, so if ${who} is open to it, a small ${top.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` });
+    out.push({ ...angle, toThemeId: options[0]!.toThemeId, text: options[0]!.text, options, generic: angleText(nights.find((n) => n.index === angle.index)!, original, null) });
   }
   return out;
 }
@@ -311,7 +315,9 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
 // ---------- discovery: which family titles stand out near the ballpark ----------
 
 interface StoredDiscovery {
-  v: 1;
+  v: 2;
+  /** Every scored pool title (centred z), kept so a night named after one can be scored from it. */
+  all: Discovered[];
   fetchedAt: string;
   movies: Discovered[];
   shows: Discovered[];
@@ -321,7 +327,7 @@ interface StoredDiscovery {
 
 const discoveryKey = (d: Deps, m: MarketIn): string => {
   const ref = d.discoveryRef ?? DISCOVERY_REFERENCE;
-  return `disc:v5:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
+  return `disc:v6:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
 };
 
 /**
@@ -341,9 +347,9 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
   if (hit) {
     try {
       const s = JSON.parse(hit) as StoredDiscovery;
-      if (s.v === 1) {
+      if (s.v === 2) {
         trace.push(step(iso(d), "qloo", `Used the recorded family-title scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
-        return { movies: s.movies, shows: s.shows, scored: s.scored, poolSize: s.poolSize, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
+        return { all: s.all, movies: s.movies, shows: s.shows, scored: s.scored, poolSize: s.poolSize, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
       }
     } catch {
       /* fall through to a fresh pull */
@@ -357,23 +363,39 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     const client = createQlooClient({ baseUrl: d.qlooBase, apiKey: d.qlooKey, fetchImpl: d.qlooFetch, delayMs: d.qlooDelayMs, maxTries: 3, sleep: d.qlooDelayMs === 0 ? async () => undefined : undefined });
     const synthetic = d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : "";
     const ranked: Record<"movie" | "tv_show", Discovered[]> = { movie: [], tv_show: [] };
-    let scored = 0;
+    const readings = new Map<string, number | null>();
     for (const type of ["movie", "tv_show"] as const) {
       const ids = ref.pool.filter((p) => p.type === type).map((p) => p.entityId);
       const rows = await client.localAffinity({ type, entityIds: ids, lon: m.lon, lat: m.lat, radiusM: RADIUS_M, take: ids.length, ...(type === "movie" ? { releaseYearMin: 1900 } : {}) });
-      const all = rankPool(new Map(rows.map((r) => [r.entityId, r.affinity])), ref, type);
-      scored += all.length;
-      ranked[type] = all.filter((x) => (x.popularity ?? 0) >= IDEA_POPULARITY).slice(0, 12);
-      trace.push(step(iso(d), "qloo", `Asked Qloo about ${ids.length} family-friendly animated ${type === "movie" ? "movies" : "shows"} near ${city} (80 km), and compared each with its spread over ${ref.markets} ballpark markets.`, `Live call at ${iso(d)}. Qloo had local data for ${all.length} of ${ids.length}. ${all.filter(standsOut).length} stand out here.${synthetic}`));
+      for (const r of rows) readings.set(r.entityId, r.affinity);
     }
-    const stored: StoredDiscovery = { v: 1, fetchedAt: iso(d), movies: ranked.movie, shows: ranked.tv_show, scored, poolSize: ref.pool.length };
+    // Centre each title's z on this market's own average over the whole pool, like the library index.
+    const offset = poolOffset(readings, ref.pool, ref.stats);
+    let scored = 0;
+    const everything: Discovered[] = [];
+    for (const type of ["movie", "tv_show"] as const) {
+      const all = rankPool(readings, ref, type, offset);
+      scored += all.length;
+      everything.push(...all);
+      ranked[type] = all.filter((x) => x.major === true && (x.popularity ?? 0) >= IDEA_POPULARITY).slice(0, 12);
+      const n = ref.pool.filter((p) => p.type === type).length;
+      trace.push(step(iso(d), "qloo", `Asked Qloo about ${n} family-friendly animated ${type === "movie" ? "movies" : "shows"} near ${city} (80 km), and compared each with its spread over ${ref.markets} ballpark markets, centred on this market's own average over the pool.`, `Live call at ${iso(d)}. Qloo had local data for ${all.length} of ${n}. ${all.filter(standsOut).length} stand out here.${synthetic}`));
+    }
+    const stored: StoredDiscovery = { v: 2, all: everything.map((x) => ({ name: x.name, entityId: x.entityId, type: x.type, affinity: x.affinity, z: x.z, zRaw: x.zRaw, popularity: x.popularity, ...(x.major ? { major: true } : {}) })), fetchedAt: iso(d), movies: ranked.movie, shows: ranked.tv_show, scored, poolSize: ref.pool.length };
     await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
-    return { movies: stored.movies, shows: stored.shows, scored, poolSize: ref.pool.length, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
+    return { all: stored.all, movies: stored.movies, shows: stored.shows, scored, poolSize: ref.pool.length, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
   } catch (err) {
     console.error("discovery failed", err instanceof Error ? err.message : String(err));
     trace.push(step(iso(d), "qloo", `Family titles near ${city} were not available right now, so swaps use library themes only.`));
     return null;
   }
+}
+
+/** The discovery result without its server-side full list. */
+function publicDiscovery(d: DiscoveryOut): DiscoveryOut {
+  const out = { ...d };
+  delete out.all;
+  return out;
 }
 
 // ---------- venue runs: acts that stand out near the venue, and a support act for each locked headliner ----------
@@ -388,7 +410,7 @@ interface StoredActs {
 
 const actsKey = (d: Deps, m: MarketIn): string => {
   const ref = d.actsRef ?? ACTS_REFERENCE;
-  return `acts:v1:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
+  return `acts:v2:${signature(d.library)}:${ref.pool.length}:${ref.pulledAt ?? "syn"}:${d.mode}:${marketKey(m)}`;
 };
 
 /**
@@ -448,6 +470,7 @@ interface ActCandidate {
   genre: Genre | undefined;
   discovered: boolean;
   touring: boolean;
+  tier: Tier | undefined;
   /** National popularity, when known. */
   popularity: number | undefined;
 }
@@ -475,12 +498,13 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
       continue;
     }
     const headIds = new Set(original.entities.map((e) => e.id));
+    const headTier = original.tier;
     const headPop = Math.max(-1, ...original.entities.map((e) => popOf(e.id) ?? -1));
     const everyone: ActCandidate[] = [
-      ...d.library.filter((t) => t.id !== original.id && !used.has(t.id) && t.entities.length === 1 && t.entities[0]!.type === "artist" && !headIds.has(t.entities[0]!.id)).map((t) => ({ ref: t.id, id: t.entities[0]!.id, label: t.label, genre: t.genre, discovered: false, touring: t.touring !== false, popularity: popOf(t.entities[0]!.id) })),
-      ...pool.filter((p) => !libraryIds.has(p.entityId) && !headIds.has(p.entityId)).map((p) => ({ ref: `qloo:${p.entityId}`, id: p.entityId, label: p.name, genre: p.genre as Genre | undefined, discovered: true, touring: true, popularity: p.popularity })),
+      ...d.library.filter((t) => t.id !== original.id && !used.has(t.id) && t.entities.length === 1 && t.entities[0]!.type === "artist" && !headIds.has(t.entities[0]!.id)).map((t) => ({ ref: t.id, id: t.entities[0]!.id, label: t.label, genre: t.genre, discovered: false, touring: t.touring !== false, tier: t.tier, popularity: popOf(t.entities[0]!.id) })),
+      ...pool.filter((p) => !libraryIds.has(p.entityId) && !headIds.has(p.entityId)).map((p) => ({ ref: `qloo:${p.entityId}`, id: p.entityId, label: p.name, genre: p.genre as Genre | undefined, discovered: true, touring: true, tier: p.tier, popularity: p.popularity })),
     ];
-    const support = everyone.filter((c) => c.touring && headPop >= 0 && c.popularity !== undefined && c.popularity <= headPop);
+    const support = everyone.filter((c) => c.touring && headPop >= 0 && c.popularity !== undefined && c.popularity <= headPop && (headTier === undefined || c.tier === undefined || TIER_RANK[c.tier] <= TIER_RANK[headTier] - 1));
     const promo = support.length === 0;
     const all = promo ? everyone : support;
     const same = all.filter((c) => original.genre !== undefined && c.genre === original.genre);
@@ -526,18 +550,20 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
         continue;
       }
     }
-    const top = stored.ranked[0] ? all.find((c) => c.ref === stored!.ranked[0]!.themeId) : undefined;
-    if (!top) {
+    const who = angle.sponsor || "the sponsor";
+    const options: AngleOption[] = stored.ranked.slice(0, 6).flatMap((r) => {
+      const c = all.find((x) => x.ref === r.themeId);
+      if (!c) return [];
+      const text = promo
+        ? `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${c.label}, so a pre-show playlist or promo tie-in could work for ${who}.`
+        : `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Support act idea: fans of ${original.label} near ${city} also lean toward ${c.label}, so an act like ${c.label} could fit the opening slot.`;
+      return [{ toThemeId: c.ref, text, act: { name: c.label, discovered: c.discovered } }];
+    });
+    if (options.length === 0) {
       out.push(angle);
       continue;
     }
-    const who = angle.sponsor || "the sponsor";
-    out.push({
-      ...angle, toThemeId: top.ref, act: { name: top.label, discovered: top.discovered },
-      text: promo
-        ? `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${top.label}, so a pre-show playlist or promo tie-in could work for ${who}.`
-        : `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Support act idea: fans of ${original.label} near ${city} also lean toward ${top.label}, so an act like ${top.label} could fit the opening slot.`,
-    });
+    out.push({ ...angle, toThemeId: options[0]!.toThemeId, text: options[0]!.text, ...(options[0]!.act ? { act: options[0]!.act } : {}), options, generic: angle.text });
   }
   return out;
 }
@@ -633,6 +659,15 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     const full = resolveTheme(r.theme, known, extraClassic);
     return full.kind === "theme" && !activeIds.has(full.themeId) ? known.find((t) => t.id === full.themeId)!.label : null;
   });
+  // A club night named after a family-title pool entry ("Lion King Night") is scored from that title's own reading, with the pool's reference spread.
+  if (!venue) {
+    const poolNames = (d.discoveryRef ?? DISCOVERY_REFERENCE).pool;
+    input.rows.forEach((r, i) => {
+      if (resolutions[i]!.kind !== "unknown" || recognised[i] !== null) return;
+      const hit = matchPoolTitle(r.theme, poolNames);
+      if (hit) resolutions[i] = { kind: "pool", entityId: hit.entityId, name: hit.name };
+    });
+  }
   const unknownIdx = resolutions.flatMap((r, i) => (r.kind === "unknown" && recognised[i] === null ? [i] : []));
   if (unknownIdx.length > 0 && d.ai) {
     // Same unknown names, same answer: the reply is cached by the sorted, normalised texts, so a repeat costs no model call.
@@ -670,6 +705,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     const text =
       recognised[i] ? `"${r.theme}" is a theme we recognise (${recognised[i]}), but we have no Qloo scores for it yet, so it is left alone.`
       : res.kind === "theme" ? `"${r.theme}" matched ${d.library.find((t) => t.id === res.themeId)?.label ?? res.themeId} (${res.method === "alias" ? "name list" : "model"}).`
+      : res.kind === "pool" ? `"${r.theme}" is the family title ${res.name}: scored from its own local reading, not from a library theme.`
       : res.kind === "classic" ? `"${r.theme}" is a classic ${W.night}, so it is not scored.`
       : res.kind === "ambiguous" ? `"${r.theme}" fits more than one theme, so the director is asked to choose.`
       : `"${r.theme}" is not a theme we can place, so it is not scored.`;
@@ -683,9 +719,22 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     ? `Compared ${Object.keys(themes).length} artist and music themes with ${d.reference.markets || "the"} reference markets${d.reference.synthetic ? " (synthetic placeholder reference)" : ""}.`
     : `Compared ${Object.keys(themes).length} library themes with ${d.reference.markets || "the"} reference ballpark markets${d.reference.synthetic ? " (synthetic placeholder reference)" : ""}.`));
 
+  // The family titles named on the calendar are scored from the discovery pass (cached, or two live requests).
+  const poolRows = resolutions.some((x) => x.kind === "pool") ? await discover(d, input.market, trace) : null;
+
   // 3. Flag.
   const nights: NightOut[] = input.rows.map((r, i) => {
     const res = resolutions[i]!;
+    if (res.kind === "pool") {
+      const found = poolRows?.all?.find((x) => x.entityId === res.entityId);
+      const z = found?.z ?? null;
+      const type = (d.discoveryRef ?? DISCOVERY_REFERENCE).pool.find((x) => x.entityId === res.entityId)?.type ?? "movie";
+      return {
+        index: i, line: r.line, date: r.date, weekday: weekdayName(r.date), theme: r.theme, sponsor: r.sponsor, locked: r.locked, notes: r.notes,
+        resolution: res, candidates: [], themeId: null, label: z === null ? "not-scored" : labelForZ(z), z, recognisedAs: null,
+        pool: { entityId: res.entityId, name: res.name, type, z, zRaw: found?.zRaw ?? null, affinity: found?.affinity ?? null },
+      };
+    }
     const themeId = res.kind === "theme" ? res.themeId : null;
     const sc = themeId ? themes[themeId] : undefined;
     const label: FitLabel = res.kind === "classic" ? "classic" : themeId ? (sc?.label ?? "not-scored") : "not-scored";
@@ -721,7 +770,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   const actsOut = venue ? await discoverActs(d, input.market, trace) : undefined;
   const city = cityOfLabel(input.market.label);
   const nights: PlanNight[] = input.nights.map((n) => ({ ...n, themeId: n.themeId && Object.hasOwn(themes, n.themeId) ? n.themeId : null }));
-  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter((x) => (x.popularity ?? 0) >= SWAP_POPULARITY && (x.z ?? -9) >= 0) : [], city, ...(venue ? { venue: true, acts: actsOut ? actsOut.acts.filter(worthABooking) : [] } : {}) });
+  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter((x) => x.major === true && (x.popularity ?? 0) >= SWAP_POPULARITY && (x.z ?? -9) >= 0) : [], city, ...(venue ? { venue: true, acts: actsOut ? actsOut.acts.filter(worthABooking) : [] } : {}) });
   trace.push(...res.trace);
 
   const whys = new Map<string, string>();
@@ -775,7 +824,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   }
   return {
     proposals: res.proposals.map((p) => ({ ...p, why: whys.get(p.id) ?? p.why, whySource: whys.has(p.id) ? "model" : "template" })),
-    discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace), unfixed: res.unfixed, trace, caps: await capsOf(d),
+    discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: (venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace)).map((x) => pickAngle(x, new Set(res.proposals.map((p) => p.toThemeId)))), unfixed: res.unfixed, trace, caps: await capsOf(d),
   };
 }
 

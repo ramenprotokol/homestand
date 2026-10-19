@@ -46,6 +46,22 @@ const EXTRA: Record<string, string> = {
   treasure: `<path class="c" d="M12 48C12 30 88 30 88 48V82H12Z"/><path class="b" d="M12 48C12 30 88 30 88 48Z"/><rect class="a" x="10" y="54" width="80" height="7"/><rect class="a" x="44" y="46" width="12" height="20" rx="2"/><circle class="c" cx="50" cy="55" r="3"/><circle class="a" cx="26" cy="22" r="5"/><circle class="a" cx="70" cy="18" r="4"/><circle class="b" cx="48" cy="12" r="3.4"/>${sp(84,30,4)}`,
 };
 
+
+/** One emblem per music genre, for concert venues: original shapes drawn in code (a hat, a bolt, a record, a heart, a sailboat...), no logos and no real acts. */
+const GENRE_ART: Record<string, string> = {
+  "genre:country": `<rect class="b" x="6" y="74" width="88" height="5" rx="2"/><rect class="b" x="6" y="85" width="88" height="5" rx="2"/><rect class="c" x="14" y="68" width="6" height="26" rx="2"/><rect class="c" x="46" y="68" width="6" height="26" rx="2"/><rect class="c" x="80" y="68" width="6" height="26" rx="2"/>${hat(50,40,1.15)}${sp(16,18,6)}${sp(86,26,5)}`,
+  "genre:rock": `<path class="a" d="M60 4L24 54H46L36 96L78 40H55Z"/><path class="b" d="M60 4L24 54H34L56 22Z" opacity=".45"/>${sp(16,22,6)}${sp(86,70,6)}${sp(84,14,4)}`,
+  "genre:classic-rock": `<circle class="c" cx="46" cy="54" r="38"/><circle class="la" cx="46" cy="54" r="31" stroke-width=".9" opacity=".55"/><circle class="la" cx="46" cy="54" r="24" stroke-width=".9" opacity=".55"/><circle class="a" cx="46" cy="54" r="14"/><path class="b" d="M46 46L48.4 51.6L54.4 52L49.8 55.8L51.2 61.6L46 58.6L40.8 61.6L42.2 55.8L37.6 52L43.6 51.6Z"/><path class="lb" stroke-width="3.4" d="M94 6L72 40"/><rect class="b" x="64" y="38" width="12" height="16" rx="2.5" transform="rotate(32 70 46)"/>`,
+  "genre:pop": `<path class="a" d="M50 6L61.5 37L94 39L68.6 59.6L77.4 92L50 73.8L22.6 92L31.4 59.6L6 39L38.5 37Z"/><path class="b" d="M50 22L56 40L75 41L60 52L65 70L50 60L35 70L40 52L25 41L44 40Z" opacity=".55"/>${sp(14,16,5)}${sp(88,86,5)}`,
+  "genre:hip-hop": `<path class="la" stroke-width="5.5" d="M18 62C12 20 88 20 82 62"/><rect class="b" x="9" y="54" width="19" height="34" rx="9"/><rect class="b" x="72" y="54" width="19" height="34" rx="9"/><rect class="a" x="14" y="61" width="9" height="20" rx="4.5"/><rect class="a" x="77" y="61" width="9" height="20" rx="4.5"/><path class="lb" stroke-width="3.4" d="M40 72V84M50 62V90M60 72V84"/>`,
+  "genre:latin": `<ellipse class="a" cx="32" cy="32" rx="16" ry="21" transform="rotate(-24 32 32)"/><ellipse class="b" cx="68" cy="32" rx="16" ry="21" transform="rotate(24 68 32)"/><path class="lc" stroke-width="5.4" d="M40 52L62 90M60 52L38 90"/><circle class="c" cx="26" cy="26" r="2.6"/><circle class="c" cx="36" cy="40" r="2.6"/><circle class="a" cx="74" cy="26" r="2.6"/><circle class="a" cx="64" cy="40" r="2.6"/>${sp(50,12,6)}`,
+  "genre:jam": `<circle class="b" cx="50" cy="50" r="40"/><path class="la" stroke-width="3.6" d="M50 50a5 5 0 0 1 10 0a10 10 0 0 1-20 0a15 15 0 0 1 30 0a20 20 0 0 1-40 0a25 25 0 0 1 50 0a30 30 0 0 1-60 0"/>${sp(86,14,6)}${sp(12,86,5)}`,
+  "genre:indie": `<rect class="b" x="8" y="24" width="84" height="54" rx="6"/><rect class="a" x="18" y="32" width="64" height="24" rx="3"/><circle class="c" cx="34" cy="44" r="8"/><circle class="c" cx="66" cy="44" r="8"/><circle class="a" cx="34" cy="44" r="3"/><circle class="a" cx="66" cy="44" r="3"/><path class="c" d="M26 78L33 64H67L74 78Z"/><path class="lb" stroke-width="2" d="M40 71H60"/>${sp(84,14,5)}`,
+  "genre:emo": `<path class="b" d="M50 90C12 64 6 38 22 23C35 12 46 21 50 31C54 21 65 12 78 23C94 38 88 64 50 90Z"/><path class="lc" stroke-width="3.2" d="M52 24L43 44L57 53L45 76"/><path class="la" stroke-width="2" stroke-dasharray="3 3" d="M22 40C26 52 36 64 50 76" opacity=".7"/>${sp(14,12,5)}${sp(88,80,5)}`,
+  "genre:r&b": `<path class="a" d="M62 6A42 42 0 1 0 94 68A34 34 0 0 1 62 6Z"/>${sp(78,28,6)}${sp(88,50,4)}${sp(70,14,3)}<path class="lb" stroke-width="3" d="M14 90C30 82 40 94 56 86"/>`,
+  "genre:yacht-rock": `<path class="a" d="M48 8V62H14Z"/><path class="b" d="M54 20V62H84Z"/><path class="c" d="M8 66H92L80 86H20Z"/><path class="lb" stroke-width="3.2" d="M4 94Q14 88 24 94T44 94T64 94T84 94T100 94"/>${sp(84,12,5)}`,
+};
+
 /** Theme id to emblem key. Themes with their own drawing use it; the rest take their category's. */
 const THEME_EMBLEM: Record<string, string> = {
   "paw-patrol": "kids", pokemon: "toys", "lord-of-the-rings": "film", "stranger-things": "tv", "the-office": "tv", batman: "film",
@@ -62,10 +78,12 @@ const CLASSIC_EMBLEM: ReadonlyArray<readonly [RegExp, string]> = [
   [/bobble|giveaway/i, "bobblehead"], [/hot ?sauce|salsa|chili|wing/i, "hot-sauce"], [/band|symphony|orchestra|concert|showcase/i, "music"],
 ];
 
-export const EMBLEMS: Record<string, string> = { ...BASE, ...EXTRA };
+export const EMBLEMS: Record<string, string> = { ...BASE, ...EXTRA, ...GENRE_ART };
 
 /** Pick the emblem for a night: the scored theme's, else a classic night's by its words, else the question mark. */
-export function emblemFor(themeId: string | null, category: string | null, text: string, classic: boolean): string {
+export function emblemFor(themeId: string | null, category: string | null, text: string, classic: boolean, genre?: string | null): string {
+  // A music act with no drawing of its own gets its genre's emblem (concert venues).
+  if (genre && category === "music" && (!themeId || !(EMBLEMS[themeId] || THEME_EMBLEM[themeId])) && EMBLEMS[`genre:${genre}`]) return EMBLEMS[`genre:${genre}`]!;
   if (themeId) {
     const key = EMBLEMS[themeId] ? themeId : (THEME_EMBLEM[themeId] ?? (category ? CATEGORY_EMBLEM[category] : undefined));
     if (key && EMBLEMS[key]) return EMBLEMS[key];

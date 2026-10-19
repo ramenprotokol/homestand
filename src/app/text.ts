@@ -1,4 +1,7 @@
 /** Small wording helpers, so a count of one never reads as "1 nights" or "1 locked night stay". */
+/** "a rock act", "an indie act", "an R&B act": the right article for a word. */
+export const withArticle = (word: string): string => `${/^(?:[aeiou]|r&b)/i.test(word) ? "an" : "a"} ${word}`;
+
 export const plural = (n: number, one: string, many = `${one}s`): string => (n === 1 ? one : many);
 
 /** "leans" for one, "lean" for the rest: "1 leans in", "7 lean in". */

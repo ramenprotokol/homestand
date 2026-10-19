@@ -20,6 +20,8 @@ export interface ParsedCalendar {
 }
 
 export const CSV_HEADER = "date,theme,sponsor,locked,notes";
+/** A venue run's exports call the second column "act". */
+export const CSV_HEADER_VENUE = "date,act,sponsor,locked,notes";
 export const CSV_TEMPLATE = `${CSV_HEADER}\n2027-04-09,Bluey Night,Harbor Credit Union,no,Kids run the bases after the game\n2027-04-16,Fireworks Friday,,no,\n2027-05-07,Star Wars Night,Gulf Coast Dental,yes,Sponsor contract signed\n`;
 export const MAX_ROWS = 200;
 
@@ -107,7 +109,8 @@ export function parseCalendar(text: string): ParsedCalendar {
   const records = splitRecords(text, pickDelimiter(firstLine));
   const header = (records[0] ?? []).map((h) => h.trim().toLowerCase());
   const col = (name: string): number => header.indexOf(name);
-  const [cDate, cTheme, cSponsor, cLocked, cNotes] = ["date", "theme", "sponsor", "locked", "notes"].map(col) as [number, number, number, number, number];
+  const [cDate, cThemeCol, cSponsor, cLocked, cNotes] = ["date", "theme", "sponsor", "locked", "notes"].map(col) as [number, number, number, number, number];
+  const cTheme = cThemeCol >= 0 ? cThemeCol : col("act"); // a venue calendar may call the column "act"
   if (cDate < 0 || cTheme < 0) {
     return { rows, errors: [{ line: 1, message: "The first row must be a header with at least date and theme columns (date,theme,sponsor,locked,notes)." }] };
   }

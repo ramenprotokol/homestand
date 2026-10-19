@@ -4,6 +4,8 @@ import { hasPhrase, isClassicNight, normalizeText } from "./classic";
 export type Resolution =
   | { kind: "theme"; themeId: string; method: "alias" | "model" | "choice" }
   | { kind: "classic" }
+  /** A night named after a family-title pool entry: scored from that title's own reading, never swapped. */
+  | { kind: "pool"; entityId: string; name: string }
   | { kind: "ambiguous"; candidates: string[] }
   | { kind: "unknown" };
 

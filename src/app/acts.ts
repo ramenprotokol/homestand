@@ -1,13 +1,15 @@
 import referenceFile from "./data/acts-reference.json";
-import { discoveryZ, standsOut } from "./discovery";
+import { discoveryZ, poolOffset, standsOut } from "./discovery";
 import type { Discovered } from "./propose/propose";
-import type { Genre } from "./themes/library";
+import type { Genre, Tier } from "./themes/library";
 
 /** One touring act in the fixed pool Qloo is asked about in every venue market. The genre is ours (declared in the pool script). */
 export interface PoolAct {
   entityId: string;
   name: string;
   genre: Genre;
+  /** Our declared booking tier (not Qloo data). */
+  tier: Tier;
   /** Qloo's national popularity for the artist (0 to 1): a promoter only books an act people know. */
   popularity: number;
 }
@@ -45,17 +47,19 @@ export function syntheticActsReference(): ActsReference {
     ["latin", ["Luna Cobre", "Sol y Marea"]], ["classic-rock", ["The Midnight Ramblers", "Silver Canyon"]], ["jam", ["Parade of Owls", "Fern & Lantern"]], ["indie", ["Paper Lighthouse", "Quiet Maple"]],
     ["r&b", ["Satin Hours", "Dev Marlowe"]], ["emo", ["Lights Out Sunday", "Paper Hearts Club"]],
   ];
-  const pool: PoolAct[] = names.flatMap(([genre, list]) => list.map((n, i) => ({ entityId: `SYN-A-${genre}-${i}`, name: `${n} (made up)`, genre, popularity: 0.99 })));
+  const pool: PoolAct[] = names.flatMap(([genre, list]) => list.map((n, i) => ({ entityId: `SYN-A-${genre}-${i}`, name: `${n} (made up)`, genre, tier: (i === 0 ? "amphitheatre" : "theatre") as Tier, popularity: 0.99 })));
   return { synthetic: true, markets: 40, pulledAt: null, pool, stats: Object.fromEntries(pool.map((p) => [p.entityId, { n: 40, mean: 0.7, sd: 0.1 }])) };
 }
 
 /** Every pool act with a reading here, ranked by z against its own spread over the reference markets, best first. */
 export function rankActs(readings: ReadonlyMap<string, number | null>, ref: ActsReference): Discovered[] {
+  // Centred on this market's own average over the pool, like the library index.
+  const offset = poolOffset(readings, ref.pool, ref.stats);
   const out: Discovered[] = [];
   for (const p of ref.pool) {
     const affinity = readings.get(p.entityId) ?? null;
     const z = discoveryZ(affinity, ref.stats[p.entityId]);
-    if (z !== null) out.push({ name: p.name, entityId: p.entityId, type: "artist", genre: p.genre, affinity, z, popularity: p.popularity });
+    if (z !== null) out.push({ name: p.name, entityId: p.entityId, type: "artist", genre: p.genre, tier: p.tier, affinity, z: z - offset, popularity: p.popularity });
   }
   return out.sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name));
 }

@@ -1,6 +1,6 @@
 {
  "biloxi": {
-  "hash": "fb5ad7490ed5c16996c75a46a4c3ba5094e061d74318692740f59d3ac3980086",
+  "hash": "d3414b6f11e9616904413f5604909289e6e95d7e88ab4fa5ab9b975508972187",
   "summary": {
    "bands": [
     "2027-04-09 Margaritaville Night: leans-away",
@@ -30,23 +30,23 @@
     "2027-09-04 Dolly Parton Night: average"
    ],
    "swaps": [
-    "2027-04-10 bluey > toy-story | alt ",
-    "2027-05-22 marvel > qloo:SYN-D-tv_show-6 (discovered) | alt ",
-    "2027-05-29 beatles > ghostbusters | alt ",
+    "2027-04-10 bluey > paw-patrol | alt ",
+    "2027-05-22 marvel > ghostbusters | alt ",
+    "2027-05-29 beatles > wrestling | alt ",
     "2027-06-12 super-mario > back-to-the-future | alt ",
-    "2027-06-26 taylor-swift > wrestling | alt ",
-    "2027-07-31 kenny-chesney > paw-patrol | alt "
+    "2027-07-31 kenny-chesney > toy-story | alt "
    ],
    "angles": [
     "Margaritaville on Fri Apr 9 is locked, so it stays exactly as planned. Fans of Margaritaville near Biloxi also lean toward Garth Brooks, so if Magnolia Mutual is open to it, a small Garth Brooks touch (walk-up songs, PA clips or a photo spot) fits the night."
    ],
    "unfixed": [
+    "2027-06-26 No theme that leans in passes the date, audience and no-repeat checks.",
     "2027-07-02 No theme that leans in passes the date, audience and no-repeat checks."
    ]
   }
  },
  "albuquerque": {
-  "hash": "ef0e7b0427287ab5beb4c665cc8e8ba9045f4a8d6dd4507081f80c0037df6b38",
+  "hash": "b9a65234949cd631205c2e88d874ffc45a2a14f9aab033959ef6b13c5c21be4f",
   "summary": {
    "bands": [
     "2027-04-10 Taylor Swift Night: leans-in",
@@ -81,13 +81,13 @@
     "2027-08-21 harry-potter > pirates | alt back-to-the-future,ninja-turtles"
    ],
    "angles": [
-    "Garth Brooks on Sat Aug 14 is locked, so it stays exactly as planned. Fans of Garth Brooks near Albuquerque also lean toward Dolly Parton, so if Red Mesa Tires is open to it, a small Dolly Parton touch (walk-up songs, PA clips or a photo spot) fits the night."
+    "Garth Brooks on Sat Aug 14 is locked, so it stays exactly as planned. Fans of Garth Brooks near Albuquerque also lean toward Kenny Chesney, so if Red Mesa Tires is open to it, a small Kenny Chesney touch (walk-up songs, PA clips or a photo spot) fits the night."
    ],
    "unfixed": []
   }
  },
  "akron": {
-  "hash": "2f217fc570793ead52b3bac29c6f607a40e729f3f05374c32af2dd734115a7db",
+  "hash": "bad836af90e14037c3b86ee1f17330aac02944b120cdf87e2717c210602db26a",
   "summary": {
    "bands": [
     "2027-04-10 Bluey Day: leans-in",
@@ -116,20 +116,20 @@
     "2027-09-17 Kenny Chesney Night: average"
    ],
    "swaps": [
-    "2027-04-16 star-trek > pirates | alt batman,stranger-things",
-    "2027-05-01 harry-potter > spongebob | alt ",
-    "2027-05-29 princess > qloo:SYN-D-movie-4 (discovered) | alt ",
-    "2027-07-10 dinosaur > qloo:SYN-D-tv_show-4 (discovered) | alt ",
+    "2027-04-16 star-trek > batman | alt stranger-things,the-office",
+    "2027-05-01 harry-potter > qloo:SYN-D-tv_show-4 (discovered) | alt ",
+    "2027-05-29 princess > spongebob | alt ",
+    "2027-07-10 dinosaur > toy-story | alt ",
     "2027-07-31 garth-brooks > margaritaville | alt elvis,stranger-things",
-    "2027-08-07 harry-potter > toy-story | alt ",
-    "2027-09-04 star-trek > top-gun | alt batman,stranger-things"
+    "2027-08-07 harry-potter > pirates | alt ",
+    "2027-09-04 star-trek > top-gun | alt stranger-things,the-office"
    ],
    "angles": [],
    "unfixed": []
   }
  },
  "portland-me": {
-  "hash": "6f9876bc06d0379248da3bca19714c0a1c3e1dce75d6971bfa949a3271a3fdaa",
+  "hash": "1c688f77f410f7e1d9a1ca5334c73f628f68cdc00cdb993fd08b28530eaf1167",
   "summary": {
    "bands": [
     "2027-04-17 Bluey Day: leans-in",
@@ -158,9 +158,9 @@
    "swaps": [
     "2027-05-08 harry-potter > spongebob | alt ",
     "2027-06-05 dinosaur > paw-patrol | alt ",
-    "2027-07-02 grateful-dead > bad-bunny | alt beatles,country",
+    "2027-07-02 grateful-dead > beatles | alt bad-bunny,country",
     "2027-07-24 ghostbusters > back-to-the-future | alt ",
-    "2027-08-07 star-trek > batman | alt beatles,country",
+    "2027-08-07 star-trek > batman | alt bad-bunny,country",
     "2027-09-11 harry-potter > hocus-pocus | alt "
    ],
    "angles": [],
@@ -168,7 +168,7 @@
   }
  },
  "example@biloxi": {
-  "hash": "7be05ee430a61b8ddc2142ec1a9ddddf0d809543f27c4105d4402a161c0f4a22",
+  "hash": "a4942e14cdaf61da1f323ccc5fa88ed5eb9b667374982a7c215fe82e9394041b",
   "summary": {
    "bands": [
     "2027-04-09 Fireworks Friday: classic",
@@ -193,21 +193,21 @@
     "2027-08-07 Pro Wrestling Night: leans-in"
    ],
    "swaps": [
-    "2027-04-10 bluey > qloo:SYN-D-tv_show-6 (discovered) | alt ",
-    "2027-04-17 marvel > qloo:SYN-D-movie-6 (discovered) | alt ",
-    "2027-05-01 taylor-swift > back-to-the-future | alt ",
-    "2027-05-22 super-mario > harry-potter | alt ",
-    "2027-07-10 margaritaville > toy-story | alt "
+    "2027-04-10 bluey > toy-story | alt ",
+    "2027-04-17 marvel > harry-potter | alt ",
+    "2027-05-22 super-mario > back-to-the-future | alt "
    ],
    "angles": [],
    "unfixed": [
+    "2027-05-01 No theme that leans in passes the date, audience and no-repeat checks.",
+    "2027-07-10 No theme that leans in passes the date, audience and no-repeat checks.",
     "2027-06-04 No theme that leans in passes the date, audience and no-repeat checks.",
     "2027-06-26 No theme that leans in passes the date, audience and no-repeat checks."
    ]
   }
  },
  "example@akron": {
-  "hash": "d6843e5328c4a0b4f8715efae8c67421977a946b2f1443c783406274653fbd5d",
+  "hash": "ffe71d6b433041441b185dc975c7399bfe80167310d51ec6e9570bfa94df24ed",
   "summary": {
    "bands": [
     "2027-04-09 Fireworks Friday: classic",
@@ -232,13 +232,13 @@
     "2027-08-07 Pro Wrestling Night: average"
    ],
    "swaps": [
-    "2027-05-15 dinosaur > qloo:SYN-D-tv_show-4 (discovered) | alt ",
-    "2027-05-29 princess > qloo:SYN-D-movie-4 (discovered) | alt ",
-    "2027-06-04 beatles > dolly-parton | alt top-gun,batman",
-    "2027-06-05 ghostbusters > spongebob | alt ",
-    "2027-06-12 star-trek > pirates | alt top-gun,batman",
-    "2027-07-17 grateful-dead > toy-story | alt top-gun,batman",
-    "2027-07-24 yellowstone > the-office | alt top-gun,batman"
+    "2027-05-15 dinosaur > spongebob | alt ",
+    "2027-05-29 princess > toy-story | alt ",
+    "2027-06-04 beatles > dolly-parton | alt ",
+    "2027-06-05 ghostbusters > pirates | alt ",
+    "2027-06-12 star-trek > top-gun | alt ",
+    "2027-07-17 grateful-dead > batman | alt ",
+    "2027-07-24 yellowstone > the-office | alt "
    ],
    "angles": [],
    "unfixed": []

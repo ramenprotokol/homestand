@@ -236,6 +236,30 @@
     "stevie-nicks:artist": {
       "id": "1C595E6F-D008-48F2-8EAB-4EFA935B29EE",
       "name": "Stevie Nicks"
+    },
+    "old-dominion:artist": {
+      "id": "45A882CC-56C8-451C-A6BB-0B446ACC4E7E",
+      "name": "Old Dominion"
+    },
+    "zac-brown-band:artist": {
+      "id": "D1AA309A-F3B3-454E-AC9A-C5B216A859CF",
+      "name": "Zac Brown Band"
+    },
+    "brad-paisley:artist": {
+      "id": "0C2D93F4-6034-4A9A-848C-E938F2D234D6",
+      "name": "Brad Paisley"
+    },
+    "darius-rucker:artist": {
+      "id": "36D703F5-2E19-4967-BE55-68130537F45A",
+      "name": "Darius Rucker"
+    },
+    "the-revivalists:artist": {
+      "id": "1010DFDB-AA57-4EF2-94EB-E709B637EFC1",
+      "name": "The Revivalists"
+    },
+    "hozier:artist": {
+      "id": "7D903E2F-70AB-44CB-AA88-82501E6D04DD",
+      "name": "Hozier"
     }
   },
   "dropped": {

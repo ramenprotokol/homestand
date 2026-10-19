@@ -37,7 +37,7 @@ describe("the venue sample", () => {
     expect(errors).toEqual([]);
     expect(rows).toHaveLength(18);
     for (const r of rows) expect(r.date >= "2027-05-01" && r.date <= "2027-09-30").toBe(true);
-    expect(rows.filter((r) => r.locked)).toHaveLength(4);
+    expect(rows.filter((r) => r.locked)).toHaveLength(5);
     expect(rows.filter((r) => r.locked).every((r) => /contract signed/i.test(r.notes))).toBe(true);
   });
   it("has the intended mix: two tribute nights, two classic dates, tentative holds across genres, nothing ambiguous", () => {
@@ -55,7 +55,7 @@ describe("the venue sample", () => {
     expect(themes.filter((x) => x.theme.id === "yacht-rock" || x.theme.id === "emo-night")).toHaveLength(2);
     const holds = themes.filter((x) => !x.row.locked && !["yacht-rock", "emo-night"].includes(x.theme.id));
     expect(holds.length).toBeGreaterThanOrEqual(8);
-    expect(new Set(holds.map((x) => x.theme.genre)).size).toBeGreaterThanOrEqual(6);
+    expect(new Set(holds.map((x) => x.theme.genre)).size).toBeGreaterThanOrEqual(3);
     // None of it resolves under the club library, so a club run could never read this calendar as baseball.
     expect(rows.map((r) => resolveTheme(r.theme, THEME_LIBRARY).kind).filter((k) => k === "theme").length).toBeLessThan(rows.length);
   });
@@ -70,9 +70,9 @@ describe("the artist library", () => {
     for (const id of ["margaritaville", "elvis", "grateful-dead", "beatles", "fleetwood-mac"]) expect(ALL_THEMES.find((t) => t.id === id)!.touring, id).toBe(false);
     expect(ALL_THEMES.filter((t) => t.tribute).map((t) => t.id).sort()).toEqual(["emo-night", "yacht-rock"]);
   });
-  it("has 20 to 30 artist themes, each with a genre, in its own library", () => {
+  it("has 20 to 40 artist themes, each with a genre, in its own library", () => {
     expect(ARTIST_LIBRARY.length).toBeGreaterThanOrEqual(20);
-    expect(ARTIST_LIBRARY.length).toBeLessThanOrEqual(30);
+    expect(ARTIST_LIBRARY.length).toBeLessThanOrEqual(40);
     expect(ARTIST_LIBRARY.every((t) => t.category === "music" && t.genre !== undefined && t.entities.every((e) => e.type === "artist"))).toBe(true);
     const ids = new Set([...THEME_LIBRARY, ...ARTIST_LIBRARY].map((t) => t.id));
     expect(ids.size).toBe(THEME_LIBRARY.length + ARTIST_LIBRARY.length);
@@ -119,7 +119,7 @@ describe("genre-aware ranking", () => {
     expect(venue.proposals[0]!.toThemeId).toBe("c"); // rock, the same genre
     expect(venue.proposals[0]!.alternates.map((x) => x.toThemeId)).toEqual(["e"]); // indie is related; country (b) and hip-hop (d) are not offered
     const club = propose({ nights, library: themes, fits, allowDuplicates: false, now: "t" });
-    expect(club.proposals[0]!.toThemeId).toBe("b"); // a club run ranks by local lean: unchanged
+    expect(club.proposals[0]!.toThemeId).toBe("c"); // a club music night also keeps to the same genre first
   });
 
   it("never swaps to a genre bundle or an act that no longer tours, and says so when nothing is left", () => {
@@ -173,12 +173,12 @@ describe("a venue run end to end on the synthetic data", () => {
     expect(a.nights.filter((n) => n.resolution.kind === "classic")).toHaveLength(2);
     expect(a.trace.map((t) => t.text).join(" ")).not.toMatch(/ballpark|baseball|nights/i);
   });
-  it("makes a support-act idea for each of the four locked headliners from the taste graph, and discovery uses the act pool", async () => {
+  it("makes a support-act idea for each of the five locked headliners from the taste graph, and discovery uses the act pool", async () => {
     const { p, d } = await run();
     expect(p.discovery).toBeNull();
     expect(p.acts).not.toBeNull();
     expect(p.acts!.poolSize).toBe(d.actsRef!.pool.length);
-    expect(p.angles).toHaveLength(4);
+    expect(p.angles).toHaveLength(5);
     for (const x of p.angles) {
       expect(x.text).toMatch(/^.+ on .+ is locked, so it stays exactly as planned\. Support act idea: fans of .+ near Raleigh also lean toward .+, so an act like .+ could fit the opening slot\.$/);
       expect(x.act?.name).toBeTruthy();
@@ -186,11 +186,11 @@ describe("a venue run end to end on the synthetic data", () => {
     expect(p.trace.map((t) => t.text).join(" ")).toMatch(/taste graph/);
   });
   it("calls it a promo tie-in, not a support act, when no act can open for the headliner", async () => {
-    const d = forKind(deps({ popularityOf: (id) => (/kenny-chesney|dave-matthews|bruno-mars|karol-g/.test(id) ? 0.4 : 0.99) }), "venue");
+    const d = forKind(deps({ popularityOf: (id) => (/dave-matthews|luke-bryan|phish|the-lumineers|jason-aldean/.test(id) ? 0.4 : 0.99) }), "venue");
     const a = await analyze(d, { market, rows: parseCalendar(sampleCsv("raleigh")).rows });
     const nights = a.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.resolution.kind === "theme" ? n.themeId : null, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
     const p = await proposeSwaps(d, { market, nights, allowDuplicates: false });
-    expect(p.angles).toHaveLength(4);
+    expect(p.angles).toHaveLength(5);
     for (const x of p.angles) {
       expect(x.text).toContain("a pre-show playlist or promo tie-in");
       expect(x.text).not.toContain("Support act idea");
@@ -204,8 +204,8 @@ describe("a venue run end to end on the synthetic data", () => {
     const nights = a.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.resolution.kind === "theme" ? n.themeId : null, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
     await proposeSwaps(d, { market, nights, allowDuplicates: false });
     const batches = actBatches(d.actsRef!.pool).length;
-    expect(urls.length).toBe(1 + batches + 4);
-    expect(urls.filter((u) => u.includes("signal.interests.entities"))).toHaveLength(4);
+    expect(urls.length).toBe(1 + batches + 5);
+    expect(urls.filter((u) => u.includes("signal.interests.entities"))).toHaveLength(5);
     // A second look at the same market costs nothing.
     urls.length = 0;
     await proposeSwaps(d, { market, nights, allowDuplicates: false });

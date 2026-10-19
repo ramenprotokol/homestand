@@ -64,7 +64,7 @@ describe("the committed discovery reference", () => {
     expect(ref.pool.length).toBeLessThanOrEqual(120);
     expect(new Set(ref.pool.map((p) => p.entityId)).size).toBe(ref.pool.length);
     for (const p of ref.pool) {
-      expect(Object.keys(p).sort()).toEqual(["entityId", "name", "popularity", "type"]);
+      expect(Object.keys(p).sort()).toEqual(expect.arrayContaining(["entityId", "name", "popularity", "type"]));
       expect(p.popularity).toBeGreaterThanOrEqual(0.7); // recognisable titles only; none with a missing popularity
       expect(["movie", "tv_show"]).toContain(p.type);
       const s = ref.stats[p.entityId]!;

@@ -1,4 +1,4 @@
-import { fitWord, pullWords, vsMarketsWords, type FitLabel } from "../../app/score";
+import { bridgeSentence, fitWord, pullWords, vsMarketsWords, type FitLabel } from "../../app/score";
 import { themeById } from "../../app/themes/artists";
 import { h } from "../dom";
 import { canHover, gsap, reduced } from "./motion";
@@ -101,7 +101,7 @@ export function specOf(v: NightView): CardSpec {
   return {
     title,
     fit,
-    emblem: emblemFor(v.discovered ? (v.discovered.type === "artist" ? "music" : v.discovered.type === "movie" ? "film" : "tv") : v.themeId, category, n.theme, n.resolution.kind === "classic"),
+    emblem: emblemFor(v.discovered ? (v.discovered.type === "artist" ? "music" : v.discovered.type === "movie" ? "film" : "tv") : v.themeId, v.discovered?.type === "artist" ? "music" : category, n.theme, n.resolution.kind === "classic", v.discovered?.genre ?? (v.themeId ? themeById(v.themeId)?.genre : null)),
     month,
     day,
     weekday: n.weekday,
@@ -113,9 +113,9 @@ export function specOf(v: NightView): CardSpec {
 }
 
 /** A card for a theme the agent proposes: the night's date and sponsor, the new theme's art and fit. */
-export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel): CardSpec {
-  const category = themeById(themeId)?.category ?? null;
-  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWord(fit, state.kind)}` };
+export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel, genre?: string | null): CardSpec {
+  const category = themeId === "music" ? "music" : (themeById(themeId)?.category ?? null);
+  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWord(fit, state.kind)}` };
 }
 
 function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
@@ -166,6 +166,7 @@ function backFace(b: BackSpec): HTMLElement {
     body.push(
       h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Local pull", h("b", null, pullWords(ix)))),
       h("div", { class: "bk-vs", "data-testid": "bk-vs" }, `${b.themeName} here: ${vsMarketsWords(b.z, state.kind)}`),
+      ...(bridgeSentence(b.fit, b.z, b.city) ? [h("div", { class: "bk-bridge", "data-testid": "bk-bridge" }, bridgeSentence(b.fit, b.z, b.city))] : []),
       h("div", { class: "bk-why" }, h("b", null, whyHead(b.fit, b.city)), whyText(b.fit)),
     );
   } else {

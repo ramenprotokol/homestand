@@ -12,7 +12,7 @@ import { MIN_DISCOVERY_N } from "../src/app/discovery";
 import { actBatches, MAX_POOL, type ActsReference, type PoolAct } from "../src/app/acts";
 import { COMMITTED_IDS } from "../src/app/themes/ids";
 import { normTitle } from "../src/app/themes/match";
-import type { Genre } from "../src/app/themes/library";
+import type { Genre, Tier } from "../src/app/themes/library";
 import { mean, populationSd } from "../src/study/stats";
 import { announce, client, dry } from "./lib";
 
@@ -35,11 +35,22 @@ const DECLARED: Record<PoolGenre, string[]> = {
   "classic-rock": ["Bruce Springsteen", "The Rolling Stones", "Billy Joel", "Def Leppard", "Lynyrd Skynyrd", "Santana", "Rod Stewart", "ZZ Top", "John Mellencamp", "Queen"],
   jam: ["Billy Strings", "Tedeschi Trucks Band"],
   indie: ["My Morning Jacket", "The Revivalists", "Rainbow Kitten Surprise", "Mt. Joy", "Death Cab for Cutie", "Noah Kahan", "Hozier", "Mumford & Sons", "Vampire Weekend", "The 1975", "Glass Animals", "Bon Iver", "Lana Del Rey", "Phoebe Bridgers", "HAIM"],
-  emo: ["blink-182", "Panic! at the Disco", "All Time Low", "Pierce the Veil", "Jimmy Eat World", "Taking Back Sunday", "Dashboard Confessional"],
+  emo: ["blink-182", "All Time Low", "Pierce the Veil", "Jimmy Eat World", "Taking Back Sunday", "Dashboard Confessional"],
 };
 const TAGS: Record<PoolGenre, string> = {
   country: "urn:tag:genre:music:country", rock: "urn:tag:genre:music:rock", pop: "urn:tag:genre:music:pop", "hip-hop": "urn:tag:genre:music:hip_hop", "r&b": "urn:tag:genre:music:r_b",
   latin: "urn:tag:genre:music:latin", "classic-rock": "urn:tag:genre:music:classic_rock", jam: "urn:tag:genre:music:jam_band", indie: "urn:tag:genre:music:indie", emo: "urn:tag:genre:music:emo",
+};
+// Declared booking tier of each act: stadium, arena, amphitheatre or theatre. Ours, not Qloo's: where an act headlines, from general knowledge of how
+// they tour. A support act must be at least one tier below the headliner; a swap must be within one tier of the date it replaces.
+const TIER: Record<string, Tier> = {
+  "Eric Church": "arena", "Tyler Childers": "amphitheatre", "Old Dominion": "amphitheatre", "Zac Brown Band": "amphitheatre", "Brad Paisley": "amphitheatre", "Darius Rucker": "amphitheatre",
+  "twenty one pilots": "arena", "Greta Van Fleet": "amphitheatre", "Avril Lavigne": "amphitheatre", "Cage the Elephant": "amphitheatre",
+  "Harry Styles": "stadium", "Olivia Rodrigo": "arena", "Lil Baby": "arena", "Latto": "amphitheatre",
+  "J Balvin": "arena", "Shakira": "stadium", "Maluma": "arena", "Ozuna": "arena", "Becky G": "amphitheatre", "Enrique Iglesias": "arena", "Romeo Santos": "stadium", "Marc Anthony": "arena", "Rauw Alejandro": "arena", "Camilo": "amphitheatre", "Manuel Turizo": "amphitheatre",
+  "Santana": "amphitheatre", "Bruce Springsteen": "stadium", "The Rolling Stones": "stadium", "Billy Joel": "stadium", "Def Leppard": "arena", "Lynyrd Skynyrd": "amphitheatre", "Rod Stewart": "arena", "ZZ Top": "amphitheatre", "John Mellencamp": "amphitheatre", "Queen": "arena",
+  "My Morning Jacket": "amphitheatre", "The Revivalists": "amphitheatre", "Rainbow Kitten Surprise": "amphitheatre", "Mt. Joy": "theatre", "Hozier": "amphitheatre", "The 1975": "arena", "Glass Animals": "amphitheatre", "Bon Iver": "theatre", "Phoebe Bridgers": "amphitheatre", "HAIM": "amphitheatre", "Death Cab for Cutie": "amphitheatre",
+  "All Time Low": "theatre", "Pierce the Veil": "amphitheatre", "Jimmy Eat World": "theatre", "Taking Back Sunday": "theatre", "Dashboard Confessional": "theatre",
 };
 const GENRES = Object.keys(DECLARED) as PoolGenre[];
 
@@ -79,7 +90,7 @@ for (const genre of GENRES) {
     const [entityId, v] = found[0]!;
     if (libraryIds.has(entityId)) { console.log(`already a library entity: ${name}`); continue; }
     if (v.popularity < POPULARITY_FLOOR) { console.log(`not in the pool (popularity under ${POPULARITY_FLOOR}): ${name}`); continue; }
-    pool.push({ entityId, name: v.name, genre, popularity: Number(v.popularity.toFixed(4)) });
+    pool.push({ entityId, name: v.name, genre, tier: TIER[name] ?? "amphitheatre", popularity: Number(v.popularity.toFixed(4)) });
   }
 }
 console.log(`pool: ${pool.length} acts`);
