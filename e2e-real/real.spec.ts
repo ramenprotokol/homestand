@@ -225,3 +225,24 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await noSideScroll(page);
   await snap("5-send");
 });
+
+// Fix screens on real data for the club samples that show the joint assignment and the centred discovery (screenshots go to VENUE_SHOTS when set).
+for (const id of ["akron", "portland-me"]) {
+  test(`real data: ${id} Fix screens`, async ({ page }, info) => {
+    const dir = process.env.VENUE_SHOTS ?? "test-results/screens-real";
+    await page.goto("/#/sample");
+    await page.getByTestId(`market-${id}`).click();
+    await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId("to-fix").click();
+    await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible({ timeout: 60_000 });
+    const skip = page.getByTestId("skip-pack");
+    await expect(skip).toBeVisible({ timeout: 60_000 });
+    await skip.click();
+    await page.waitForTimeout(1500);
+    // No family-title chip is a niche title, and there are at most three.
+    const chips = await page.getByTestId("ideas").locator(".idea").allInnerTexts();
+    expect(chips.length).toBeLessThanOrEqual(3);
+    for (const c of chips) expect(c).not.toMatch(/Nimona|^Leo$|Wish Dragon/);
+    await page.screenshot({ path: `${dir}/${info.project.name}-${id}-fix.png`, fullPage: true });
+  });
+}
