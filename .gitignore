@@ -41,3 +41,6 @@ data/derived/
 dist-e2e/
 study/results/
 dist-real/
+
+# Working notes, kept locally
+docs/superpowers/

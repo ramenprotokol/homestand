@@ -1,5 +1,8 @@
 import type { MarketIn } from "../app/api-types";
 import type { CalendarRow, RowError } from "../app/calendar/csv";
+import { parseCalendar } from "../app/calendar/csv";
+import { sampleById } from "../app/markets";
+import { sampleCsv } from "../app/samples";
 import { api, ApiFailure } from "./api";
 import { addTrace, invalidateProposals, reset, state, ui, viewOf } from "./store";
 
@@ -61,14 +64,25 @@ export function resumeClub(): void {
 }
 
 /** Step 1 of 3, Check: parse is done by the caller; this asks the Worker to resolve, score and flag. */
-export async function startCheck(market: MarketIn, rows: CalendarRow[], parseErrors: RowError[], sampleId: string | null): Promise<void> {
+export async function startCheck(market: MarketIn, rows: CalendarRow[], parseErrors: RowError[], sampleId: string | null, go = true): Promise<void> {
   reset();
   Object.assign(state, { market, rows, parseErrors, sampleId });
   saveClub({ market, rows, parseErrors, sampleId });
   ui.loading = true;
   ui.error = null;
-  navigate("#/check");
+  // A sample club has a link of its own: #/check/biloxi opens it from a cold start.
+  if (go) navigate(sampleId ? `#/check/${sampleId}` : "#/check");
   await analyzeClub({ market, rows, parseErrors, sampleId });
+}
+
+/** A deep link such as #/check/biloxi: load that sample club unless it is already loaded. False for an unknown club. */
+export function openSample(id: string): boolean {
+  const m = sampleById(id);
+  if (!m) return false;
+  if (state.sampleId === id && (state.analysis || ui.loading || ui.error)) return true;
+  const { rows, errors } = parseCalendar(sampleCsv(id));
+  void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, id, false);
+  return true;
 }
 
 export async function ensureProposals(): Promise<void> {

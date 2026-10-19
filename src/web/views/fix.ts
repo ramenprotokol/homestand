@@ -2,7 +2,7 @@ import { shortDate } from "../../app/dates";
 import { vsAverage } from "../../app/score";
 import { themeById } from "../../app/themes/library";
 import { openDrawer, syntheticBanner } from "../components";
-import { h, type Child } from "../dom";
+import { h, localizeDates, type Child } from "../dom";
 import { ensureProposals, navigate } from "../flow";
 import { makeCard, setFlip, specForSwap, specOf, flipper, type CardSpec } from "../foil/cards";
 import { onCleanup, onMount, onResize, routeContext } from "../foil/lifecycle";
@@ -23,7 +23,7 @@ const stage = { forPropose: null as object | null, opened: false, cur: 0 };
 export function fixView(): HTMLElement {
   const a = state.analysis;
   if (!a) {
-    navigate("#/");
+    navigate("#/sample");
     return h("div");
   }
   if (!state.propose && !ui.proposeError) {
@@ -220,7 +220,8 @@ class FixStage {
         this.slides.forEach((s, j) => {
           const o = j - stage.cur;
           if (Math.abs(o) > 1) return;
-          gsap.from(s.lift, { x: -(o * (cw * 0.86 + 22)), y: 60, scale: 0.3, rotation: (o || 1) * -16, opacity: 0, duration: 0.95, delay: 0.08 + Math.abs(o) * 0.14, ease: "back.out(1.3)", clearProps: "transform,opacity" });
+          // No opacity tween: fading a 3D-flipped card flattens it, and its back face flashes as a black box.
+          gsap.from(s.lift, { x: -(o * (cw * 0.86 + 22)), y: 60, scale: 0.3, rotation: (o || 1) * -16, duration: 0.95, delay: 0.08 + Math.abs(o) * 0.14, ease: "back.out(1.3)", clearProps: "transform" });
         });
       });
     }
@@ -229,12 +230,11 @@ class FixStage {
   /** After the pack opens, scroll just far enough that Approve and Reject are on screen, keeping the card's top in view. */
   private actionsInView(): void {
     if (!this.alive) return;
-    const acts = this.console.querySelector(".acts");
-    if (!acts) return;
-    const room = window.innerHeight - 16;
-    const bottom = acts.getBoundingClientRect().bottom;
+    // The console's own bottom, not the sticky bar's: the bar is pinned to the window edge and says nothing about where the page ends.
+    const room = window.innerHeight - 12;
+    const bottom = this.console.getBoundingClientRect().bottom;
     if (bottom <= room) return;
-    const dy = Math.min(bottom - room, this.root.getBoundingClientRect().top - 84);
+    const dy = Math.min(bottom - room, this.root.getBoundingClientRect().top - 72);
     if (dy > 0) window.scrollBy({ top: dy, behavior: reduced() ? "auto" : "smooth" });
   }
 
@@ -345,6 +345,11 @@ class FixStage {
           }))
         : null;
 
+    const nowCard = makeCard(this.specs(top).alt, { inert: true });
+    nowCard.dataset.notilt = "1";
+    nowCard.removeAttribute("aria-label");
+    nowCard.setAttribute("aria-hidden", "true");
+
     const nextOpen = this.nextUndecided();
     const acts: Child =
       d === undefined
@@ -368,10 +373,16 @@ class FixStage {
       h(
         "div",
         { class: "swap-card", "data-proposal": p.id, "data-decision": d ?? "open", "data-testid": "proposal" },
-        h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), label(p.toThemeId)),
-        h("p", { class: "swap-why" }, p.why),
-        h("p", { class: "small", "data-testid": "cited" }, cited, p.whySource === "model" ? ". Wording drafted by an AI from the checked facts." : ""),
-        chips,
+        // The new night, shown before approval: the big card above is the night as planned.
+        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : "Would be"), nowCard),
+        h(
+          "div",
+          { class: "swap-body" },
+          h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), label(p.toThemeId)),
+          h("p", { class: "swap-why" }, p.why),
+          h("p", { class: "small", "data-testid": "cited" }, cited, p.whySource === "model" ? ". Wording drafted by an AI from the checked facts." : ""),
+          chips,
+        ),
       ),
       h("div", { class: "acts", role: "group", "aria-label": `Decide the swap for ${shortDate(p.date)}` }, acts),
     );
@@ -584,7 +595,7 @@ export function openTrace(): void {
           { class: "trace-list" },
           g.steps.map((s) => {
             if (quiet(s.detail)) console.debug(`[homestand] ${g.title}: ${s.text} ${s.detail}`);
-            return h("li", null, h("span", { class: "trace-kind" }, `${s.kind} at ${new Date(s.at).toLocaleTimeString("en-US")}`), h("span", null, s.text), s.detail && !quiet(s.detail) ? h("span", { class: "small" }, s.detail) : null);
+            return h("li", null, h("span", { class: "trace-kind" }, `${s.kind} at ${new Date(s.at).toLocaleTimeString("en-US")}`), h("span", null, localizeDates(s.text)), s.detail && !quiet(s.detail) ? h("span", { class: "small" }, localizeDates(s.detail)) : null);
           }),
         ),
       ),

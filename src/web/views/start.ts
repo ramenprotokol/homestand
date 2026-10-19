@@ -1,7 +1,7 @@
 import type { GeoHit } from "../../app/api-types";
 import { CSV_TEMPLATE, parseCalendar } from "../../app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../app/markets";
-import { sampleCsv } from "../../app/samples";
+import { exampleCsv, sampleCsv } from "../../app/samples";
 import { AUDIT_LINE } from "../../app/score";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
@@ -24,7 +24,7 @@ function teaser(): HTMLElement {
     r === null ? `We are testing local taste against ${nights} real 2025 theme nights. Results are pending.`
     : r.h1.verdict === "CONFIRMED" ? `We tested local taste against ${nights} real 2025 theme nights before building this. Result: local taste beat the line we set.`
     : r.h1.verdict === "OVERTURNED" ? `We tested local taste against ${nights} real 2025 theme nights before building this. Result: local taste pointed the wrong way.`
-    : `Before building this, we tested it. ${AUDIT_LINE}`;
+    : `Before building this, we tested local taste against ${nights} real 2025 theme nights. See what we found, and where it falls short.`;
   return h(
     "div",
     { class: "teaser", "data-testid": "study-teaser" },
@@ -223,7 +223,7 @@ export function ownView(): HTMLElement {
       errors.replaceChildren(...rowErrors.map((e) => h("p", null, `Line ${e.line}: ${e.message}`)));
       return;
     }
-    void startCheck({ label: `${chosen.label} club`, lon: chosen.lon, lat: chosen.lat }, rows, rowErrors, null);
+    void startCheck({ label: chosen.label, lon: chosen.lon, lat: chosen.lat }, rows, rowErrors, null);
   });
 
   return h(
@@ -232,7 +232,7 @@ export function ownView(): HTMLElement {
     h(
       "div",
       { class: "wrap" },
-      sceneHead("Get started · Bring your own", "Use your own", "calendar", "Two things: where your ballpark is, and your theme nights."),
+      sceneHead("Get started · Bring your own", "Use your own", "calendar", "Two things: where your ballpark is (any US or Canadian city), and your theme nights."),
       h(
         "div",
         { class: "paper" },
@@ -255,7 +255,7 @@ export function ownView(): HTMLElement {
           h(
             "div",
             { class: "actions" },
-            h("button", { type: "button", class: "btn gold sm", "data-testid": "load-example", onclick: () => { paste.value = CSV_TEMPLATE; errors.replaceChildren(); } }, "Load an example"),
+            h("button", { type: "button", class: "btn gold sm", "data-testid": "load-example", onclick: () => { paste.value = exampleCsv(); errors.replaceChildren(); } }, "Load an example"),
             h("button", { type: "button", class: "btn ghost sm dark", onclick: () => download("homestand-template.csv", "text/csv", CSV_TEMPLATE) }, icon("download"), "Download the template"),
             file,
           ),

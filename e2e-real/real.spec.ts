@@ -10,7 +10,7 @@ async function noSideScroll(page: Page): Promise<void> {
 
 test("real data: start page", async ({ page }, info) => {
   await page.goto("/");
-  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 nights");
+  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 theme nights");
   await noSideScroll(page);
   await shot(page, info, "start");
 });
@@ -52,8 +52,9 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await why.getByRole("button", { name: "Show the numbers" }).click();
   await expect(why.getByText(/Index = z - market average/)).toBeVisible();
   await expect(why).toContainText(/Compared with other ballpark markets, this market scores/);
-  await expect(why.getByTestId("why-footer")).toContainText("It doesn't predict ticket sales");
-  await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Result recorded/);
+  await expect(why.getByTestId("why-footer")).toContainText("See how we tested this");
+  await expect(why).not.toContainText("coin flip");
+  await expect(why.getByTestId("source-line")).toContainText(/Fetched from Qloo|Saved result, pulled from Qloo on/);
   await shot(page, info, "why");
   await why.getByTestId("recheck").click();
   await expect(why.getByTestId("recheck-message")).toContainText(/Checked again/);
@@ -102,9 +103,27 @@ test("real data: the own path finds a city through the local worker (live geocod
   await page.goto("/#/own");
   await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
   await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByRole("button", { name: "Tulsa, Oklahoma, US" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Tulsa, OK" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Something upstream failed")).toHaveCount(0);
-  await page.getByRole("button", { name: "Tulsa, Oklahoma, US" }).click();
+  await page.getByRole("button", { name: "Tulsa, OK" }).click();
   await page.getByTestId("load-example").click();
-  await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/Bluey Night/);
+  await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/Bluey Day/);
+});
+
+test("real data: a non-sample city with the example calendar gets swaps to look at", async ({ page }, info) => {
+  await page.goto("/#/own");
+  await page.getByLabel("1. Your ballpark's city").fill("Fresno");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Fresno, CA" }).click();
+  await page.getByTestId("load-example").click();
+  await page.getByTestId("check-mine").click();
+  await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByTestId("check-result")).toContainText("Fresno");
+  await page.getByTestId("to-fix").click();
+  const pack = page.getByRole("button", { name: /Open the pack/ });
+  await expect(pack).toBeVisible({ timeout: 40_000 });
+  await pack.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("proposal")).toBeVisible();
+  await shot(page, info, "own-example-fix");
 });

@@ -21,8 +21,8 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Your market, not the national chart." })).toBeVisible();
   await expect(page.getByTestId("study-link")).toBeVisible();
-  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 nights");
-  await expect(page.getByTestId("study-teaser")).toContainText("about a coin flip");
+  await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 theme nights");
+  await expect(page.getByTestId("study-teaser")).not.toContainText("coin flip");
   // The hero says what the app is, and what it is not, in plain words on readable panels.
   await expect(page.getByTestId("hero-intro")).toContainText("Planning next season's theme nights? Homestand checks each one against what fans in your town like");
   await expect(page.getByTestId("hero-honest")).toContainText("It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.");
@@ -116,6 +116,17 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   // Approve and Reject are on screen right after the reveal, without scrolling.
   await expect(page.getByTestId("approve")).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId("reject")).toBeInViewport({ ratio: 1 });
+  // The new night and its reason show before anything is approved: no black flash box, no hidden meter.
+  await expect(page.getByTestId("now-card")).toContainText("Would be");
+  await expect(page.getByTestId("now-card").locator(".card")).toHaveCount(1);
+  if ((page.viewportSize()?.width ?? 0) >= 900) {
+    await expect(page.getByTestId("now-card")).toBeInViewport({ ratio: 1 });
+    await expect(page.locator(".swap-why")).toBeInViewport({ ratio: 1 });
+    await expect(page.locator(".idx")).toBeInViewport({ ratio: 1 });
+    const bar = (await page.locator(".acts").boundingBox())!;
+    const idx = (await page.locator(".idx").boundingBox())!;
+    expect(overlap(bar, idx), "the Approve bar covers the local-pull meter").toBe(false);
+  }
   await noSideScroll(page);
   // The cited comparison replaces the repeated sentence; the why is not said twice.
   await expect(card.getByTestId("cited")).toContainText(/(above|below|in line with) this market's average \([+-]\d\.\d\)/);
@@ -224,8 +235,11 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
   await expect(page.getByTestId("audit-line")).toContainText("It doesn't predict ticket sales");
   await expect(page.getByTestId("stamp-plain")).toHaveText("Not enough evidence to overturn: taste didn't predict bigger crowds.");
+  // The user's own call is answered once, in one line.
+  await expect(page.getByTestId("you-said")).toHaveText("You said Yes. The data didn't show it at this sample size.");
+  expect(await page.getByText(/You said Yes/).count()).toBe(1);
   await expect(page.getByTestId("plain-result")).toBeVisible();
-  await expect(page.locator(".dnote")).toContainText("385 theme nights at 89 clubs made 521 same-ballpark pairs");
+  await expect(page.locator(".dnote")).toContainText("385 theme nights at 120 clubs. The 89 clubs that ran two or more different themes made 521 same-ballpark pairs");
   // The stamp does not touch the line under it.
   const stampBox = (await page.locator(".stampv").boundingBox())!;
   expect(overlap(stampBox, (await page.getByTestId("stamp-plain").boundingBox())!), "stamp overlaps its plain line").toBe(false);
@@ -240,7 +254,7 @@ test("own club: city search, pasted calendar with a bad row", async ({ page }, i
   await page.goto("/#/own");
   await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
   await page.getByRole("button", { name: "Search" }).click();
-  await page.getByRole("button", { name: "Tulsa, Oklahoma, US" }).click();
+  await page.getByRole("button", { name: "Tulsa, OK" }).click();
   await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\n2026-04-11,Bluey Day,Prairie Bank,no,\nsoon,Star Wars Night,,no,\n2026-04-18,Fireworks Friday,,no,\n2026-05-02,Dolly Parton Night,,yes,\n");
   await noSideScroll(page);
   await shot(page, info, "11-own");
@@ -258,13 +272,42 @@ test("own club: Load an example fills the rows and explains the columns", async 
   await expect(page.getByText("Themes we don't recognise are left alone.")).toBeVisible();
   await expect(page.locator(".cols dt")).toHaveText(["date", "theme", "sponsor", "locked", "notes"]);
   await page.getByTestId("load-example").click();
-  await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/Bluey Night,Harbor Credit Union,no/);
+  await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/Bluey Day,Sunrise Dental Group,no,Day game/);
   await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
   await page.getByRole("button", { name: "Search" }).click();
-  await page.getByRole("button", { name: "Tulsa, Oklahoma, US" }).click();
+  await page.getByRole("button", { name: "Tulsa, OK" }).click();
   await page.getByTestId("check-mine").click();
   await expect(page.getByTestId("summary")).toBeVisible();
-  expect(await page.locator(".tile").count()).toBe(3);
+  expect(await page.locator(".tile").count()).toBe(20);
+});
+
+test("own club: the example is a full season and the headings read naturally", async ({ page }) => {
+  await page.goto("/#/own");
+  await page.getByTestId("load-example").click();
+  const rows = (await page.getByLabel("2. Your theme nights").inputValue()).trim().split("\n");
+  expect(rows.length - 1).toBeGreaterThanOrEqual(15);
+  await page.getByLabel("1. Your ballpark's city").fill("Fresno");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Fresno, CA" }).click();
+  await page.getByTestId("check-mine").click();
+  await expect(page.getByTestId("summary")).toBeVisible();
+  expect(await page.locator(".tile").count()).toBeGreaterThanOrEqual(15);
+  await expect(page.getByRole("heading", { name: /^Check: Fresno, CA$/ })).toBeVisible();
+  await expect(page.locator(".nav .club")).toHaveText("Fresno, CA");
+});
+
+test("deep links: a sample club opens cold, and a cold step with no club goes to the picker", async ({ page }) => {
+  await page.goto("/#/check/biloxi");
+  await expect(page.getByRole("heading", { name: /Check: Biloxi, MS sample club/ })).toBeVisible();
+  await expect(page.getByTestId("check-result")).toBeVisible();
+  await page.goto("/#/check/nowhere");
+  await expect(page.getByRole("heading", { name: "Pick a sample club" })).toBeVisible();
+  for (const hash of ["check", "fix", "send"]) {
+    await page.evaluate(() => sessionStorage.clear());
+    await page.goto(`/#/${hash}`);
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Pick a sample club" })).toBeVisible();
+  }
 });
 
 test("reload on Check keeps the chosen club", async ({ page }) => {

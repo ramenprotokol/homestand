@@ -1,5 +1,6 @@
 import type { Interval, Verdict } from "../../study/analysis";
 import { AUDIT_LINE } from "../../app/score";
+import { personalLine } from "../../app/text";
 import { STUDY_THEMES } from "../../study/themes";
 import { h } from "../dom";
 import { onCleanup, onResize } from "../foil/lifecycle";
@@ -8,6 +9,8 @@ import { makeRand } from "../foil/rng";
 import { bulbs } from "../foil/scenery";
 import { loadStudy, type PublishedResults } from "../study-data";
 
+/** Clubs in the study: all were scored; 89 of them ran two or more different themes, which is what makes a pair (study/PULL_RECORD.md). */
+const STUDY_CLUBS = 120;
 const REPO = "https://github.com/ramenprotokol/homestand";
 type Call = "Yes" | "No" | "Not sure";
 let call: Call | null = readCall();
@@ -202,7 +205,7 @@ export function studyView(): HTMLElement {
     const under = h("div", { class: "under" }, h("i"), "Under review");
     canvas = h("canvas", { id: "dots", "aria-label": `${r.counts.pairs} dots, one per pair of theme nights`, role: "img" });
     const dls = h("div", { class: "dls" }, h("div", { class: "dl dl-a" }, h("b", null, String(a)), "taste picked the bigger crowd"), h("div", { class: "dl dl-b" }, h("b", null, String(b)), "it didn't"));
-    const dnote = h("p", { class: "dnote" }, `${r.counts.nightsInput} theme nights at ${r.counts.clubsWithPairs} clubs made ${r.counts.pairs} same-ballpark pairs (any two nights at one club), so there are more pairs than nights. Each dot is one real pair. The counts are real; positions are illustrative.`);
+    const dnote = h("p", { class: "dnote" }, `${r.counts.nightsInput} theme nights at ${STUDY_CLUBS} clubs. The ${r.counts.clubsWithPairs} clubs that ran two or more different themes made ${r.counts.pairs} same-ballpark pairs (any two nights at one club), so there are more pairs than nights. Each dot is one real pair. The counts are real; positions are illustrative.`);
     const nval = h("b", null, "0.0%");
     const needle = h("div", { class: "needle" }, nval);
     const ci = h("div", { class: "ci", style: `left:${(acc.lo * 100).toFixed(1)}%;width:${((acc.hi - acc.lo) * 100).toFixed(1)}%` });
@@ -216,12 +219,12 @@ export function studyView(): HTMLElement {
     const verdict = h(
       "div",
       { class: "verdict", "data-testid": "verdict" },
-      h("span", { class: "small" }, `You said ${c}. The result:`),
+      h("span", { class: "small" }, "The result:"),
       h("div", { class: "stampv" }, r.h1.verdict),
       h("p", { class: "stamp-plain", "data-testid": "stamp-plain" }, STAMP_PLAIN[r.h1.verdict]),
       h("p", { class: "v1" }, VERDICT_WORDS[r.h1.verdict]),
       r.h1.pass ? null : h("p", { class: "v2 audit-line honest", "data-testid": "audit-line" }, AUDIT_LINE),
-      h("p", { class: "echo" }, `You said ${c}.`),
+      h("p", { class: "echo", "data-testid": "you-said" }, personalLine(c, r.h1.verdict)),
       h("button", { type: "button", class: "btn ghost sm", id: "again", onclick: () => { call = null; try { sessionStorage.removeItem("homestand.call"); } catch { /* ignore */ } paint(false); } }, "Make a different call"),
     );
     const skip = h("button", { type: "button", class: "skip", id: "skip", onclick: () => final() }, "Skip");
@@ -352,7 +355,7 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
       h("h2", null, "How often local taste picked the bigger crowd"),
       h("p", { "data-testid": "h1-text" }, `Between two theme nights at the same ballpark, local taste picked the better-drawing one ${interval(r.h1.accuracy)} of the time, over ${r.counts.pairs} pairs at ${r.counts.clubsWithPairs} clubs (${r.counts.nightsInput} theme nights make ${r.counts.pairs} same-ballpark pairs). The line to pass was 55%, with that range above 50%. A coin flip gets 50%.`),
       chart(r),
-      h("p", { class: "small" }, `Side by side: an AI guessing with no local data got ${interval(r.h2.llmAccuracy)}, but that is mostly ties: it gave the same rating for nearly every town (${r.flatThemes.llm.length} of 9 themes had no variation at all). National popularity gets ${pct(r.rawLiftAccuracy.nationalPopularityCentred)} by design, because it is the same for every club and so cannot rank two themes inside one club.`),
+      h("p", { class: "small" }, `Side by side: an AI guessing with no local data got ${interval(r.h2.llmAccuracy)}, but that is mostly ties: it gave the same rating for nearly every town (${r.flatThemes.llm.length} of 9 themes had no variation at all). What's popular nationally gets exactly ${pct(r.rawLiftAccuracy.nationalPopularityCentred)} by design, because it is the same for every club and so cannot rank two themes inside one club. (study/RESULTS.md also lists ${pct(r.rawLiftAccuracy.nationalPopularity)} for it: that is a raw, unadjusted count over the nine themes, a different measure.)`),
     ),
     h(
       "section", { class: "sect" },

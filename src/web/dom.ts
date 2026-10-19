@@ -49,3 +49,10 @@ export function download(filename: string, mime: string, text: string): void {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+
+/** Turn raw ISO timestamps and dates inside a sentence into the viewer's local, readable form. */
+export function localizeDates(text: string): string {
+  return text
+    .replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z\b/g, (m) => formatDateTime(m))
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, (m) => formatDate(m));
+}

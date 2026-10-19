@@ -4,7 +4,7 @@
 
 Homestand checks a Minor League Baseball club's theme-night calendar against what its own ballpark market leans toward, using Qloo's Taste AI. It then proposes swaps that keep every sponsor and every date. Before building it, we ran a sealed, pre-registered test on 385 real 2025 theme nights of whether local taste predicted bigger crowds. The result is published as it came out.
 
-**Live demo:** https://homestand-6az.pages.dev. Pick a sample club; no sign-up.
+**Live demo:** https://homestand-6az.pages.dev. Pick a sample club, or use your own: type any US or Canadian city, paste or load a calendar, and Homestand scores it live. No sign-up.
 
 ## What it does
 
@@ -12,20 +12,21 @@ A promotions director plans dozens of theme nights a season, and most of them ar
 
 1. **Check.** The calendar appears as a magnet board, one magnet per night. Each theme is labelled **Leans in**, **About average** or **Leans away** for this market.
    - **Why panel.** Tap a magnet to see what Qloo looked at, the numbers behind the label, and a **Re-check live** button.
-   - **Ambiguous names.** When a night's name fits two themes ("Elvis and the Beatles Night"), the agent asks the director to choose. It never guesses.
+   - **Ambiguous names.** When a night's name fits two themes ("Elvis and the Beatles Night"), Homestand asks the director to choose. It never guesses.
    - **Unscored nights.** Classic promos (fireworks, dollar dogs, heritage nights) and unknown themes are labelled, not scored.
-2. **Fix.** For unlocked nights that lean away, the agent proposes a swap.
-   - **Ranking.** It ranks swaps like-for-like first: a kids' show for a kids' show, a music act for a music act. It shows up to two alternates.
+2. **Fix.** For unlocked nights that lean away, Homestand proposes a swap. You see the new night, the reason and both scores before you approve.
+   - **Audience rule.** A kids or family night is only ever replaced by a kids or family theme; if none leans in, the night is listed as "Could not fix" with a next step. An adult night may take an adult or a family theme, and kids' themes only on weekends and day games.
+   - **Ranking.** Within that rule, swaps rank like-for-like first (same kind of theme), then by how strongly the market leans in. It shows up to two alternates.
    - **Locks.** A locked night is never swapped. Instead it gets a sponsor-friendly angle.
    - **Approval.** Nothing changes until the director approves it.
-   - **Trace.** An agent trace logs every step: theme resolution, each Qloo call (cached or live), each constraint check and each model call.
+   - **Step log.** "How Homestand decided" logs every step: theme resolution, each Qloo call (cached or live), each constraint check and each model call.
 3. **Send.** Export the revised calendar as CSV or ICS, plus a one-page rationale memo for sponsors.
 
-**The rule: code computes, the model explains.** Scoring, normalisation, constraints and ranking are plain TypeScript. A language model (Llama 3.3 70B on Cloudflare Workers AI) only words the explanations and the memo. Every number it writes must appear in the computed facts, or the app falls back to template text.
+**The rule: code computes, the model explains.** Scoring, normalisation, constraints and ranking are plain TypeScript. A language model (Llama 3.3 70B on Cloudflare Workers AI) only words the reasons for each swap. Every number it writes must appear in the computed facts, and it may not claim an effect on sales or attendance, or the app falls back to template text (also used if the model takes longer than six seconds). The memo's opening sentence is fixed wording built from counts.
 
 ## How Qloo is used
 
-- **Entity resolution, done offline** with `npm run qloo:resolve`. Each theme in the 25-theme library is a small, declared bundle of Qloo entities, for example Star Wars = *A New Hope* + *The Mandalorian*. IDs come from `/search` by exact name match (and release year for films); a fuzzy match is never forced.
+- **Entity resolution, done offline** with `npm run qloo:resolve`. Each theme in the 41-theme library is a small, declared bundle of Qloo entities, for example Star Wars = *A New Hope* + *The Mandalorian*. IDs come from `/search` by exact name match (and release year for films); a fuzzy match is never forced.
   - **Coverage check.** Entities that return no local affinity at the sample markets are dropped. One example is *Toy Story*, which returns nothing even with the release-year floor below.
   - **What's committed:** the IDs, in `src/app/data/entity-ids.json`.
 - **Local affinity, at runtime.** The call is `GET /v2/insights` with these parameters:
@@ -47,8 +48,8 @@ A promotions director plans dozens of theme nights a season, and most of them ar
 A pre-registered test of one question: **at the same ballpark, did the theme with the stronger local Qloo lean draw the bigger crowd?**
 
 - **Sealed first.** The hypotheses, sample, outcome model, metrics and pass line were committed before any Qloo request ([`study/PREREGISTRATION.md`](study/PREREGISTRATION.md), Amendments 1–5). The scores were then frozen with a SHA-256 hash before any attendance data was opened ([`study/PULL_RECORD.md`](study/PULL_RECORD.md)).
-- **Data.** These were 2025 Minor League theme nights (Star Wars, Princess, Bluey, Harry Potter, Margaritaville, Dinosaur, Country, Marvel, Wrestling) at 120 clubs. Attendance was compared with each club's own baseline, adjusted for weekday, month, fireworks and giveaways.
-- **Verdict: CALL STANDS.** Local taste called 49.1% of 521 within-club pairs (95% interval 43.2% to 54.9%). The pre-registered pass line was 55%, with the interval above 50%. An LLM-only baseline scored 50.6%, mostly ties. This is "not detected at this sample size", not "disproved".
+- **Data.** These were 385 theme nights from 2025 (Star Wars, Princess, Bluey, Harry Potter, Margaritaville, Dinosaur, Country, Marvel, Wrestling) at 120 clubs. A pair is any two different themes at the same club, so only the 89 clubs that ran two or more themes count, and they make 521 pairs (more pairs than nights). Attendance was compared with each club's own baseline, adjusted for weekday, month, fireworks and giveaways.
+- **Verdict: CALL STANDS.** Local taste called 49.1% of 521 within-club pairs (95% interval 43.2% to 54.9%). The pre-registered pass line was 55%, with the interval above 50%. An LLM-only baseline scored 50.6%, mostly ties. This is "not detected at this sample size", not "disproved". (A theme's national popularity scores exactly 50.0% in the app because it is the same for every club and can't rank two nights at one club; the 49.1% for it in `study/RESULTS.md` is a different, unadjusted count.)
 - **What that means for the product.** Homestand is a reasoned, cited audit of local taste, not an attendance predictor, and the app says so. Full results: [`study/RESULTS.md`](study/RESULTS.md).
 
 ## Limitations

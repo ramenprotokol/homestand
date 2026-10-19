@@ -4,7 +4,7 @@ import { h } from "./dom";
 import { clear } from "./dom";
 import { closeDrawer } from "./components";
 import { closeWhy } from "./foil/why";
-import { resumeClub } from "./flow";
+import { openSample, resumeClub, navigate } from "./flow";
 import { route as routeState, runMounts, teardown } from "./foil/lifecycle";
 import { state, ui } from "./store";
 import { checkView } from "./views/check";
@@ -35,7 +35,7 @@ function topbar(route: string): HTMLElement {
         "ol",
         { class: "steps" },
         STEPS.map((s) => {
-          const current = route === s.hash.slice(1);
+          const current = baseOf(route) === s.hash.slice(1);
           const inner = [h("span", { class: "n" }, String(s.n)), h("span", { class: "label" }, s.label)];
           return h("li", null, ready ? h("a", { class: "step", href: s.hash, "aria-current": current ? "step" : null }, ...inner) : h("span", { class: "step", "aria-disabled": "true" }, ...inner));
         }),
@@ -50,7 +50,15 @@ function topbar(route: string): HTMLElement {
   );
 }
 
+/** "/check/biloxi" is the Check screen for one sample club. */
+const baseOf = (route: string): string => "/" + (route.split("/")[1] ?? "");
+
 function view(route: string): HTMLElement {
+  if (route.startsWith("/check/") && !openSample(route.slice("/check/".length))) {
+    navigate("#/sample");
+    return h("div");
+  }
+  route = baseOf(route) === "/check" ? "/check" : route;
   // A reload on Fix or Send re-checks the saved club first: show Check's loading or error screen until it is ready.
   if ((route === "/fix" || route === "/send") && !state.analysis && (ui.loading || ui.error)) return checkView();
   switch (route) {
@@ -82,7 +90,7 @@ function render(): void {
   const main = h("main", { id: "main", tabindex: "-1" });
   main.append(view(route));
   app.append(topbar(route), main);
-  document.title = `${TITLES[route] ?? "Your market, not the national chart"} | Homestand`;
+  document.title = `${TITLES[baseOf(route)] ?? "Your market, not the national chart"} | Homestand`;
   runMounts();
   const nav = document.getElementById("nav")!;
   const solid = (): void => {

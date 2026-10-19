@@ -11,6 +11,7 @@ import { gsap, reduced } from "../foil/motion";
 import { crowdBar } from "../foil/scenery";
 import { download, formatDate, h } from "../dom";
 import { navigate } from "../flow";
+import { localDay } from "../../app/text";
 import { icon } from "../icons";
 import { approvedSwaps, state, viewOf } from "../store";
 
@@ -27,19 +28,19 @@ function memoData(): MemoData {
   const a = state.analysis!;
   const swaps = approvedSwaps().map((p) => ({
     date: p.date, weekday: p.weekday, from: themeById(p.fromThemeId)?.label ?? p.fromThemeId, to: themeById(p.toThemeId)?.label ?? p.toThemeId, sponsor: p.sponsor,
-    fromZ: p.from.z, toZ: p.to.z, fromScore: p.from.score, toScore: p.to.score, why: p.why,
+    fromZ: p.from.z, toZ: p.to.z, fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource,
   }));
   return {
-    club: a.market.label, generatedOn: new Date().toISOString().slice(0, 10), swaps,
+    club: a.market.label, generatedOn: localDay(), swaps,
     angles: (state.propose?.angles ?? []).map((x) => x.text), nights: a.nights.length, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
-    synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedOn: a.recordedOn,
+    synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedOn: a.recordedAt ? localDay(new Date(a.recordedAt)) : a.recordedOn,
   };
 }
 
 export function sendView(): HTMLElement {
   const a = state.analysis;
   if (!a) {
-    navigate("#/");
+    navigate("#/sample");
     return h("div");
   }
   const swaps = approvedSwaps();

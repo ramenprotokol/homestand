@@ -369,3 +369,25 @@ body.why-open .nav{visibility:hidden}
 .audit-line.honest{color:#fff;font-weight:500;max-width:64ch}
 .memo-scroll{overflow-x:auto}
 .nav .step{min-width:44px;justify-content:center}
+
+/* ---------- round 2 ---------- */
+/* Size the swap cards to the window height so the card, the new night, the reason and Approve fit together. */
+@media (min-width:521px){.carousel{--cw:clamp(150px,19vw,min(272px,21.5vh))}}
+.swap-card{grid-template-columns:104px minmax(0,1fr);gap:6px 16px;align-items:center}
+.swap-body{display:grid;gap:6px;min-width:0}
+.now-card{display:grid;gap:4px;justify-items:center;container-type:normal}
+.now-card .card{width:100%}
+.now-k{font-family:var(--cond);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold2)}
+@media (max-width:420px){.swap-card{grid-template-columns:84px minmax(0,1fr);gap:6px 12px}}
+.echo{font-size:22px;line-height:1.25}
+/* Send's fireworks stay in the right half on a wide screen, clear of the heading and buttons on the left. */
+@media (min-width:901px){.send>#fx3{left:auto;right:0;width:50%}}
+@media (max-width:520px){
+  .carousel{--cw:min(46vw,176px)}
+  .meta{margin-top:6px;gap:6px 14px}
+  .idx .v{font-size:30px}
+  .pinbar{padding:6px 10px}
+  .acts{padding:6px 8px;min-height:0;margin-top:2px}
+  .swap-card{padding:10px 12px}
+  .stage2{padding-top:10px;padding-bottom:10px}
+}

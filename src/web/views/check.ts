@@ -1,6 +1,7 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { AUDIT_LINE, CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS, pullWords } from "../../app/score";
+import { CLASSIC_REASON, comparisonSentence, FIT_WORDS, marketLevelSentence, METHOD_WORDS, pullWords } from "../../app/score";
 import { themeById } from "../../app/themes/library";
+import { checkResultLine, fitSummary, lockedLine } from "../../app/text";
 import { ApiFailure } from "../api";
 import { fitChip, syntheticBanner } from "../components";
 import { formatDate, formatDateTime, h, type Child } from "../dom";
@@ -17,11 +18,11 @@ import { state, ui, viewOf, type NightView } from "../store";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const LEGEND: ReadonlyArray<readonly [CardFit, string, string]> = [
-  ["leans-in", "Leans in", "This market likes it more than its own average. Gold foil, green gem."],
-  ["average", "About average", "Right around this market's own average. Silver."],
-  ["leans-away", "Leans away", "This market likes it less than its own average. Red gem with a red glow."],
-  ["classic", "Classic night", "A proven promo, left alone. Blue."],
-  ["not-scored", "Not scored", "No theme in the library matches. An unpainted sketch."],
+  ["leans-in", "Leans in", "Fans here like it more than the average theme."],
+  ["average", "About average", "Liked about as much as the average theme."],
+  ["leans-away", "Leans away", "Fans here like it less than the average theme."],
+  ["classic", "Classic night", "A proven promo, left alone."],
+  ["not-scored", "Not scored", "No theme match, so no reading."],
 ];
 
 const city = (): string => (state.analysis?.market.label ?? "").split(",")[0]!.replace(/ (sample )?club$/, "");
@@ -45,7 +46,7 @@ export function checkView(): HTMLElement {
   }
   const a = state.analysis;
   if (!a) {
-    navigate("#/");
+    navigate("#/sample");
     return h("div");
   }
   const views = a.nights.map(viewOf);
@@ -66,7 +67,7 @@ export function checkView(): HTMLElement {
       ),
     );
   }
-  if (a.recordedOn) notices.push(h("div", { class: "notice", role: "note" }, icon("clock"), h("span", null, `Scores recorded on ${formatDate(a.recordedOn)}. They are saved results from Qloo, not a new request.`)));
+  if (a.recordedAt) notices.push(h("div", { class: "notice", role: "note", "data-testid": "recorded" }, icon("clock"), h("span", null, `These scores were pulled from Qloo on ${formatDateTime(a.recordedAt)} and saved. "Re-check live" on any night asks Qloo again.`)));
 
   const months = new Map<string, NightView[]>();
   for (const v of views) {
@@ -74,9 +75,9 @@ export function checkView(): HTMLElement {
     months.set(key, [...(months.get(key) ?? []), v]);
   }
 
-  const summary = `${count("leans-in")} lean in, ${count("average")} about average, ${away} lean away, ${count("not-scored")} not scored, ${count("classic")} classic.`;
+  const summary = fitSummary({ in: count("leans-in"), average: count("average"), away, notScored: count("not-scored"), classic: count("classic") });
   const locked = views.filter((v) => v.night.locked);
-  const result = away === 0 ? `None of the ${views.length} nights lean away from what ${city()} likes.` : `${away} of ${views.length} nights ${away === 1 ? "leans" : "lean"} away from what ${city()} likes.`;
+  const result = checkResultLine(away, views.length, city());
 
   const asks = pendingViews.map((v) =>
     h(
@@ -133,12 +134,11 @@ export function checkView(): HTMLElement {
     tally(views),
     h("div", { class: "legend", role: "list", "aria-label": "What the cards mean" }, LEGEND.map(([fit, word, text]) => h("div", { class: `lg${fit === "leans-away" ? " away" : ""}`, role: "listitem" }, gemChip(fit), h("span", null, h("b", null, `${word}: `), text)))),
     locked.length > 0
-      ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, `${locked.length} locked night${locked.length === 1 ? "" : "s"}`), ` stay exactly as planned: ${locked.map((v) => v.night.theme).join(", ")}.`))
+      ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, lockedLine(locked.length)), `: ${locked.map((v) => v.night.theme).join(", ")}.`))
       : null,
     h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
     pendingViews.length > 0 ? h("p", { class: "small" }, `${pendingViews.length} night${pendingViews.length === 1 ? " needs" : "s need"} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} unscored.`) : null,
-    h("p", { class: "honest" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See how we tested it")),
-    h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Scores describe what this market leans toward."),
+    h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Scores describe what this market leans toward. ", h("a", { href: "#/study" }, "See how we tested it")),
   );
 
   const section = h(
@@ -215,7 +215,7 @@ const rel = (z: number | null): string => (z === null ? "n/a" : `${z >= 0 ? "+" 
 function sourceLine(s: ThemeScoreOut, recheckedAt: string | null): string {
   if (recheckedAt) return `Re-checked live at ${formatDateTime(recheckedAt)}.`;
   if (s.source === "synthetic") return `Synthetic test data generated ${formatDateTime(s.fetchedAt)}. Not from Qloo.`;
-  if (s.source === "cache") return `Result recorded ${formatDateTime(s.fetchedAt)}.`;
+  if (s.source === "cache") return `Saved result, pulled from Qloo on ${formatDateTime(s.fetchedAt)}. "Re-check live" asks Qloo again.`;
   return `Fetched from Qloo ${formatDateTime(s.fetchedAt)}.`;
 }
 
@@ -327,7 +327,7 @@ function whyInfo(index: number): Child {
     );
   }
 
-  out.push(h("p", { class: "honest", "data-testid": "why-footer" }, AUDIT_LINE, " ", h("a", { href: "#/study" }, "See The Study")));
+  out.push(h("p", { class: "small", "data-testid": "why-footer" }, h("a", { href: "#/study" }, "See how we tested this")));
   const caps = a.caps;
   const disabled = caps.recheckDisabled || recheckBusy;
   out.push(
