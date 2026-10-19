@@ -70,7 +70,7 @@ export async function readBody(req: Request, max: number): Promise<string | null
 
 /** One count against this client's allowance for today (UTC). Sample clubs never count against new-city pulls. */
 function gateFor(deps: RouterDeps, req: Request, m: MarketIn): Gate {
-  return {
+  const gate: Gate = {
     async allow(kind: QuotaKind): Promise<boolean> {
       if (kind === "pull" && isSampleMarket(m)) return true;
       const id = await deps.clientId(req);
@@ -83,10 +83,12 @@ function gateFor(deps: RouterDeps, req: Request, m: MarketIn): Gate {
         return true;
       } catch (err) {
         console.error("quota counter failed", kind, err instanceof Error ? err.message : String(err));
+        gate.broken = true;
         return false;
       }
     },
   };
+  return gate;
 }
 
 const QUOTA_MESSAGES: Record<QuotaKind, string> = {

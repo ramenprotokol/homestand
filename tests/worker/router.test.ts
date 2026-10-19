@@ -831,6 +831,20 @@ describe("closed doors", () => {
     expect(h.qlooUrls).toHaveLength(0);
   });
 
+  it("says the counters are unavailable (not that the new-city allowance is used up) when a new city's counter cannot be written", async () => {
+    const h = harness();
+    const geo = { label: "Fresno, CA", lon: -119.78707, lat: 36.74773, sig: await signMarket(SIGNING_KEY, { label: "Fresno, CA", lon: -119.78707, lat: 36.74773 }) };
+    h.deps.agent.kv.put = async () => {
+      throw new Error("KV put() limit exceeded for the day");
+    };
+    const res = await route(post("/api/analyze", { market: geo, rows }), h.deps);
+    expect(res.status).toBe(503);
+    const body = (await res.json()) as ApiError;
+    expect(body.error).toBe("counters");
+    expect(body.message).not.toMatch(/new cities/);
+    expect(h.qlooUrls).toHaveLength(0);
+  });
+
   it("fails closed when the counters cannot be read, and still serves what is recorded", async () => {
     const h = harness();
     await analyzeOk(h); // records the scores

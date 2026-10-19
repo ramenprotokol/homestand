@@ -54,6 +54,8 @@ export interface Deps {
 /** Counts one use of a per-client daily allowance and says whether it was still available. */
 export interface Gate {
   allow(kind: QuotaKind): Promise<boolean>;
+  /** Set when a refusal was because the client's counter could not be read or written (not because the allowance is used up). */
+  broken?: boolean;
 }
 
 /** Thrown when this client's daily allowance for live lookups is used up. */
@@ -214,7 +216,7 @@ export async function getScores(d: Deps, m: MarketIn, trace: TraceStep[]): Promi
     }
   }
   const need = new Set(d.library.flatMap((t) => t.entities.map((e) => e.type))).size;
-  if (d.gate && !(await d.gate.allow("pull"))) throw new QuotaError("pull");
+  if (d.gate && !(await d.gate.allow("pull"))) throw d.gate.broken ? new CappedError(true) : new QuotaError("pull");
   if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
   const themes = await askQloo(d, m, d.library, trace);
   const stored: StoredLibrary = { v: 1, fetchedAt: iso(d), themes };
@@ -893,7 +895,7 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
     trace.push(step(iso(d), "note", `Re-check ${theme.label}: checked with Qloo within the last day, so the saved answer is returned.`));
     return { theme: all[theme.id]!, themes: all, trace, caps: await capsOf(d), withinDay: true };
   }
-  if (d.gate && !(await d.gate.allow("recheck"))) throw new QuotaError("recheck");
+  if (d.gate && !(await d.gate.allow("recheck"))) throw d.gate.broken ? new CappedError(true) : new QuotaError("recheck");
   const need = new Set(theme.entities.map((e) => e.type)).size;
   if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
   trace.push(step(iso(d), "note", `Re-checking ${theme.label} live, ignoring the recorded result.`));
