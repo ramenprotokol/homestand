@@ -3,6 +3,11 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
   await page.screenshot({ path: `test-results/screens-real/${info.project.name}-${name}.png`, fullPage: true });
 }
+// The live site limits each client to 12 checks a minute. The live run (not the local one, which has roomy limits) therefore paces itself.
+test.afterEach(async (_fixtures, info) => {
+  if (info.project.name.startsWith("live")) await new Promise((r) => setTimeout(r, 6000));
+});
+
 async function noSideScroll(page: Page): Promise<void> {
   const [sw, iw] = await page.evaluate(() => [document.documentElement.scrollWidth, window.innerWidth]);
   expect(sw).toBeLessThanOrEqual(iw);
