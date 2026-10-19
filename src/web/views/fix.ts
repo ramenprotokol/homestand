@@ -20,8 +20,13 @@ const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hash
 const label = (id: string): string => themeById(id)?.label ?? id;
 /** What the swap puts on the night: a library theme, or a title Qloo found. */
 const foundWordsOf = (f: { z?: number | null }): string => `${vsMarketsWords(f.z ?? null)}.`.replace(/^./, (c) => c.toUpperCase());
-/** "Best kids option here (about this town's usual)": the honest name for a best-option swap. */
-const bestLabel = (p: ShownProposal): string => `Best ${themeById(p.fromThemeId)?.audience === "kids" ? "kids" : "family"} option here (about this town's usual)`;
+/** The badge on a best-option swap. The "about this town's usual" detail lives in the reason. */
+const bestLabel = (p: ShownProposal): string => `Best ${themeById(p.fromThemeId)?.audience === "kids" ? "kids" : "family"} option`;
+/** Colour of a local-pull reading by its band: red below the town's usual, silver about usual, gold above. */
+const bandClass = (z: number | null): "neg" | "mid" | "pos" => {
+  const b = pullBand(z);
+  return b === "below" || b === "well below" ? "neg" : b === "above" || b === "well above" ? "pos" : "mid";
+};
 const toLabel = (p: ShownProposal): string => p.discovered?.name ?? label(p.toThemeId);
 /** "Well below": the local pull in words, for the big meter. The numbers stay small beside it. */
 const bandWord = (z: number | null): string => {
@@ -456,7 +461,7 @@ class FixStage {
         "div",
         { class: "meta" },
         h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDate(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Date and sponsor stay")),
-        h("div", { class: "idx" }, h("span", { class: "k" }, "Local pull"), h("span", { class: `v v--word ${(shown ?? 0) < 0 ? "neg" : "pos"}`, id: "idxV" }, found && d === "approved" ? "Found by Qloo" : bandWord(shown)), h("div", { class: "pp" }, sub)),
+        h("div", { class: "idx" }, h("span", { class: "k" }, "Local pull"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, found && d === "approved" ? "Found by Qloo" : bandWord(shown)), h("div", { class: "pp" }, sub)),
       ),
       h(
         "div",
@@ -532,7 +537,7 @@ class FixStage {
           const v = this.console.querySelector<HTMLElement>("#idxV");
           if (v) {
             v.textContent = p.discovered ? "Found by Qloo" : bandWord(p.to.z);
-            v.className = `v v--word ${(p.to.z ?? 1) < 0 ? "neg" : "pos"}`;
+            v.className = `v v--word ${p.discovered ? "pos" : bandClass(p.to.z)}`;
           }
         }, 0.5)
         .to(s.lift, { y: 0, scale: 1, duration: 0.55, ease: "back.out(1.8)" }, 0.5);
@@ -585,7 +590,7 @@ class FixStage {
     const th = state.analysis?.themes[themeId];
     const items: Child[] = (th?.entities ?? []).flatMap((e, i) => [i > 0 ? " · " : null, h("b", null, cleanTitle(e.name)), ` (${TYPE_WORDS[e.type] ?? e.type.replace("_", " ")})`, e.affinity === null ? h("i", null, " no reading") : null]);
     const index = th?.index ?? null;
-    return this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, kicker), h("div", { class: "m" }, items, index === null ? null : h("span", { class: `ix ${index < 0 ? "neg" : "pos"}` }, `→ local pull: ${pullWords(index)}`)))], instant);
+    return this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, kicker), h("div", { class: "m" }, items, index === null ? null : h("span", { class: `ix ${bandClass(index)}` }, `→ local pull: ${pullWords(index)}`)))], instant);
   }
 
   private idleAgent(): void {

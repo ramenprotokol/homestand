@@ -427,7 +427,7 @@ body.why-open .nav{visibility:hidden}
 .idx .pp{max-width:34ch}
 
 /* ---------- round 6 ---------- */
-.best-badge{display:inline-block;margin-top:2px;padding:4px 8px;border-radius:10px;border:1px solid rgba(255,217,122,.55);font-family:var(--cond);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold2);line-height:1.3;text-align:center;max-width:100%}
+.best-badge{display:inline-block;margin-top:2px;padding:3px 9px;border-radius:99px;border:1px solid rgba(255,217,122,.55);font-family:var(--cond);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold2);line-height:1.25;white-space:nowrap}
 .now-card .best-badge{margin:0}
 .advanced{flex:1 1 100%;font-size:13.5px;color:#cfd3ee}
 .advanced summary{cursor:pointer;min-height:44px;display:flex;align-items:center;font-family:var(--cond);letter-spacing:.2em;text-transform:uppercase;font-size:12px;color:var(--gold2);list-style-position:inside}
@@ -439,3 +439,8 @@ body.why-open .nav{visibility:hidden}
 .nofix-list{list-style:none;padding:0;margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px 8px}
 .nofix-list li{padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);font-size:13px;color:#e2e5f6}
 .nofix-list b{color:var(--gold2);font-weight:600}
+
+.st .m .ix.mid{color:#cfd3ee}
+.idx .v.mid{color:#cfd3ee;text-shadow:none}
+.now-card .disc-badge,.now-card .best-badge{font-size:9.5px;letter-spacing:.07em;white-space:nowrap;padding:3px 7px;max-width:none}
+@media (max-width:420px){.swap-card{grid-template-columns:96px minmax(0,1fr)}}
