@@ -1,7 +1,7 @@
 import statsFile from "../data/reference-stats.json";
 import syntheticFile from "../data/reference-stats.synthetic.json";
 
-export type FitLabel = "leans-in" | "average" | "leans-away" | "not-scored" | "classic";
+export type FitLabel = "leans-in" | "average" | "leans-away" | "not-scored" | "classic" | "found";
 
 export const FIT_WORDS: Record<FitLabel, string> = {
   "leans-in": "Leans in",
@@ -9,6 +9,7 @@ export const FIT_WORDS: Record<FitLabel, string> = {
   "leans-away": "Leans away",
   "not-scored": "Not scored",
   classic: "Classic night",
+  found: "Found by Qloo",
 };
 
 /** z at or beyond these cut-offs is "Leans in" / "Leans away". */

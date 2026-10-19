@@ -5,6 +5,7 @@ import { buildMemoHtml, memoDocument, type MemoData } from "../../app/export/mem
 import { themeById } from "../../app/themes/library";
 import { syntheticBanner } from "../components";
 import { makeCard, specOf } from "../foil/cards";
+import { ideaTitles } from "./fix";
 import { Fireworks } from "../foil/fx";
 import { onCleanup, onMount, onResize, route, routeContext, whileVisible } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
@@ -20,19 +21,27 @@ function exportRows(): ExportRow[] {
   const a = state.analysis!;
   return a.nights.map((n) => {
     const v = viewOf(n);
-    return { date: n.date, theme: v.swappedFrom ? v.themeLabel : n.theme, sponsor: n.sponsor, locked: n.locked, notes: v.swappedFrom ? [n.notes, `Swapped from ${n.theme} (Homestand)`].filter(Boolean).join(". ") : n.notes };
+    return { date: n.date, theme: v.swappedFrom ? v.themeLabel : n.theme, sponsor: n.sponsor, locked: n.locked, notes: v.swappedFrom ? [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", discovered by Qloo" : ""})`].filter(Boolean).join(". ") : n.notes };
   });
+}
+
+function ideasOf(marketLabel: string): MemoData["ideas"] {
+  const d = state.propose?.discovery;
+  if (!d) return undefined;
+  const titles = ideaTitles(d);
+  return titles.length === 0 ? undefined : { city: marketLabel.split(",")[0]!.replace(/ (sample )?club$/, ""), titles, young: d.young.map((x) => x.name).filter((n) => !titles.includes(n)).slice(0, 3) };
 }
 
 function memoData(): MemoData {
   const a = state.analysis!;
   const swaps = approvedSwaps().map((p) => ({
-    date: p.date, weekday: p.weekday, from: themeById(p.fromThemeId)?.label ?? p.fromThemeId, to: themeById(p.toThemeId)?.label ?? p.toThemeId, sponsor: p.sponsor,
-    fromZ: p.from.z, toZ: p.to.z, fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource,
+    date: p.date, weekday: p.weekday, from: themeById(p.fromThemeId)?.label ?? p.fromThemeId, to: p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId, sponsor: p.sponsor,
+    fromZ: p.from.z, toZ: p.to.z, fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
   }));
   return {
     club: a.market.label, generatedOn: localDay(), swaps,
     angles: (state.propose?.angles ?? []).map((x) => x.text), nights: a.nights.length, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
+    ideas: ideasOf(a.market.label),
     synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedOn: a.recordedAt ? localDay(new Date(a.recordedAt)) : a.recordedOn,
   };
 }
@@ -64,7 +73,7 @@ export function sendView(): HTMLElement {
     fan.append(w);
   });
   const counts = (f: string): number => views.filter((v) => v.fit === f).length;
-  const caption = swaps.length === 0 ? "The deck stands as planned" : `${counts("leans-in")} in \u00b7 ${counts("average")} average \u00b7 ${counts("leans-away")} away`;
+  const caption = swaps.length === 0 ? "The deck stands as planned" : `${counts("leans-in")} in \u00b7 ${counts("average")} average \u00b7 ${counts("leans-away")} away${counts("found") > 0 ? ` \u00b7 ${counts("found")} found` : ""}`;
 
   const canvas = h("canvas", { id: "fx3", "aria-hidden": "true" });
   const final = h(

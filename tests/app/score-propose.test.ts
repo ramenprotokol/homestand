@@ -192,6 +192,35 @@ describe("proposals", () => {
     expect(res.angles[0]!.text).not.toMatch(/Dinosaur|PAW Patrol/);
     expect(res.angles[0]!.text).toContain("locked, so it stays");
   });
+  it("hands a kids or family night the library cannot fix to a discovered Qloo title, never repeating one", () => {
+    const f2 = { ...fits, "paw-patrol": fit("average", 0), pokemon: fit("average", 0), "super-mario": fit("leans-away", -1), bluey: fit("leans-away", -2) };
+    const discovered = [
+      { name: "Kite Club", entityId: "m1", type: "movie" as const, affinity: 0.9 },
+      { name: "Puddle Patrol", entityId: "s1", type: "tv_show" as const, affinity: 0.9 },
+    ];
+    const res = propose({ ...base, fits: f2, discovered, city: "Tulsa", nights: [night(0, "2026-04-11", "bluey", { sponsor: "Sunrise Dental" }), night(1, "2026-04-18", "super-mario")]});
+    expect(res.proposals).toHaveLength(2);
+    const [a, b] = res.proposals;
+    expect(a).toMatchObject({ fromThemeId: "bluey", toThemeId: "qloo:m1", sponsor: "Sunrise Dental", date: "2026-04-11", to: { label: "found", z: null, score: null }, discovered: { name: "Kite Club" } });
+    expect(a!.why).toBe("Qloo ranks Kite Club among the top family movies for fans near Tulsa.");
+    expect(b!.toThemeId).toBe("qloo:s1");
+    expect(b!.why).toBe("Qloo ranks Puddle Patrol among the top family shows for fans near Tulsa.");
+    // Not offered to an adult night, and nothing is left to repeat.
+    const adult = propose({ ...base, fits: { ...f2, elvis: fit("leans-away", -2), "grateful-dead": fit("average", 0), yellowstone: fit("average", 0), "taylor-swift": fit("average", 0) }, discovered, nights: [night(0, "2026-04-24", "elvis")] });
+    expect(adult.proposals).toEqual([]);
+    expect(adult.unfixed).toHaveLength(1);
+  });
+  it("a locked night gets a cross-theme touch only from the same kind of theme", () => {
+    const f4 = { ...fits, "star-trek": fit("leans-away", -1), wrestling: fit("leans-in", 3), "star-wars": fit("leans-in", 0.6), country: fit("leans-away", -1), "stranger-things": fit("leans-in", 3), "garth-brooks": fit("leans-in", 0.6) };
+    const trek = propose({ ...base, fits: f4, nights: [night(0, "2026-04-11", "star-trek", { locked: true })] });
+    expect(trek.angles[0]!.text).toMatch(/Star Wars|PAW Patrol/);
+    expect(trek.angles[0]!.text).not.toContain("Pro wrestling");
+    const country = propose({ ...base, fits: f4, nights: [night(0, "2026-04-11", "country", { locked: true })] });
+    expect(country.angles[0]!.text).toMatch(/Grateful Dead|Garth Brooks/);
+    expect(country.angles[0]!.text).not.toContain("Stranger Things");
+    const lonely = propose({ ...base, fits: { ...f4, "garth-brooks": fit("average", 0), "grateful-dead": fit("average", 0) }, nights: [night(0, "2026-04-11", "country", { locked: true })] });
+    expect(lonely.angles[0]!.text).toContain("A sponsor-friendly angle");
+  });
   it("only touches leans-away nights", () => {
     const res = propose({ ...base, nights: [night(0, "2026-07-03", "paw-patrol"), night(1, "2026-07-04", null)] });
     expect(res.proposals).toEqual([]);

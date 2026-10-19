@@ -75,7 +75,7 @@ export function checkView(): HTMLElement {
     months.set(key, [...(months.get(key) ?? []), v]);
   }
 
-  const summary = fitSummary({ in: count("leans-in"), average: count("average"), away, notScored: count("not-scored"), classic: count("classic") });
+  const summary = fitSummary({ in: count("leans-in"), average: count("average"), away, notScored: count("not-scored"), classic: count("classic"), found: count("found") });
   const locked = views.filter((v) => v.night.locked);
   const result = checkResultLine(away, views.length, city());
 
@@ -229,7 +229,7 @@ function backOf(v: NightView): BackSpec {
   const s = v.score;
   const scored = !!s && s.label !== "not-scored";
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
-  const reason = v.fit === "classic" ? CLASSIC_REASON : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
+  const reason = v.discovered ? `Qloo found this title among the top family ${v.discovered.type === "movie" ? "movies" : "shows"} for fans near ${city()}. It is not scored against the library, so there is no local-pull number.` : v.fit === "classic" ? CLASSIC_REASON : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
   return {
     no: n.index + 1,
     total: state.analysis!.nights.length,
@@ -277,6 +277,10 @@ function whyInfo(index: number): Child {
 
   if (v.fit === "classic") {
     out.push(h("p", { class: "panel-box" }, CLASSIC_REASON));
+    return out;
+  }
+  if (v.discovered) {
+    out.push(h("p", { class: "panel-box" }, `Qloo ranks ${v.discovered.name} among the top family ${v.discovered.type === "movie" ? "movies" : "shows"} for fans near ${city()}. It is not scored against the library, so there is no local-pull number: it was found, not measured.`));
     return out;
   }
   if (v.needsChoice) {

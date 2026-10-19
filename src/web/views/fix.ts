@@ -10,10 +10,14 @@ import { fmt, gsap, reduced, sleep, tween } from "../foil/motion";
 import { packEl } from "../foil/pack";
 import { setTally, tally } from "../foil/tally";
 import { icon } from "../icons";
+import type { ProposeResponse } from "../../app/api-types";
+import { kindWords } from "../../app/propose/propose";
 import { approvedSwaps, effective, state, ui, viewOf, type ShownProposal } from "../store";
 
 const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hashchange"));
 const label = (id: string): string => themeById(id)?.label ?? id;
+/** What the swap puts on the night: a library theme, or a title Qloo found. */
+const toLabel = (p: ShownProposal): string => p.discovered?.name ?? label(p.toThemeId);
 const ix = (z: number | null): string => (z === null ? "n/a" : fmt(z));
 const TYPE_WORDS: Record<string, string> = { tv_show: "TV show", movie: "movie", artist: "artist", book: "book", brand: "brand" };
 
@@ -79,6 +83,7 @@ export function fixView(): HTMLElement {
       tools,
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
+      ideasPanel(p.discovery, a.market.label),
       p.angles.length > 0
         ? h("section", { class: "sect side" }, h("h2", null, "Locked nights: keep them, add an angle"), h("div", { class: "side-list" }, p.angles.map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))))
         : null,
@@ -90,6 +95,29 @@ export function fixView(): HTMLElement {
 
   if (swaps.length > 0) onMount(() => new FixStage(stageEl, agent, swaps, headTally, paintDone).mount());
   return h("div", { class: "page" }, section);
+}
+
+/** Up to six of Qloo's local family titles, movies and shows taking turns. */
+export function ideaTitles(d: { movies: Array<{ name: string }>; shows: Array<{ name: string }> }, max = 6): string[] {
+  const out: string[] = [];
+  for (let i = 0; out.length < max && i < Math.max(d.movies.length, d.shows.length); i++) for (const x of [d.movies[i], d.shows[i]]) if (x && out.length < max) out.push(x.name);
+  return out;
+}
+
+function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLElement | null {
+  if (!d) return null;
+  const titles = ideaTitles(d);
+  if (titles.length === 0) return null;
+  const city = marketLabel.split(",")[0]!.replace(/ (sample )?club$/, "");
+  const young = d.young.map((x) => x.name).filter((n) => !titles.includes(n)).slice(0, 3);
+  return h(
+    "section",
+    { class: "ideas", "data-testid": "ideas", "aria-label": `Fresh family ideas from Qloo for ${city}` },
+    h("h2", null, `Fresh family ideas from Qloo for ${city}`),
+    h("ul", { class: "idea-chips" }, titles.map((t) => h("li", { class: "idea" }, t))),
+    young.length > 0 ? h("p", { class: "ideas-young", "data-testid": "ideas-young" }, `Under-25 fans here also lean toward: ${young.join(", ")}.`) : null,
+    h("p", { class: "small" }, "These come from Qloo's taste data for this area. They are ideas, not scores."),
+  );
 }
 
 /** A card for a night the agent could not change, beside the plain reason. */
@@ -241,7 +269,7 @@ class FixStage {
   private specs(top: ShownProposal): { front: CardSpec; alt: CardSpec } {
     const p = effective(top);
     const base = specOf(viewOf(state.analysis!.nights[p.index]!));
-    return { front: specForSwap(base, p.fromThemeId, label(p.fromThemeId), p.from.label), alt: specForSwap(base, p.toThemeId, label(p.toThemeId), p.to.label) };
+    return { front: specForSwap(base, p.fromThemeId, label(p.fromThemeId), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, toLabel(p), p.to.label) };
   }
 
   private buildSlides(): void {
@@ -331,9 +359,10 @@ class FixStage {
     const p = effective(top);
     const night = state.analysis!.nights[p.index]!;
     const d = state.decisions[p.id];
-    const cited = `${label(p.toThemeId)}: ${vsAverage(p.to.z)} · ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}`;
+    const found = p.discovered;
+    const cited = found ? `Found by Qloo, not scored against the library, so no local-pull number. ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}` : `${label(p.toThemeId)}: ${vsAverage(p.to.z)} · ${label(p.fromThemeId)}: ${vsAverage(p.from.z)}`;
     const shown = d === "approved" ? p.to.z : p.from.z;
-    const sub = d === "approved" ? `Approved. Was ${ix(p.from.z)}.` : d === "rejected" ? "Rejected. Kept as planned." : `now ${ix(p.from.z)} → proposed ${ix(p.to.z)}`;
+    const sub = d === "approved" ? `Approved. Was ${ix(p.from.z)}.` : d === "rejected" ? "Rejected. Kept as planned." : found ? `now ${ix(p.from.z)} → found by Qloo` : `now ${ix(p.from.z)} → proposed ${ix(p.to.z)}`;
 
     const takenElsewhere = new Set(this.swaps.filter((o) => o.id !== p.id).map((o) => effective(o).toThemeId));
     const pool = [top.toThemeId, ...top.alternates.map((a) => a.toThemeId)].filter((id) => id !== p.toThemeId);
@@ -358,7 +387,7 @@ class FixStage {
             h("button", { type: "button", class: "btn ghost", "data-testid": "reject", onclick: () => this.reject(s) }, "Reject"),
           ]
         : [
-            h("span", { class: "decision" }, icon(d === "approved" ? "check" : "x"), d === "approved" ? `Approved: ${label(p.toThemeId)} now holds ${shortDate(p.date)}${night.sponsor ? `. ${night.sponsor} stays` : ""}.` : "Rejected, stays as planned"),
+            h("span", { class: "decision" }, icon(d === "approved" ? "check" : "x"), d === "approved" ? `Approved: ${toLabel(p)} now holds ${shortDate(p.date)}${night.sponsor ? `. ${night.sponsor} stays` : ""}.` : "Rejected, stays as planned"),
             h("button", { type: "button", class: "lnk", "data-focus": "", onclick: () => this.undo(s) }, "Undo"),
             nextOpen >= 0 ? h("button", { type: "button", class: "btn pri sm", "data-testid": "next-swap", onclick: () => this.show(nextOpen) }, "Next swap", icon("arrowRight")) : null,
           ];
@@ -368,17 +397,17 @@ class FixStage {
         "div",
         { class: "meta" },
         h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDate(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Date and sponsor stay")),
-        h("div", { class: "idx" }, h("span", { class: "k" }, "Local pull"), h("span", { class: `v ${(shown ?? 0) < 0 ? "neg" : "pos"}`, id: "idxV" }, ix(shown)), h("div", { class: "pp" }, sub)),
+        h("div", { class: "idx" }, h("span", { class: "k" }, "Local pull"), h("span", { class: `v ${(shown ?? 0) < 0 ? "neg" : "pos"}`, id: "idxV" }, found && d === "approved" ? "Found" : ix(shown)), h("div", { class: "pp" }, sub)),
       ),
       h(
         "div",
         { class: "swap-card", "data-proposal": p.id, "data-decision": d ?? "open", "data-testid": "proposal" },
         // The new night, shown before approval: the big card above is the night as planned.
-        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : "Would be"), nowCard),
+        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : "Would be"), nowCard, found ? h("span", { class: "disc-badge", "data-testid": "disc-badge" }, "Discovered by Qloo") : null),
         h(
           "div",
           { class: "swap-body" },
-          h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), label(p.toThemeId)),
+          h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), toLabel(p)),
           h("p", { class: "swap-why" }, p.why),
           h("p", { class: "small", "data-testid": "cited" }, cited, p.whySource === "model" ? ". Wording drafted by an AI from the checked facts." : ""),
           chips,
@@ -442,7 +471,8 @@ class FixStage {
         .to(flipper(s.card), { rotationY: 180, duration: 0.95, ease: "power2.inOut" }, 0.05)
         .add(() => {
           const v = this.console.querySelector<HTMLElement>("#idxV");
-          if (v) tween(p.from.z ?? 0, p.to.z ?? 0, 1100, (x) => {
+          if (v && p.discovered) v.textContent = "Found";
+          else if (v) tween(p.from.z ?? 0, p.to.z ?? 0, 1100, (x) => {
             v.textContent = fmt(x);
             v.className = `v ${x < 0 ? "neg" : "pos"}`;
           });
@@ -512,7 +542,7 @@ class FixStage {
     const night = state.analysis!.nights[p.index]!;
     const d = state.decisions[p.id];
     const el =
-      d === "approved" ? this.add([h("div", { class: "ic ok" }, "✓"), h("div", null, h("div", { class: "k" }, "Approved"), h("div", { class: "m" }, h("b", null, label(p.toThemeId)), ` lands on ${shortDate(p.date)}. ${night.sponsor ? `${night.sponsor} stays.` : "The date stays."}`))], quick)
+      d === "approved" ? this.add([h("div", { class: "ic ok" }, "✓"), h("div", null, h("div", { class: "k" }, "Approved"), h("div", { class: "m" }, h("b", null, toLabel(p)), ` lands on ${shortDate(p.date)}. ${night.sponsor ? `${night.sponsor} stays.` : "The date stays."}`))], quick)
       : d === "rejected" ? this.add([h("div", { class: "ic" }, "–"), h("div", null, h("div", { class: "k" }, "Rejected"), h("div", { class: "m" }, "Kept as planned. You can still approve it."))], quick)
       : this.add([h("div", { class: "ic" }, "…"), h("div", { class: "wait" }, h("div", { class: "k" }, "Waiting for your approval"), h("div", { class: "m" }, "Approve the swap or reject it", h("span", { class: "dots" }, h("span", null, "."), h("span", null, "."), h("span", null, "."))))], quick);
     el.classList.add("tail");
@@ -537,7 +567,8 @@ class FixStage {
     this.qloo(p.fromThemeId, "Taste lookup · the weak night", quick);
     await wait(520);
     if (!live()) return;
-    this.qloo(p.toThemeId, "Taste lookup · the better fit", quick);
+    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, "Discovered by Qloo"), h("div", { class: "m" }, h("b", null, p.discovered.name), ` is among Qloo's top family ${kindWords(p.discovered.type)} for fans near ${state.analysis!.market.label.split(",")[0]!.replace(/ (sample )?club$/, "")}. No library theme leaned in for this night. It has no local-pull number: it was found, not scored.`))], quick);
+    else this.qloo(p.toThemeId, "Taste lookup · the better fit", quick);
     await wait(520);
     if (!live()) return;
     const items = p.checks.map((c) => h("li", null, c));

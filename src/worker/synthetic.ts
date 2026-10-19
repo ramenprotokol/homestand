@@ -21,9 +21,22 @@ export function syntheticAffinity(entityId: string, lon: number, lat: number): n
   return Math.min(0.99, Math.max(0.42, base + swing));
 }
 
+const DISCOVER_MOVIES = ["Moonpie Pirates", "Captain Pocketwatch", "The Marmalade Express", "Zippy and the Cloud Zoo", "Little Lantern Dragon", "Biscuit Bay Heroes", "Pip the Rocket Mouse", "The Tiny Tuba Parade", "Sunny Side Sleuths", "Wobbly Knight"];
+const DISCOVER_SHOWS = ["Puddle Patrol", "The Jellybean Bus", "Mango Moon Club", "Clementine Calling", "Fizz and Flick", "Treehouse Tuesday", "Sprocket Street", "The Pudding Pals", "Kite Runners", "Nimbus Nights"];
+const DISCOVER_YOUNG = ["Glitter Garage", "Nova Nook", "Skatepark Sparrow", "The Snack Squad", "Pixel Playhouse", "Moonwalk Middle School"];
+
 /** A fetch that answers Qloo's /v2/insights from the function above. */
 export const syntheticQlooFetch: typeof fetch = async (input) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+  if (url.searchParams.get("filter.tags")) {
+    // Discovery: made-up family titles, clearly labelled, in a fixed order.
+    const type = (url.searchParams.get("filter.type") ?? "").replace("urn:entity:", "");
+    const young = url.searchParams.has("signal.demographics.age");
+    const names = young ? DISCOVER_YOUNG : type === "movie" ? DISCOVER_MOVIES : DISCOVER_SHOWS;
+    const take = Number(url.searchParams.get("take") ?? names.length);
+    const entities = names.slice(0, take).map((n, i) => ({ entity_id: `SYN-D-${type}${young ? "-y" : ""}-${i}`, name: `${n} (made up)`, query: { affinity: Math.round((0.95 - i * 0.03) * 100) / 100 } }));
+    return new Response(JSON.stringify({ results: { entities } }), { status: 200, headers: { "content-type": "application/json" } });
+  }
   const ids = (url.searchParams.get("filter.results.entities") ?? "").split(",").filter(Boolean);
   const point = /POINT\(([-\d.]+) ([-\d.]+)\)/.exec(url.searchParams.get("signal.location") ?? "");
   const lon = point ? Number(point[1]) : 0;

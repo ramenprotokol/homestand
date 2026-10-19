@@ -68,6 +68,26 @@ describe("memo", () => {
     expect(buildMemoHtml(data)).toContain("Homestand checked 24 theme nights for Akron, OH sample club &lt;b&gt; against local taste data from Qloo");
     expect(buildMemoHtml(data)).not.toMatch(/preference for certain/i);
   });
+  it("labels a discovered swap, has no local-pull number for it, and repeats Qloo's family ideas", () => {
+    const d: MemoData = {
+      ...data, synthetic: false,
+      swaps: [{ date: "2026-05-08", weekday: "Friday", from: "Barbie", to: "DC League of Super-Pets", sponsor: "Pinecrest Auto", fromZ: -2.1, toZ: null, fromScore: null, toScore: null, why: "Qloo ranks DC League of Super-Pets among the top family movies for fans near Tulsa.", source: "template", discovered: true }],
+      ideas: { city: "Tulsa", titles: ["Fuller House", "Sing 2"], young: ["All That"] },
+    };
+    const html = buildMemoHtml(d);
+    expect(html).toContain("DC League of Super-Pets <em>(Discovered by Qloo)</em>");
+    expect(html).toContain("-2.1 to Found by Qloo");
+    expect(html).toContain("Fresh family ideas from Qloo for Tulsa");
+    expect(html).toContain("Fuller House, Sing 2.");
+    expect(html).toContain("Under-25 fans here also lean toward: All That.");
+    expect(html).toContain("These come from Qloo's taste data for this area");
+    expect(html).not.toContain("n/a");
+  });
+  it("carries a discovered title into the CSV and the calendar file", () => {
+    const rows = [{ date: "2026-05-08", theme: "DC League of Super-Pets", sponsor: "Pinecrest Auto", locked: false, notes: "Swapped from Barbie (Homestand, discovered by Qloo)" }];
+    expect(exportCsv(rows)).toContain('DC League of Super-Pets,Pinecrest Auto,no,"Swapped from Barbie (Homestand, discovered by Qloo)"');
+    expect(exportIcs(rows, "Tulsa, OK", "2026-10-18T00:00:00.000Z")).toContain("DC League of Super-Pets");
+  });
   it("says so when nothing was approved", () => {
     expect(buildMemoHtml({ ...data, swaps: [], synthetic: false })).toContain("No swaps were approved");
   });

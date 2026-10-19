@@ -64,6 +64,8 @@ export interface NightView {
   /** Set when an approved swap replaced the planned theme. */
   swappedFrom: string | null;
   needsChoice: boolean;
+  /** Set when an approved swap replaced the night with a title Qloo found. */
+  discovered: { name: string; type: "movie" | "tv_show" } | null;
 }
 
 /** What a night looks like right now: the director's choice and any approved swap applied. */
@@ -74,9 +76,10 @@ export function viewOf(n: NightOut): NightView {
   const themeId = approved ? approved.toThemeId : effectiveThemeId(n);
   const score = themeId ? (a.themes[themeId] ?? null) : null;
   const needsChoice = n.resolution.kind === "ambiguous" && state.choices[n.index] === undefined;
-  const fit: FitLabel = n.resolution.kind === "classic" ? "classic" : score ? score.label : "not-scored";
-  const label = themeId ? (themeById(themeId)?.label ?? themeId) : n.theme;
-  return { night: n, themeId, themeLabel: label, fit, z: score?.z ?? null, score, swappedFrom: approved ? (themeById(approved.fromThemeId)?.label ?? approved.fromThemeId) : null, needsChoice };
+  const disc = approved?.discovered ?? null;
+  const fit: FitLabel = n.resolution.kind === "classic" ? "classic" : disc ? "found" : score ? score.label : "not-scored";
+  const label = disc ? disc.name : themeId ? (themeById(themeId)?.label ?? themeId) : n.theme;
+  return { night: n, themeId, themeLabel: label, fit, z: score?.z ?? null, score, swappedFrom: approved ? (themeById(approved.fromThemeId)?.label ?? approved.fromThemeId) : null, needsChoice, discovered: disc ? { name: disc.name, type: disc.type } : null };
 }
 
 export type ShownProposal = Proposal & { whySource: "model" | "template" };

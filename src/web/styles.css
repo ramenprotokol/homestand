@@ -391,3 +391,16 @@ body.why-open .nav{visibility:hidden}
   .swap-card{padding:10px 12px}
   .stage2{padding-top:10px;padding-bottom:10px}
 }
+
+/* ---------- Discovered by Qloo ---------- */
+.lab-found{--pn:radial-gradient(circle at 50% 46%,#2fc7b4,#17848a 55%,#0a3d52);--rim:#7be3d0;--e1:#e8fffa;--e2:#ffd97a;--e3:#08343f;--glow:rgba(90,230,205,.5)}
+.lab-found .nm-s{color:#0b5a63}
+.lab-found .fitword{color:#9df0e0}
+.tally .t[hidden]{display:none}
+.disc-badge{display:inline-block;margin-top:2px;padding:3px 9px;border-radius:99px;font-family:var(--cond);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:#062b30;background:linear-gradient(#9df0e0,#3fd6c0);box-shadow:0 0 12px rgba(90,230,205,.45)}
+.ideas{margin-top:clamp(18px,2.4vw,28px);padding:14px 16px;border-radius:16px;background:linear-gradient(165deg,rgba(32,38,120,.55),rgba(10,14,52,.85));border:1px solid rgba(157,240,224,.4);max-width:880px}
+.ideas h2{font-family:var(--slab);font-weight:400;font-size:clamp(17px,1.7vw,22px);color:#fff;margin:0 0 10px}
+.idea-chips{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.idea{padding:6px 12px;border-radius:99px;border:1.5px solid rgba(157,240,224,.6);color:#d8fff7;font-size:14px;font-weight:600;background:rgba(61,214,181,.08)}
+.ideas-young{margin:10px 0 0;font-size:14px;color:#e2e5f6}
+.ideas .small{margin:8px 0 0}

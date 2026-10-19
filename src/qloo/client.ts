@@ -29,6 +29,37 @@ export interface AffinityQuery {
   locationQuery?: string;
 }
 
+export interface DiscoverQuery {
+  type: "movie" | "tv_show";
+  lon: number;
+  lat: number;
+  radiusM?: number;
+  take: number;
+  /** Qloo's age signal, e.g. "24_and_younger". */
+  age?: string;
+}
+
+export interface DiscoveredRow {
+  entityId: string;
+  name: string;
+  affinity: number | null;
+}
+
+/** Always sent with discovery: without it, local results include adult and explicit titles. */
+export const FAMILY_TAG = "urn:tag:genre:media:family";
+
+/** Only these three fields are kept from a discovery response. */
+export function discoveredFromBody(raw: unknown, type: DiscoverQuery["type"]): Array<DiscoveredRow & { type: DiscoverQuery["type"] }> {
+  const body = raw as { results?: { entities?: Record<string, unknown>[] } };
+  return (body.results?.entities ?? []).flatMap((e) => {
+    const name = typeof e.name === "string" ? e.name.trim() : "";
+    const id = typeof e.entity_id === "string" ? e.entity_id : "";
+    if (!name || !id) return [];
+    const q = e.query as { affinity?: unknown } | undefined;
+    return [{ entityId: id, name, type, affinity: num(q?.affinity) }];
+  });
+}
+
 export interface ClientOptions {
   baseUrl: string;
   apiKey: string;
@@ -140,7 +171,20 @@ export function createQlooClient(opts: ClientOptions) {
     return affinityRowsFromBody(await get("/v2/insights", params), q.entityIds);
   }
 
-  return { search, localAffinity, get requests() { return requests; }, get retries() { return { ...retries }; } };
+  /** The top family-tagged titles of one type near a point, optionally for one age group. Never called without the family tag. */
+  async function discoverFamily(q: DiscoverQuery): Promise<Array<DiscoveredRow & { type: DiscoverQuery["type"] }>> {
+    const params: Record<string, string> = {
+      "filter.type": `urn:entity:${q.type}`,
+      "filter.tags": FAMILY_TAG,
+      "signal.location": `POINT(${q.lon} ${q.lat})`,
+      "signal.location.radius": String(q.radiusM ?? 40000),
+      take: String(q.take),
+    };
+    if (q.age) params["signal.demographics.age"] = q.age;
+    return discoveredFromBody(await get("/v2/insights", params), q.type);
+  }
+
+  return { search, localAffinity, discoverFamily, get requests() { return requests; }, get retries() { return { ...retries }; } };
 }
 
 export type QlooClient = ReturnType<typeof createQlooClient>;

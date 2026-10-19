@@ -1,5 +1,5 @@
 import type { Resolution } from "./calendar/resolve";
-import type { Proposal, SponsorAngle } from "./propose/propose";
+import type { Discovered, Proposal, SponsorAngle } from "./propose/propose";
 import type { FitLabel } from "./score";
 import type { TraceStep } from "./trace";
 
@@ -91,8 +91,20 @@ export interface ProposeNightIn {
   notes: string;
 }
 
+/** Qloo's local family ranking for a market: only name, id, type and affinity are kept. */
+export interface DiscoveryOut {
+  movies: Discovered[];
+  shows: Discovered[];
+  /** Family shows that fans aged 24 and younger lean toward. */
+  young: Discovered[];
+  source: "live" | "cache" | "synthetic";
+  fetchedAt: string;
+}
+
 export interface ProposeResponse {
   proposals: Array<Proposal & { whySource: "model" | "template" }>;
+  /** Null when discovery was unavailable (cap reached or Qloo trouble); swaps then use library themes only. */
+  discovery: DiscoveryOut | null;
   angles: SponsorAngle[];
   unfixed: Array<{ index: number; date: string; reason: string }>;
   trace: TraceStep[];

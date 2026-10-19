@@ -9,6 +9,7 @@ const FIT_ICON: Record<FitLabel, IconName> = {
   "leans-away": "trendDown",
   "not-scored": "question",
   classic: "star",
+  found: "star",
 };
 
 /** The fit in words, with an icon: colour is never the only signal. */

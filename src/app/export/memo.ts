@@ -14,6 +14,8 @@ export interface MemoSwap {
   why: string;
   /** Where the reason came from: the model, or the fixed template (identical wording for every swap). */
   source?: "model" | "template";
+  /** The new night is a title Qloo found, not a library theme: no local-pull number. */
+  discovered?: boolean;
 }
 
 export interface MemoData {
@@ -27,6 +29,8 @@ export interface MemoData {
   recordedOn: string | null;
   /** Full timestamp of the saved scores, when the scores were a saved result. */
   recordedAt?: string | null;
+  /** Qloo's local family ideas for this area, when they were available. */
+  ideas?: { city: string; titles: string[]; young: string[] };
 }
 
 export function escapeHtml(s: string): string {
@@ -47,15 +51,22 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps">): stri
 export function buildMemoHtml(d: MemoData): string {
   const rows = d.swaps
     .map(
-      (s) => `<tr><td>${escapeHtml(s.weekday)} ${escapeHtml(longDate(s.date))}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
-        `<td>${signed(s.fromZ)} to ${signed(s.toZ)}</td></tr>`,
+      (s) => `<tr><td>${escapeHtml(s.weekday)} ${escapeHtml(longDate(s.date))}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}${s.discovered ? " <em>(Discovered by Qloo)</em>" : ""}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
+        `<td>${s.discovered ? `${signed(s.fromZ)} to Found by Qloo` : `${signed(s.fromZ)} to ${signed(s.toZ)}`}</td></tr>`,
     )
     .join("");
-  // Template reasons are the same sentence with different names, so they are said once, not once per swap.
-  const templated = d.swaps.length > 1 && d.swaps.every((s) => s.source !== "model");
-  const whys = templated
-    ? d.swaps.map((s) => `<li><strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}, ${escapeHtml(longDate(s.date))}.</strong></li>`).join("") + `<li>In each case the new theme stands out above this market's own average and the planned one stands out below it. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>`
-    : d.swaps.map((s) => `<li><strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}, ${escapeHtml(longDate(s.date))}.</strong> ${escapeHtml(s.why)}</li>`).join("");
+  // Template reasons for library themes are the same sentence with different names, so they are said once, not once per swap.
+  const collapse = d.swaps.filter((s) => !s.discovered && s.source !== "model").length > 1;
+  const whys =
+    d.swaps
+      .map((s) => {
+        const head = `<strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}${s.discovered ? " (Discovered by Qloo)" : ""}, ${escapeHtml(longDate(s.date))}.</strong>`;
+        return collapse && !s.discovered && s.source !== "model" ? `<li>${head}</li>` : `<li>${head} ${escapeHtml(s.why)}</li>`;
+      })
+      .join("") + (collapse ? `<li>For the library themes, the new theme stands out above this market's own average and the planned one stands out below it. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>` : "");
+  const ideas = d.ideas && d.ideas.titles.length > 0
+    ? `<h2>Fresh family ideas from Qloo for ${escapeHtml(d.ideas.city)}</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}.${d.ideas.young.length ? ` Under-25 fans here also lean toward: ${d.ideas.young.map(escapeHtml).join(", ")}.` : ""} These come from Qloo's taste data for this area. They are ideas, not scores.</p>`
+    : "";
   const angles = d.angles.map((a) => `<li>${escapeHtml(a)}</li>`).join("");
   const banner = d.synthetic ? `<p class="warn">SYNTHETIC DEMO DATA. These numbers are made up for testing, not from Qloo.</p>` : "";
   const recorded = d.recordedOn ? ` Scores were pulled from Qloo on ${escapeHtml(longDate(d.recordedOn))}.` : "";
@@ -67,11 +78,12 @@ ${banner}
 ${d.swaps.length ? `<h2>Approved swaps</h2>
 <div class="memo-scroll"><table><thead><tr><th>Night</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Local pull (was to now)</th></tr></thead><tbody>${rows}</tbody></table></div>
 <h2>Why</h2><ul>${whys}</ul>` : `<p>No swaps were approved. The calendar is unchanged.</p>`}
+${ideas}
 ${d.angles.length ? `<h2>Locked nights: sponsor-friendly angles</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
 <p>${escapeHtml(METHOD_WORDS)}</p>
 <p>${escapeHtml(AUDIT_LINE)}</p>
-<p>${d.nights} nights were reviewed; ${d.classic} classic nights (fireworks, giveaways, heritage and similar) were left as planned because they are not a pop-culture taste. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
+<p>${d.nights} nights were reviewed; ${d.classic} classic ${d.classic === 1 ? "night" : "nights"} (fireworks, giveaways, heritage and similar) ${d.classic === 1 ? "was" : "were"} left as planned because they are not a pop-culture taste. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
 </article>`;
 }
 

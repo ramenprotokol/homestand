@@ -11,8 +11,9 @@ export function checkResultLine(away: number, total: number, city: string): stri
   return `${away} of ${total} nights ${leanVerb(away)} away from what ${city} likes.`;
 }
 
-export function fitSummary(c: { in: number; average: number; away: number; notScored: number; classic: number }): string {
-  return `${c.in} ${leanVerb(c.in)} in, ${c.average} about average, ${c.away} ${leanVerb(c.away)} away, ${c.notScored} not scored, ${c.classic} classic.`;
+export function fitSummary(c: { in: number; average: number; away: number; notScored: number; classic: number; found?: number }): string {
+  const found = c.found ? `, ${c.found} found by Qloo` : "";
+  return `${c.in} ${leanVerb(c.in)} in, ${c.average} about average, ${c.away} ${leanVerb(c.away)} away, ${c.notScored} not scored, ${c.classic} classic${found}.`;
 }
 
 export function lockedLine(n: number): string {

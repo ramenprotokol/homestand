@@ -51,6 +51,7 @@ const GEM: Record<string, [string, string, string, string, string]> = {
   average: ["#ffffff", "#d5ddf2", "#8e9ab8", "#4a5575", "#cfd7ee"],
   "leans-away": ["#ffc0c6", "#ff4a5c", "#c0243c", "#7a1226", "#ff8a96"],
   classic: ["#c8dbff", "#5a8bff", "#2c55c8", "#16327e", "#9db9ff"],
+  found: ["#c9fff3", "#3fd6c0", "#1b9c92", "#0b5a63", "#9df0e0"],
 };
 
 const labClass = (fit: CardFit): string => `lab-${fit === "pick" ? "not-scored" : fit}`;
@@ -96,7 +97,7 @@ export function specOf(v: NightView): CardSpec {
   return {
     title,
     fit,
-    emblem: emblemFor(v.themeId, category, n.theme, n.resolution.kind === "classic"),
+    emblem: emblemFor(v.discovered ? (v.discovered.type === "movie" ? "film" : "tv") : v.themeId, category, n.theme, n.resolution.kind === "classic"),
     month,
     day,
     weekday: n.weekday,

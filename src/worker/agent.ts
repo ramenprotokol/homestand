@@ -1,9 +1,9 @@
-import type { AnalyzeResponse, Caps, MarketIn, MemoResponse, NightOut, ProposeNightIn, ProposeResponse, RecheckResponse, ThemeScoreOut } from "../app/api-types";
+import type { AnalyzeResponse, Caps, DiscoveryOut, MarketIn, MemoResponse, NightOut, ProposeNightIn, ProposeResponse, RecheckResponse, ThemeScoreOut } from "../app/api-types";
 import { weekdayName, type CalendarRow } from "../app/calendar/csv";
 import { resolveTheme, type Resolution } from "../app/calendar/resolve";
 import { numbersAreGrounded, claimsOutcome } from "../app/guard";
 import { marketKey } from "../app/markets";
-import { propose, type PlanNight, type ThemeFit } from "../app/propose/propose";
+import { propose, type Discovered, type PlanNight, type ThemeFit } from "../app/propose/propose";
 import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
 import { idsOfType, type LiveTheme } from "../app/themes/ids";
 import { step, type TraceStep } from "../app/trace";
@@ -182,6 +182,78 @@ function allOut(d: Deps, s: Scores): Record<string, ThemeScoreOut> {
   return Object.fromEntries(list.map((o) => [o.themeId, o]));
 }
 
+// ---------- discovery: what Qloo ranks for families near the ballpark ----------
+
+interface StoredDiscovery {
+  v: 1;
+  fetchedAt: string;
+  movies: Discovered[];
+  shows: Discovered[];
+  young: Discovered[];
+}
+
+const discoveryKey = (d: Deps, m: MarketIn): string => `disc:v1:${signature(d.library)}:${d.mode}:${marketKey(m)}`;
+const norm = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+
+/**
+ * Three family-tagged Qloo calls: top movies, top shows, and shows fans aged 24 and younger lean toward. The family tag is
+ * always sent (without it local results include adult titles). Titles that are already library themes are dropped, by id or name.
+ * Returns null, never throws, when discovery is unavailable: swaps then just use library themes.
+ */
+export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promise<DiscoveryOut | null> {
+  const city = m.label.split(",")[0]!.replace(/ (sample )?club$/, "");
+  const key = discoveryKey(d, m);
+  const hit = await d.kv.get(key);
+  if (hit) {
+    try {
+      const s = JSON.parse(hit) as StoredDiscovery;
+      if (s.v === 1) {
+        trace.push(step(iso(d), "qloo", `Used the recorded top family movies, top family shows and under-25 picks near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        return { movies: s.movies, shows: s.shows, young: s.young, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
+      }
+    } catch {
+      /* fall through to a fresh pull */
+    }
+  }
+  if (!(await reserveQloo(d, 3))) {
+    trace.push(step(iso(d), "qloo", `Skipped the family ideas near ${city}: today's Qloo allowance is used up.`));
+    return null;
+  }
+  try {
+    const client = createQlooClient({ baseUrl: d.qlooBase, apiKey: d.qlooKey, fetchImpl: d.qlooFetch, delayMs: d.qlooDelayMs, maxTries: 3, sleep: d.qlooDelayMs === 0 ? async () => undefined : undefined });
+    const libIds = new Set(d.library.flatMap((t) => t.entities.map((e) => e.id)));
+    const libNames = new Set(d.library.flatMap((t) => [norm(t.label), ...t.entities.flatMap((e) => e.names.map(norm))]));
+    // A title is "already a library theme" when its name is one, or contains one as whole words ("Bluey Minisodes").
+    const isLibraryTitle = (name: string): boolean => {
+      const n = ` ${norm(name)} `;
+      return libNames.has(norm(name)) || [...libNames].some((l) => l.length >= 5 && n.includes(` ${l} `));
+    };
+    const keep = (rows: Array<Discovered>): { kept: Discovered[]; dropped: number } => {
+      const seen = new Set<string>();
+      const kept: Discovered[] = [];
+      for (const r of rows) {
+        if (libIds.has(r.entityId) || isLibraryTitle(r.name) || seen.has(r.entityId)) continue;
+        seen.add(r.entityId);
+        kept.push({ name: r.name, entityId: r.entityId, type: r.type, affinity: r.affinity });
+      }
+      return { kept, dropped: rows.length - kept.length };
+    };
+    const base = { lon: m.lon, lat: m.lat, radiusM: RADIUS_M };
+    const movies = keep(await client.discoverFamily({ ...base, type: "movie", take: 10 }));
+    trace.push(step(iso(d), "qloo", `Asked Qloo for top family movies near ${city} (80 km, family tag).`, `Live call at ${iso(d)}. ${movies.kept.length} kept, ${movies.dropped} already library themes dropped.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    const shows = keep(await client.discoverFamily({ ...base, type: "tv_show", take: 10 }));
+    trace.push(step(iso(d), "qloo", `Asked Qloo for top family shows near ${city} (80 km, family tag).`, `Live call at ${iso(d)}. ${shows.kept.length} kept, ${shows.dropped} already library themes dropped.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    const young = keep(await client.discoverFamily({ ...base, type: "tv_show", take: 6, age: "24_and_younger" }));
+    trace.push(step(iso(d), "qloo", `Asked Qloo which family shows fans aged 24 and younger near ${city} lean toward.`, `Live call at ${iso(d)}. ${young.kept.length} kept.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    const stored: StoredDiscovery = { v: 1, fetchedAt: iso(d), movies: movies.kept, shows: shows.kept, young: young.kept };
+    await d.kv.put(key, JSON.stringify(stored), { expirationTtl: TTL });
+    return { movies: stored.movies, shows: stored.shows, young: stored.young, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
+  } catch (err) {
+    trace.push(step(iso(d), "qloo", `Family ideas near ${city} were not available (${err instanceof Error ? err.message.slice(0, 80) : "error"}), so swaps use library themes only.`));
+    return null;
+  }
+}
+
 // ---------- model ----------
 
 /**
@@ -317,46 +389,49 @@ function fitsOf(themes: Record<string, ThemeScoreOut>): Record<string, ThemeFit>
   return Object.fromEntries(Object.entries(themes).map(([id, t]) => [id, { label: t.label, z: t.index, score: t.score }]));
 }
 
-const abs1 = (z: number | null): number | null => (z === null ? null : Math.round(Math.abs(z) * 10) / 10);
+/** The model words only the taste comparison. These words mean it wandered off the facts it was given. */
+const OFF_FACTS = /\b(sponsors?|dates?|tickets?|sales|attendance|revenue|crowds?|fans? will)\b/i;
 
 export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: ProposeNightIn[]; allowDuplicates: boolean }): Promise<ProposeResponse> {
   const trace: TraceStep[] = [];
   const scores = await getScores(d, input.market, trace);
   const themes = allOut(d, scores);
+  const discovery = await discover(d, input.market, trace);
+  const city = input.market.label.split(",")[0]!.replace(/ (sample )?club$/, "");
   const nights: PlanNight[] = input.nights.map((n) => ({ ...n, themeId: n.themeId && themes[n.themeId] ? n.themeId : null }));
-  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d) });
+  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows] : [], city });
   trace.push(...res.trace);
 
   const whys = new Map<string, string>();
-  if (res.proposals.length > 0) {
+  const libraryProposals = res.proposals.filter((p) => !p.discovered);
+  if (libraryProposals.length > 0) {
     const label = (id: string): string => d.library.find((t) => t.id === id)?.label ?? id;
-    const facts = res.proposals.map((p) => ({
-      id: p.id, night: `${p.weekday} ${p.date}`, planned: label(p.fromThemeId), plannedFit: p.from.label, plannedZ: abs1(p.from.z),
-      proposed: label(p.toThemeId), proposedFit: p.to.label, proposedZ: abs1(p.to.z), hasSponsor: p.sponsor !== "",
-    }));
+    // Opaque ids: the real ones contain the date, which the model has no business seeing.
+    const facts = libraryProposals.map((p, i) => ({ id: String(i + 1), planned: label(p.fromThemeId), proposed: label(p.toThemeId) }));
     const reply = await runModel(
       d,
-      "You write one or two plain-English sentences explaining a theme-night swap to a minor league promotions director. Use ONLY the facts given: the two theme names, how each compares with the market's own average (plannedFit, proposedFit), and whether a sponsor stays. Do not add anything else about the shows, artists, games or the ballpark. Describe local taste only: people near the ballpark like one theme more or less than the average theme. Never say or imply a theme will raise attendance, ticket sales, sponsor value or revenue. Use no digits at all. Answer with JSON only: an array of {\"id\": string, \"why\": string}.",
+      "For each swap write ONE sentence of at most 20 words saying people near the ballpark like the proposed theme more than the average theme and the planned theme less. Use only the two theme names given. No digits. Never mention sponsors, dates, tickets, sales, attendance or revenue. Reply with JSON only: [{\"id\": string, \"why\": string}].",
       JSON.stringify(facts),
       trace,
       "Writing the reasons for the swaps",
-      900,
+      300,
     );
     const parsed = jsonIn(reply);
     if (Array.isArray(parsed)) {
       for (const item of parsed as Array<{ id?: unknown; why?: unknown }>) {
         if (typeof item?.id !== "string" || typeof item.why !== "string") continue;
-        const f = facts.find((x) => x.id === item.id);
-        const allowed = f ? [f.plannedZ, f.proposedZ].filter((x): x is number => x !== null) : [];
+        const p = libraryProposals[Number(item.id) - 1];
         const text = item.why.trim();
-        if (f && text.length > 0 && text.length <= 420 && numbersAreGrounded(text, allowed) && !claimsOutcome(text)) whys.set(item.id, text);
-        else trace.push(step(iso(d), "model", `Dropped the model's reason for ${item.id}: it broke the grounding rules, so the template text is used.`));
+        if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text)) {
+          // The code, not the model, says what stays: the date and the sponsor always do.
+          whys.set(p.id, `${/[.!?]$/.test(text) ? text : `${text}.`} ${p.sponsor ? "The date and sponsor stay the same." : "The date stays the same."}`);
+        } else trace.push(step(iso(d), "model", `Dropped the model's reason for swap ${item.id}: it went beyond the taste comparison, so the template text is used.`));
       }
     }
   }
   return {
     proposals: res.proposals.map((p) => ({ ...p, why: whys.get(p.id) ?? p.why, whySource: whys.has(p.id) ? "model" : "template" })),
-    angles: res.angles, unfixed: res.unfixed, trace, caps: await capsOf(d),
+    discovery, angles: res.angles, unfixed: res.unfixed, trace, caps: await capsOf(d),
   };
 }
 
