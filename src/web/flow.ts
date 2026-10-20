@@ -46,7 +46,7 @@ async function analyzeClub(c: SavedClub): Promise<void> {
   try {
     const a = await api.analyze(c.market, c.rows, c.kind ?? "club");
     state.analysis = a;
-    addTrace("Check: match names, rate, flag", a.trace);
+    addTrace("Check: match names, rate, flag weak nights", a.trace);
   } catch (err) {
     ui.error = err instanceof ApiFailure ? err.message : "Something went wrong. Try again.";
   }
@@ -109,7 +109,7 @@ export async function ensureProposals(): Promise<void> {
       ui.dupesBefore = null;
     }
     state.analysis.caps = res.caps;
-    addTrace("Fix: find swaps", res.trace);
+    addTrace("Fix: find swaps for the weak nights", res.trace);
   } catch (err) {
     ui.proposeError = err instanceof ApiFailure ? err.message : "Something went wrong. Try again.";
   }

@@ -49,7 +49,7 @@ const city = (): string => cityOfLabel(state.analysis?.market.label ?? "");
 function logChoice(night: string, theme: string): void {
   const vs = state.analysis!.nights.map(viewOf);
   const n = (f: NightView["fit"]): number => vs.filter((x) => x.fit === f).length;
-  addTrace("Check: your choice", [step(new Date().toISOString(), "note", `You chose ${theme} for "${night}": now ${fitSummary({ in: n("leans-in"), average: n("average"), away: n("leans-away"), notScored: n("not-scored"), classic: n("classic"), found: n("found") })}`)]);
+  addTrace("Check: your pick", [step(new Date().toISOString(), "note", `You chose ${theme} for "${night}": now ${fitSummary({ in: n("leans-in"), average: n("average"), away: n("leans-away"), notScored: n("not-scored"), classic: n("classic"), found: n("found") })}`)]);
 }
 
 /** Sponsor and lock, in words under the card: the card art is too small to carry them. */
@@ -155,6 +155,8 @@ export function checkView(): HTMLElement {
       h("p", { class: "check-line", "data-testid": "summary" }, result),
       asks,
       picked,
+      pendingViews.length > 0 ? h("p", { class: "small pick-hint" }, `${pendingViews.length} ${pendingViews.length === 1 ? `${copy().night} needs` : `${copy().nights} need`} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} ungraded.`) : null,
+      h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
       notices,
     ),
     h(
@@ -164,8 +166,6 @@ export function checkView(): HTMLElement {
       locked.length > 0
         ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, lockedLine(locked.length, copy().night)), `: ${locked.map((v) => v.night.theme).join(", ")}.`))
         : null,
-      h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
-      pendingViews.length > 0 ? h("p", { class: "small" }, `${pendingViews.length} ${pendingViews.length === 1 ? `${copy().night} needs` : `${copy().nights} need`} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} ungraded.`) : null,
       h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Ratings describe taste, not ticket sales. ", h("a", { href: "#/study" }, state.kind === "venue" ? "We tested this on baseball, not concerts." : "See how we tested it")),
     ),
   );
@@ -176,7 +176,7 @@ export function checkView(): HTMLElement {
     bokeh(),
     garland(),
     lamp(),
-    h("div", { class: "wrap deck-in" }, deckL, h("div", { class: "deck-r" }, h("div", { class: "binder", id: "binder" }, grid))),
+    h("div", { class: "wrap deck-in" }, deckL, h("div", { class: "deck-r" }, h("p", { class: "tap-line" }, "Tap any card to see why it got its rating."), h("div", { class: "binder", id: "binder" }, grid))),
   );
 
   function tap(c: HTMLElement): void {
@@ -239,7 +239,8 @@ function loadingView(): HTMLElement {
 
 // ---------- the Why: the card flips to its cardboard back ----------
 
-const rel = (z: number | null): string => (z === null ? "n/a" : `${z >= 0 ? "+" : ""}${z.toFixed(2)}`);
+/** "3.1 normal gaps below other towns": the same number, with its unit and direction in words. */
+const gaps = (z: number | null, ref: string): string => (z === null ? "n/a" : Math.abs(z) < 0.05 ? `level with ${ref}` : `${Math.abs(z).toFixed(1)} normal gaps ${z < 0 ? "below" : "above"} ${ref}`);
 
 function sourceLine(s: ThemeScoreOut): string {
   if (s.source === "synthetic") return `Synthetic test data generated ${formatDateTime(s.fetchedAt)}. Not from Qloo.`;
@@ -346,7 +347,7 @@ function whyInfo(index: number): Child {
     out.push(h("p", { class: "panel-box" }, s.reason ?? "We have no data for this one."));
   } else {
     // The card back and this line say the one plain thing: how the town rates it against its own other themes. The comparison with other towns is under "Show the numbers".
-    out.push(h("div", { class: "panel-box" }, h("p", { style: "font-weight:650", "data-testid": "fit-line" }, comparisonSentence(theme.label, s.label, city(), state.kind))));
+    out.push(h("p", { class: "sr-only", "data-testid": "fit-line" }, comparisonSentence(theme.label, s.label, city(), state.kind)));
   }
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${cleanTitle(e.name)} (${e.type.replace("_", " ")})`)))),
@@ -373,11 +374,11 @@ function whyInfo(index: number): Child {
           h("dt", null, "This theme's score here"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
           h("dt", null, `Average of ${s.ref?.n ?? "n/a"} other towns`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
           h("dt", null, "Normal gap between towns"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
-          h("dt", null, `${city()} vs. other towns`), h("dd", null, rel(s.z)),
-          h("dt", null, `${city()}'s usual`), h("dd", null, rel(s.marketMeanZ)),
-          h("dt", null, `${theme.label} vs. ${city()}'s usual`), h("dd", null, rel(s.index)),
+          h("dt", null, `${city()} vs. other towns`), h("dd", null, gaps(s.z, "other towns")),
+          h("dt", null, `${city()}'s usual`), h("dd", null, gaps(s.marketMeanZ, "other towns")),
+          h("dt", null, `${theme.label} vs. ${city()}'s usual`), h("dd", null, gaps(s.index, `${city()}'s usual`)),
         ),
-        h("p", { class: "small" }, "Weak below \u22120.5 \u00b7 Strong above +0.5"),
+        h("p", { class: "small" }, `Weak fit: at least 0.5 normal gaps below ${city()}'s usual. Strong fit: at least 0.5 above it.`),
         h("p", { class: "small" }, `${city()}'s usual is the average over the themes Qloo had data for here.`),
         a.reference.synthetic ? h("p", { class: "small" }, "The typical-town numbers are a synthetic placeholder until the comparison set is pulled.") : null,
       ),

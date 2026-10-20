@@ -100,7 +100,7 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
       await expect(page.getByTestId("approve")).toBeInViewport({ ratio: 1 });
       await page.waitForTimeout(1200); // the page scrolls the actions into view; measure once it has settled
       const bar = (await page.locator(".acts").boundingBox())!;
-      const idx = (await page.locator(".idx").boundingBox())!;
+      const idx = (await page.getByTestId("swap-line").boundingBox())!;
       expect(bar.y < idx.y + idx.height && idx.y < bar.y + bar.height && bar.x < idx.x + idx.width && idx.x < bar.x + bar.width, "the Approve bar covers the fit meter").toBe(false);
     }
     await noSideScroll(page);

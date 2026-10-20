@@ -1,5 +1,5 @@
 import type { GeoHit } from "../../app/api-types";
-import { CSV_HEADER, CSV_TEMPLATE, csvField, parseCalendar, type CalendarRow } from "../../app/calendar/csv";
+import { CSV_HEADER, CSV_TEMPLATE, csvField, parseCalendar, parseDate, parseLocked, splitRecords } from "../../app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../app/markets";
 import { exampleCsv, sampleCsv } from "../../app/samples";
 import { api, ApiFailure } from "../api";
@@ -59,7 +59,7 @@ function teaseSection(): HTMLElement {
   const cards = demoCards();
   const beats = [
     { n: "1", name: "Check", text: "See which nights fit your town. Each card shows its rating in words.", art: h("div", { class: "fan3", "aria-hidden": "true" }, cards) },
-    { n: "2", name: "Fix", text: "Approve or reject swaps for the weak nights.", art: h("div", { class: "pack-art", "aria-hidden": "true" }, packEl("div", "", "swaps · sealed")) },
+    { n: "2", name: "Fix", text: "Approve or reject swaps for the weak nights.", art: h("div", { class: "pack-art", "aria-hidden": "true" }, packEl("div", "", "2 swaps · sealed")) },
     { n: "3", name: "Send", text: "Export the new calendar and a one-page memo.", art: h("div", { class: "memo-art", "aria-hidden": "true" }, memoArt()) },
   ];
   const section = h(
@@ -135,7 +135,7 @@ function ticketFor(m: (typeof SAMPLE_MARKETS)[number]): HTMLElement {
     h(
       "span",
       { class: "tk-main" },
-      h("b", null, `${m.region} \u00b7 ${count} ${venue ? "dates" : "nights"} \u00b7 Open`),
+      h("b", null, `${m.region} \u00b7 ${count} ${venue ? "dates" : "nights"}`),
       venue ? h("span", null, "A made-up summer concert calendar for a sample amphitheatre. It is not a real venue.") : null,
       h("span", { class: "tk-go" }, venue ? "Open this venue" : "Open this club", icon("arrowRight")),
     ),
@@ -161,8 +161,8 @@ export function pickView(): HTMLElement {
 }
 
 /** A new row starts a week after the last one, so it is a valid date from the first moment. */
-function nextWeek(rows: CalendarRow[]): string {
-  const last = rows.map((r) => r.date).sort().pop();
+function nextWeek(rows: Array<{ date: string }>): string {
+  const last = rows.map((r) => parseDate(r.date) ?? "").sort().pop();
   const d = last ? new Date(`${last}T12:00:00Z`) : new Date();
   d.setUTCDate(d.getUTCDate() + 7);
   return d.toISOString().slice(0, 10);
@@ -183,38 +183,58 @@ export function ownView(): HTMLElement {
   const check = h("div", { class: "rowcheck", "data-testid": "rowcheck", "aria-live": "polite" });
   const table = h("div", { class: "rowtable", "data-testid": "rowtable" });
 
-  /** Rows as the editor shows them, written back into the paste box (lines that failed are kept as typed, at the end). */
-  function writeRows(rows: CalendarRow[], badLines: string[]): void {
-    const lines = rows.map((r) => [r.date, r.theme, r.sponsor, r.locked ? "yes" : "no", r.notes].map(csvField).join(","));
-    paste.value = [CSV_HEADER, ...lines, ...badLines].join("\n") + "\n";
-    refresh();
+  interface EdRow { date: string; theme: string; sponsor: string; locked: boolean; notes: string }
+  let model: EdRow[] = [];
+  const rowText = (r: EdRow): string => [r.date, r.theme, r.sponsor, r.locked ? "yes" : "no", r.notes].map(csvField).join(",");
+  /** What is wrong with one row, in plain words, or null when it is fine. */
+  function rowProblem(r: EdRow): string | null {
+    if (parseDate(r.date) === null) return "Not a date. Use 2027-04-10.";
+    if (r.theme.trim() === "") return "Needs a theme name.";
+    return parseCalendar(`${CSV_HEADER}\n${rowText(r)}`).errors[0]?.message ?? null;
   }
-  /** Checks the pasted rows on this screen, before anything runs, and draws the table. */
-  function refresh(): void {
-    const text = paste.value;
-    if (text.trim() === "") { check.replaceChildren(); table.replaceChildren(); return; }
-    const { rows, errors: bad } = parseCalendar(text);
-    const raw = text.split(/\r?\n/);
-    const badRaw = bad.map((e) => raw[e.line - 1] ?? "").filter((x) => x.trim() !== "");
-    check.replaceChildren(
-      h("p", { class: bad.length ? "rc-warn" : "rc-ok" }, `${rows.length} ${rows.length === 1 ? "night" : "nights"} ready.${bad.length ? ` ${bad.length} ${bad.length === 1 ? "needs" : "need"} a fix:` : ""}`),
-      ...(bad.length ? [h("ul", { class: "rc-bad" }, bad.map((e) => h("li", null, h("b", null, `Line ${e.line}`), ` ${e.message}`, h("code", null, raw[e.line - 1] ?? ""))))] : []),
-    );
-    const cell = (r: CalendarRow, key: "date" | "theme" | "sponsor", label: string): HTMLElement =>
-      h("input", { type: "text", value: r[key], "aria-label": `${label}, row ${r.line}`, onchange: (e: Event) => { r[key] = (e.target as HTMLInputElement).value; writeRows(rows, badRaw); } });
+  /** The pasted text as rows. A row with a bad date is kept, so it can be fixed in place. */
+  function parseModel(text: string): EdRow[] {
+    const recs = splitRecords(text.trim().startsWith("date") ? text : `${CSV_HEADER}\n${text}`, text.includes("\t") && !text.includes(",") ? "\t" : text.includes(";") && !text.includes(",") ? ";" : ",");
+    const head = (recs[0] ?? []).map((x) => x.trim().toLowerCase());
+    const at = (rec: string[], name: string, alt = ""): string => (rec[head.indexOf(name) >= 0 ? head.indexOf(name) : head.indexOf(alt)] ?? "").trim();
+    return recs.slice(1).filter((rec) => rec.some((x) => x.trim() !== "")).map((rec) => ({ date: at(rec, "date"), theme: at(rec, "theme", "act"), sponsor: at(rec, "sponsor"), locked: parseLocked(at(rec, "locked")) === true, notes: at(rec, "notes") }));
+  }
+  const writeBack = (): void => { paste.value = [CSV_HEADER, ...model.map(rowText)].join("\n") + "\n"; };
+  function summary(): void {
+    const bad = model.filter((r) => rowProblem(r) !== null).length;
+    const ok = model.length - bad;
+    check.replaceChildren(h("p", { class: bad ? "rc-warn" : "rc-ok" }, `${ok} ${ok === 1 ? "night" : "nights"} ready.${bad ? ` ${bad} ${bad === 1 ? "needs" : "need"} a fix (marked below).` : ""}`));
+  }
+  /** Draws the table. Only called when rows come or go; editing a cell never redraws it, so focus and typing are kept. */
+  function drawTable(): void {
+    const cell = (r: EdRow, key: "date" | "theme" | "sponsor", label: string, msg: HTMLElement): HTMLElement =>
+      h("input", { type: "text", value: r[key], "aria-label": `${label}, row ${model.indexOf(r) + 1}`, oninput: (e: Event) => { r[key] = (e.target as HTMLInputElement).value; writeBack(); summary(); showProblem(r, msg); } });
+    const showProblem = (r: EdRow, msg: HTMLElement): void => { const pr = rowProblem(r); msg.textContent = pr ?? ""; msg.hidden = pr === null; };
     table.replaceChildren(
       h("table", { class: "rows-ed" },
         h("thead", null, h("tr", null, ["Date", "Theme", "Sponsor", "Locked", ""].map((t) => h("th", null, t)))),
-        h("tbody", null, rows.map((r) => h("tr", null,
-          h("td", { "data-label": "Date" }, cell(r, "date", "Date")),
-          h("td", { "data-label": "Theme" }, cell(r, "theme", "Theme")),
-          h("td", { "data-label": "Sponsor" }, cell(r, "sponsor", "Sponsor")),
-          h("td", { "data-label": "Locked" }, h("input", { type: "checkbox", checked: r.locked, "aria-label": `Locked, row ${r.line}`, onchange: (e: Event) => { r.locked = (e.target as HTMLInputElement).checked; writeRows(rows, badRaw); } })),
-          h("td", null, h("button", { type: "button", class: "btn ghost sm dark", "aria-label": `Delete row ${r.line}`, onclick: () => writeRows(rows.filter((x) => x !== r), badRaw) }, "Delete")),
-        ))),
+        h("tbody", null, model.map((r) => {
+          const msg = h("div", { class: "rc-inline", role: "alert", hidden: "" });
+          const tr = h("tr", null,
+            h("td", { "data-label": "Date" }, cell(r, "date", "Date", msg), msg),
+            h("td", { "data-label": "Theme" }, cell(r, "theme", "Theme", msg)),
+            h("td", { "data-label": "Sponsor" }, cell(r, "sponsor", "Sponsor", msg)),
+            h("td", { "data-label": "Locked" }, h("input", { type: "checkbox", checked: r.locked, "aria-label": `Locked, row ${model.indexOf(r) + 1}`, onchange: (e: Event) => { r.locked = (e.target as HTMLInputElement).checked; writeBack(); } })),
+            h("td", null, h("button", { type: "button", class: "btn ghost sm dark", "aria-label": `Delete row ${model.indexOf(r) + 1}`, onclick: () => { model = model.filter((x) => x !== r); writeBack(); summary(); drawTable(); } }, "Delete")),
+          );
+          showProblem(r, msg);
+          return tr;
+        })),
       ),
-      h("button", { type: "button", class: "btn ghost sm dark", "data-testid": "add-row", onclick: () => writeRows([...rows, { line: 0, date: nextWeek(rows), theme: "New night", sponsor: "", locked: false, notes: "" }], badRaw) }, "Add row"),
+      h("button", { type: "button", class: "btn ghost sm dark", "data-testid": "add-row", onclick: () => { model = [...model, { date: nextWeek(model), theme: "New night", sponsor: "", locked: false, notes: "" }]; writeBack(); summary(); drawTable(); } }, "Add row"),
     );
+  }
+  /** Reads the paste box again (it was typed in, uploaded or filled) and redraws. */
+  function refresh(): void {
+    if (paste.value.trim() === "") { model = []; check.replaceChildren(); table.replaceChildren(); return; }
+    model = parseModel(paste.value);
+    summary();
+    drawTable();
   }
   paste.addEventListener("input", refresh);
   const go = h("button", { type: "button", class: "btn pri", "data-testid": "check-mine" }, "Check my calendar", icon("arrowRight"));

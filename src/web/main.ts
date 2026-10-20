@@ -46,7 +46,7 @@ function topbar(route: string): HTMLElement {
     h(
       "div",
       { class: "nav-r" },
-      state.market ? h("a", { class: "club", href: "#/sample", "data-testid": "change-club", "aria-label": `${shortLabel(state.market.label)}. Change club` }, h("i"), shortLabel(state.market.label), h("span", { class: "club-change" }, "Change club")) : null,
+      state.market ? h("a", { class: "club", href: "#/sample", "data-testid": "change-club", "aria-label": `${shortLabel(state.market.label)}. Change ${state.kind === "venue" ? "venue" : "club"}` }, h("i"), shortLabel(state.market.label), h("span", { class: "club-change" }, state.kind === "venue" ? "Change venue" : "Change club"), h("span", { class: "club-compact" }, "Change")) : null,
       h("a", { class: "study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
     ),
   );
@@ -99,6 +99,7 @@ function render(): void {
   teardown();
   routeState.entering = changed;
   if (route !== "/sample") ui.pickNote = false;
+  document.body.classList.toggle("has-club", state.market !== null);
   clear(app);
   const main = h("main", { id: "main", tabindex: "-1" });
   main.append(view(route));

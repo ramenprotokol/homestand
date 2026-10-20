@@ -470,7 +470,7 @@ describe("propose", () => {
       expect(x.to).toEqual({ label: "found", z: null, score: null });
       expect(x.date).toBe(loud.date);
       expect(x.sponsor).toBe("Sunrise Dental");
-      expect(x.why).toBe(`People in Akron like ${x.discovered!.name} more than people in most towns do.`);
+      expect(x.why).toBe(`People in Akron like ${x.discovered!.name} more than people in most towns do. The date and the sponsor stay the same.`);
       expect(loud.p.unfixed.find((q) => q.index === loud.index)).toBeUndefined();
     });
   });

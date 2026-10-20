@@ -115,7 +115,7 @@ ${d.stillWeak?.length ? `<h2>Still weak, no ${venue ? "offer" : "swap"}</h2><p>$
 ${venue ? acts : ideas}
 ${d.angles.length ? `<h2>${venue ? "Locked headliners: an opener idea" : "Locked nights: an idea for the sponsor"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
-<p>Strong, average and weak compare each theme with this ${C.place}'s other themes. They describe taste, not ticket sales.</p>
+<p>Strong, average and weak compare each ${venue ? "act" : "theme"} with this ${C.place}'s other ${venue ? "acts" : "themes"}. They describe taste, not ticket sales.</p>
 <p>${d.nights} ${C.nights} were reviewed; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : "(fireworks, giveaways, heritage nights and similar)"} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded. Taste data comes from Qloo. Every ${venue ? "offer" : "swap"} keeps its date and sponsor.</p>
 </article>`;
 }
@@ -123,5 +123,5 @@ ${d.angles.length ? `<h2>${venue ? "Locked headliners: an opener idea" : "Locked
 export const MEMO_CSS = `body{font:15px/1.5 Geist,system-ui,sans-serif;color:#14233c;max-width:760px;margin:2rem auto;padding:0 1rem}h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:1.6rem}table{border-collapse:collapse;width:100%;font-size:.9rem}.memo-scroll{overflow-x:auto}th,td{border:1px solid #9aa4b2;padding:.35rem .5rem;text-align:left}.meta{color:#4a5568}.warn{border:2px solid #b3360b;padding:.5rem;font-weight:600}@media (max-width:640px){body{font-size:16px}.memo-scroll{overflow:visible}table,thead,tbody,tr,th,td{display:block}thead{position:absolute;left:-9999px}tr{border:1px solid #9aa4b2;margin:0 0 .6rem;padding:.3rem .2rem}td{border:0;padding:.15rem .4rem}td::before{content:attr(data-label) ": ";font-weight:700}}`;
 
 export function memoDocument(d: MemoData): string {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${copyFor(d.kind).memoTitle}: ${escapeHtml(d.club)}</title><style>${MEMO_CSS}</style></head><body>${buildMemoHtml(d)}</body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${copyFor(d.kind).memoTitle}: ${escapeHtml(d.club)}</title><style>${MEMO_CSS}</style></head><body>${buildMemoHtml(d)}</body></html>`;
 }

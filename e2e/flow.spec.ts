@@ -142,17 +142,17 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   if ((page.viewportSize()?.width ?? 0) >= 900) {
     await expect(page.getByTestId("now-card")).toBeInViewport({ ratio: 1 });
     await expect(page.locator(".swap-why")).toBeInViewport({ ratio: 1 });
-    await expect(page.locator(".idx")).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId("swap-line")).toBeInViewport({ ratio: 1 });
     const bar = (await page.locator(".acts").boundingBox())!;
-    const idx = (await page.locator(".idx").boundingBox())!;
+    const idx = (await page.getByTestId("swap-line").boundingBox())!;
     expect(overlap(bar, idx), "the Approve bar covers the fit meter").toBe(false);
   }
   await noSideScroll(page);
   // The cited comparison replaces the repeated sentence; the why is not said twice.
   await expect(card.getByTestId("swap-line")).toContainText(/: (Strong|Average|Weak) fit.*: (Strong|Average|Weak) fit|: Local favorite/s);
   await expect(card).not.toContainText(/leans toward|lean toward|market/i);
-  await expect(page.locator(".idx")).toContainText(/(Strong|Average|Weak) fit \u2192 (Strong fit|Average fit|Local favorite)/);
-  await expect(page.locator(".idx")).not.toContainText(/\d\.\d/);
+  await expect(page.getByTestId("swap-line")).toContainText(/(Strong|Average|Weak) fit.*(Strong fit|Average fit|Local favorite)/s);
+  await expect(page.getByTestId("swap-line")).not.toContainText(/\d\.\d/);
   await expect(card).not.toContainText(/\d\.\d/); // no raw index in the swap text
   if ((await page.getByTestId("angle").count()) > 0) {
     const angle = await page.getByTestId("angle").first().innerText();
@@ -254,7 +254,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("verdict")).toHaveCount(0);
   await shot(page, info, "09-study-call");
   await page.getByTestId("call-yes").click();
-  await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
+  await expect(page.getByTestId("verdict")).toContainText("COIN FLIP");
   await expect(page.getByTestId("stamp-plain")).toHaveText(/^Local taste did not pick the bigger crowd: \d+ times in 100, about a coin flip\.$/);
   // The user's own call is answered once, in one line.
   await expect(page.getByTestId("you-said")).toHaveText("You said Yes. The data didn't back that up.");
@@ -349,7 +349,7 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   await expect(now.locator(".fitword")).toHaveText("Local favorite");
   await expect(page.locator(".swap-why")).toHaveText("Qloo ranks Moonpie Pirates (made up) among the top family movies for fans near Akron.");
   await expect(page.locator("#steps")).toContainText("Local favorite");
-  await expect(page.locator(".idx")).toContainText("Local favorite");
+  await expect(page.getByTestId("swap-line")).toContainText("Local favorite");
   await page.getByTestId("approve").click();
   await expect(page.locator(".decision")).toContainText("Approved: Moonpie Pirates (made up) now holds");
   await page.getByTestId("to-send").click();

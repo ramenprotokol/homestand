@@ -93,6 +93,7 @@ function chart(r: PublishedResults): SVGSVGElement {
   return svg;
 }
 
+const STAMP_WORD = { CONFIRMED: "CONFIRMED", "CALL STANDS": "COIN FLIP", OVERTURNED: "OVERTURNED" } as const;
 const REVIEW_MS = { dots: 1900, notes: 1300, meter: 1800, verdict: 3500 };
 
 /** Dot piles: one dot per pair of theme nights, drawn in two piles. Positions are illustrative; the counts are the study's. */
@@ -131,7 +132,7 @@ export function studyView(): HTMLElement {
   const intro = h(
     "div",
     { class: "scene-head" },
-    h("div", { class: "eyebrow" }, "The Study"),
+    h("div", { class: "eyebrow" }, "We tested it"),
     h("h1", { class: "h2", tabindex: "-1" }, "The Study ", h("em", null, "does local taste sell tickets?")),
     h("p", { class: "lede wide" }, "Ratings say what a town likes. They do not say a theme will raise attendance. So we tested it on real 2025 theme nights, with the method and the bar we set written down before we looked at any result."),
   );
@@ -219,7 +220,7 @@ export function studyView(): HTMLElement {
       "div",
       { class: "verdict", "data-testid": "verdict" },
       h("span", { class: "small" }, "The result:"),
-      h("div", { class: "stampv" }, r.h1.verdict),
+      h("div", { class: "stampv" }, STAMP_WORD[r.h1.verdict]),
       h("p", { class: "stamp-plain", "data-testid": "stamp-plain" }, stampPlain(r.h1.verdict, acc.estimate)),
       h("p", { class: "v1" }, VERDICT_WORDS[r.h1.verdict]),
       h("p", { class: "echo", "data-testid": "you-said" }, personalLine(c, r.h1.verdict)),

@@ -212,9 +212,9 @@ describe("proposals", () => {
     expect(res.proposals).toHaveLength(2);
     const [a, b] = res.proposals;
     expect(a).toMatchObject({ fromThemeId: "bluey", toThemeId: "qloo:m1", sponsor: "Sunrise Dental", date: "2026-04-11", to: { label: "found", z: null, score: null }, discovered: { name: "Kite Club" } });
-    expect(a!.why).toBe("People in Tulsa like Kite Club more than people in most towns do.");
+    expect(a!.why).toBe("People in Tulsa like Kite Club more than people in most towns do. The date and the sponsor stay the same.");
     expect(b!.toThemeId).toBe("qloo:s1");
-    expect(b!.why).toBe("People in Tulsa like Puddle Patrol more than people in most towns do.");
+    expect(b!.why).toBe("People in Tulsa like Puddle Patrol more than people in most towns do. The date stays the same.");
     // Not offered to an adult night, and nothing is left to repeat.
     const adult = propose({ ...base, fits: { ...f2, elvis: fit("leans-away", -2), "grateful-dead": fit("average", 0), yellowstone: fit("average", 0), "taylor-swift": fit("average", 0) }, discovered, nights: [night(0, "2026-04-24", "elvis")] });
     expect(adult.proposals).toEqual([]);
@@ -289,7 +289,7 @@ describe("proposals", () => {
       const weak = { name: "Odd Title", entityId: "m8", type: "movie" as const, affinity: 0.8, z: -0.6, popularity: 0.98 };
       const ok = propose({ ...base, fits: f, discovered: [weak, typical], city: "Biloxi", nights: [night(0, "2027-04-10", "bluey", day)] });
       expect(ok.proposals[0]).toMatchObject({ kind: "best-option", discovered: { name: "Big Studio Movie" } });
-      expect(ok.proposals[0]!.why).toBe("Nothing on our list is a strong fit for this night in Biloxi, so Big Studio Movie is offered: a well-known family title that holds up there.");
+      expect(ok.proposals[0]!.why).toBe("Nothing on our list is a strong fit for this night in Biloxi, so Big Studio Movie is offered: a well-known family title that holds up there. The date and the sponsor stay the same.");
       const none = propose({ ...base, fits: f, discovered: [weak], nights: [night(0, "2027-04-10", "bluey", day)] });
       expect(none.proposals).toEqual([]);
       const mild = propose({ ...base, fits: { ...f, bluey: fit("leans-away", -0.7) }, discovered: [typical], nights: [night(0, "2027-04-10", "bluey", day)] });

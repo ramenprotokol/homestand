@@ -15,9 +15,9 @@ test("bad routes say so, and Fix or Send with no club go to the picker", async (
 test("Use your own checks the rows on the same screen and edits them in a table", async ({ page }) => {
   await page.goto("/#/own");
   await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\n2026-04-11,Bluey Day,Prairie Bank,no,\nsoon,Star Wars Night,,no,\n2026-04-18,Fireworks Friday,,no,\n");
-  await expect(page.getByTestId("rowcheck")).toContainText("2 nights ready. 1 needs a fix:");
-  await expect(page.getByTestId("rowcheck")).toContainText("Line 3");
-  expect(await page.locator(".rows-ed tbody tr").count()).toBe(2);
+  await expect(page.getByTestId("rowcheck")).toContainText("2 nights ready. 1 needs a fix");
+  await expect(page.locator(".rc-inline:not([hidden])")).toHaveText("Not a date. Use 2027-04-10.");
+  expect(await page.locator(".rows-ed tbody tr").count()).toBe(3);
   await page.getByTestId("add-row").click();
   await expect(page.getByTestId("rowcheck")).toContainText("3 nights ready.");
   await page.getByRole("button", { name: /Delete row/ }).first().click();
@@ -25,6 +25,22 @@ test("Use your own checks the rows on the same screen and edits them in a table"
   await page.getByLabel("1. Your home city").fill("Tusla");
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page.getByText(/No city called "Tusla"\. Check the spelling, for example "Tulsa, OK"\./)).toBeVisible();
+});
+
+test("editing three cells in a row keeps all three", async ({ page }) => {
+  await page.goto("/#/own");
+  await page.getByTestId("load-example").click();
+  const date = page.getByLabel("Date, row 1", { exact: true });
+  await date.fill("2027-04-12");
+  await page.getByLabel("Theme, row 1", { exact: true }).fill("");
+  await page.getByLabel("Theme, row 1", { exact: true }).pressSequentially("Acme Night");
+  await page.getByLabel("Sponsor, row 1", { exact: true }).click();
+  await page.getByLabel("Sponsor, row 1", { exact: true }).fill("");
+  await page.keyboard.type("Acme Corp");
+  await expect(date).toHaveValue("2027-04-12");
+  await expect(page.getByLabel("Theme, row 1", { exact: true })).toHaveValue("Acme Night");
+  await expect(page.getByLabel("Sponsor, row 1", { exact: true })).toHaveValue("Acme Corp");
+  await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/2027-04-12,Acme Night,Acme Corp,no/);
 });
 
 test("a pick stays as one line with a way back, the CSV has a fit column, and the memo lists what was left", async ({ page }) => {

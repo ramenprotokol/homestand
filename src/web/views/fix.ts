@@ -125,9 +125,9 @@ export function fixView(): HTMLElement {
       { class: "wrap" },
       h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `the weak ${copy().nights}`)), h("p", { class: "lede" }, lead))),
       synth,
-      state.kind === "venue" ? actsPanel(p.acts, a.market.label) : ideasPanel(p.discovery, a.market.label),
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
+      state.kind === "venue" ? actsPanel(p.acts, a.market.label) : ideasPanel(p.discovery, a.market.label),
       settings,
       shownAngles().length > 0 ? anglesSection() : null,
       p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
@@ -300,7 +300,7 @@ class FixStage {
   }
 
   private get steps(): HTMLElement {
-    return this.agent.querySelector<HTMLElement>("#steps")!;
+    return this.agent.querySelector<HTMLElement>("#steps") ?? document.createElement("div");
   }
 
   // ----- the pack -----
@@ -309,8 +309,8 @@ class FixStage {
     const n = this.swaps.length;
     const wrap = h("div", { class: "pack-wrap", id: "packWrap" });
     const pack = packEl("button", `Open the pack: ${n} ${state.kind === "venue" ? "offer" : "swap"}${n === 1 ? "" : "s"}`, `${n} new card${n === 1 ? "" : "s"} · sealed`, copy().season === "season" ? undefined : "Summer offers", state.kind === "venue");
-    const hint = h("p", { class: "pack-hint" }, `Homestand has ${n} ${state.kind === "venue" ? "offer" : "swap"}${n === 1 ? "" : "s"} ready. Tap the pack to tear it open.`);
-    const skip = h("button", { type: "button", class: "btn ghost sm", "data-testid": "skip-pack", onclick: () => this.open(false) }, "Skip the tearing");
+    const hint = h("p", { class: "pack-hint" }, `${n} ${state.kind === "venue" ? "offer" : "swap"}${n === 1 ? "" : "s"} ready. Tap the pack to see ${n === 1 ? "it" : "them"}.`);
+    const skip = h("button", { type: "button", class: "btn ghost sm", "data-testid": "skip-pack", onclick: () => this.open(false) }, (state.kind === "venue" ? "Just show me the offers" : "Just show me the swaps"));
     wrap.append(pack, hint, skip);
     pack.addEventListener("click", () => this.open(true));
     this.root.replaceChildren(wrap);
@@ -455,7 +455,7 @@ class FixStage {
       s.el.style.pointerEvents = a > 1 ? "none" : "auto";
       s.el.setAttribute("aria-hidden", a === 0 ? "false" : "true");
     });
-    this.dashes.querySelectorAll<HTMLElement>(".dash").forEach((d, j) => {
+    this.dashes?.querySelectorAll<HTMLElement>(".dash").forEach((d, j) => {
       d.classList.toggle("on", j === stage.cur);
       d.classList.toggle("done", !!state.decisions[this.slides[j]!.top.id]);
       d.setAttribute("aria-current", j === stage.cur ? "true" : "false");
@@ -520,7 +520,7 @@ class FixStage {
         "div",
         { class: "meta" },
         h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDate(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Date and sponsor stay")),
-        h("div", { class: "idx" }, h("span", { class: "k" }, "Fit"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, !d ? `${fromRating} \u2192 ${toRating(p)}` : found && d === "approved" ? toRating(p) : ratingWord(shown)), sub ? h("div", { class: "pp" }, sub) : null),
+        d ? h("div", { class: "idx" }, h("span", { class: "k" }, "Fit"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, !d ? `${fromRating} \u2192 ${toRating(p)}` : found && d === "approved" ? toRating(p) : ratingWord(shown)), sub ? h("div", { class: "pp" }, sub) : null) : null,
       ),
       h(
         "div",

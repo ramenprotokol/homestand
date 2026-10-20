@@ -95,7 +95,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(page.getByTestId("verdict")).toHaveCount(0);
   await shot(page, info, "study-call");
   await page.getByTestId("call-not-sure").click();
-  await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
+  await expect(page.getByTestId("verdict")).toContainText("COIN FLIP");
   await expect(page.getByTestId("stamp-plain")).toContainText("Local taste did not pick the bigger crowd: 49 times in 100, about a coin flip.");
   await expect(page.getByTestId("h1-text")).toContainText("49.1%");
   await expect(page.getByTestId("h1-text")).toContainText("521 pairs");
@@ -211,7 +211,7 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await snap("3-fix-pack");
   await skip.click();
   await page.waitForTimeout(1500);
-  console.log("boxes", JSON.stringify([await page.locator(".acts").boundingBox(), await page.locator(".idx").boundingBox(), await page.locator(".now-card").boundingBox(), page.viewportSize()]));
+  console.log("boxes", JSON.stringify([await page.locator(".acts").boundingBox(), await page.getByTestId("swap-line").boundingBox(), await page.locator(".now-card").boundingBox(), page.viewportSize()]));
   await page.screenshot({ path: `${dir}/${info.project.name}-venue-3b-viewport.png` });
   expect(await page.locator(".slide").count()).toBeGreaterThanOrEqual(1);
   expect(await page.getByTestId("angle").count()).toBe(5);
@@ -222,7 +222,7 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await expect(page.getByTestId("disc-badge").first()).toBeVisible(); // at least one swap is an act Qloo found
   if ((page.viewportSize()?.width ?? 0) >= 900) {
     const bar = (await page.locator(".acts").boundingBox())!;
-    const idx = (await page.locator(".idx").boundingBox())!;
+    const idx = (await page.getByTestId("swap-line").boundingBox())!;
     expect(bar.y < idx.y + idx.height && idx.y < bar.y + bar.height && bar.x < idx.x + idx.width && idx.x < bar.x + bar.width, "the Approve bar covers the local-pull meter").toBe(false);
   }
   await noSideScroll(page);

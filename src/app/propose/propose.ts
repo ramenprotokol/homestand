@@ -262,8 +262,8 @@ export function noSwapLine(c: { strong: number; used: number; wrong: number }, c
   if (c.strong === 0) return `No swap: none of our ${venue ? "acts" : "themes"} is a strong fit in ${city} right now.`;
   const parts = [c.used > 0 ? `already on your calendar (${c.used})` : "", c.wrong > 0 ? `wrong for this ${venue ? "date" : "night"} (${c.wrong})` : ""].filter(Boolean);
   const other = c.strong - c.used - c.wrong;
-  if (other > 0) parts.push(`given to another swap (${other})`);
-  return `No swap: ${city}'s ${c.strong} strong ${c.strong === 1 ? "theme is" : "themes are"} ${parts.length ? parts.join(" or ") : "not available here"}.`;
+  if (other > 0) parts.push(`given to another ${venue ? "offer" : "swap"} (${other})`);
+  return `No swap: ${city}'s ${c.strong} strong ${venue ? (c.strong === 1 ? "act is" : "acts are") : c.strong === 1 ? "theme is" : "themes are"} ${parts.length ? parts.join(" or ") : "not available here"}.`;
 }
 
 const REJECT_WORDS: Record<RejectReason, string> = { duplicate: "already used in the season", window: "outside its date window", audience: "wrong audience for this night", "same-theme": "the planned theme" };
@@ -418,7 +418,7 @@ export function propose(input: ProposeInput): ProposeResult {
           "Not used anywhere else in the season.",
           night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
         ],
-        why: `People in ${city} like ${found.name} more than people in most towns do.`,
+        why: `People in ${city} like ${found.name} more than people in most towns do. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
         discovered: found,
       });
       continue;
@@ -456,7 +456,7 @@ export function propose(input: ProposeInput): ProposeResult {
         proposals.push({
           ...common, toThemeId: discoveredId(found), to: { label: "found", z: null, score: null }, discovered: found,
           checks: checks.map((c) => (c.startsWith("Same audience") ? "A well-known family title, so it suits a kids or family night." : c)),
-          why: `Nothing on our list is a strong fit for this night in ${city}, so ${found.name} is offered: a well-known family title that holds up there.`,
+          why: `Nothing on our list is a strong fit for this night in ${city}, so ${found.name} is offered: a well-known family title that holds up there. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
         });
         continue;
       }
