@@ -56,7 +56,7 @@ function memoData(): MemoData {
   return {
     stillWeak, rejected,
     ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : {}), club: a.market.label, city: cityOfLabel(a.market.label), generatedOn: localDay(), swaps,
-    angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : clubAngleParts(x, cityOfLabel(a.market.label)).filter(Boolean).join(" ")), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
+    angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : (([h1, b1, e1]) => [`${h1}.`, b1, e1].filter(Boolean).join(" "))(clubAngleParts(x, cityOfLabel(a.market.label)))), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
     ...(state.kind === "venue" ? { acts: actsOf(a.market.label) } : {}),
     synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedLabel: a.recordedAt ? formatDateTime(a.recordedAt) : null,

@@ -517,9 +517,18 @@ body.why-open .nav{visibility:hidden}
 .rows-ed input[type=checkbox]{width:20px;height:20px}
 @media (max-width:640px){
   .rows-ed thead{position:absolute;left:-9999px}
-  .rows-ed,.rows-ed tbody,.rows-ed tr,.rows-ed td{display:block}
-  .rows-ed tr{border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:6px;margin-bottom:8px}
-  .rows-ed td::before{content:attr(data-label);display:block;font-size:12px;color:#b4bbe2}
+  .rows-ed,.rows-ed tbody{display:block}
+  .rows-ed tr{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;border:1px solid rgba(0,0,0,.18);border-radius:10px;padding:8px;margin-bottom:8px}
+  .rows-ed td{display:block;padding:0;min-width:0}
+  .rows-ed td::before{content:attr(data-label);display:block;font-size:12px;color:#5b4f38}
+  .rows-ed td:nth-child(3){grid-column:1/-1}
+  .rows-ed td:nth-child(2){width:auto}
+  .rows-ed td:nth-child(5){align-self:end}
+  .rows-ed input[type=text]{min-width:0}
+  .rowtable{margin-inline:-6px}
+  table.data{font-size:12px}
+  table.data th{letter-spacing:.04em;padding-inline:4px}
+  table.data td{padding-inline:4px}
 }
 /* The sample picker note and the "Pick a club to start" nav line. */
 .pick-note{margin:0 auto 14px;max-width:44ch;text-align:center;font-weight:600}
@@ -553,3 +562,9 @@ body.why-open .nav{visibility:hidden}
 .pick-first{white-space:nowrap}
 @media (max-width:640px){.nav .logo{font-size:22px}.pick-first{flex:1;text-align:center;font-size:12px;letter-spacing:.06em}}
 .ideas{margin-bottom:20px}
+.idx .v--word{font-size:clamp(20px,2.4vw,28px)}
+.narrow .lede{margin:14px 0 20px}
+.rows-ed td:nth-child(2){width:36%}
+.rows-ed input[type=text]{min-width:120px}
+.rows-ed input[type=checkbox]{accent-color:#c9283c;background:#fff}
+.nav .study-link{white-space:nowrap}

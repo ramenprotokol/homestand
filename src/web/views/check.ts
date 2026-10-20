@@ -166,7 +166,7 @@ export function checkView(): HTMLElement {
         : null,
       h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
       pendingViews.length > 0 ? h("p", { class: "small" }, `${pendingViews.length} ${pendingViews.length === 1 ? `${copy().night} needs` : `${copy().nights} need`} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} ungraded.`) : null,
-      h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Ratings describe taste, not ticket sales. ", h("a", { href: "#/study" }, state.kind === "venue" ? "See how we tested it on baseball" : "See how we tested it")),
+      h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Ratings describe taste, not ticket sales. ", h("a", { href: "#/study" }, state.kind === "venue" ? "We tested this on baseball, not concerts." : "See how we tested it")),
     ),
   );
 

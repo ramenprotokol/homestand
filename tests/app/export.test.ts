@@ -125,7 +125,7 @@ describe("memo", () => {
     expect(exportIcs(rows, "Tulsa, OK", "2026-10-18T00:00:00.000Z")).toContain("DC League of Super-Pets");
   });
   it("says so when nothing was approved", () => {
-    expect(buildMemoHtml({ ...data, swaps: [], synthetic: false })).toContain("No swaps were approved");
+    expect(buildMemoHtml({ ...data, swaps: [], synthetic: false })).toContain("The calendar is unchanged");
   });
   it("makes a standalone printable document", () => {
     expect(memoDocument(data).startsWith("<!doctype html>")).toBe(true);

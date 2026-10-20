@@ -109,9 +109,9 @@ ${banner}
 <p>${escapeHtml(memoOpener(d))}</p>
 ${d.swaps.length ? `<h2>Approved ${venue ? "offers" : "swaps"}</h2>
 <div class="memo-scroll"><table><thead><tr><th>${C.night.replace(/^./, (c) => c.toUpperCase())}</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Fit: before \u2192 after</th></tr></thead><tbody>${rows}</tbody></table></div>
-<h2>Why</h2><ul>${whys}</ul>` : `<p>No ${venue ? "offers were" : "swaps were"} approved. The calendar is unchanged.</p>`}
+<h2>Why</h2><ul>${whys}</ul>` : ``}
 ${d.rejected?.length ? `<h2>Rejected</h2><p>${d.rejected.map(escapeHtml).join("; ")}.</p>` : ""}
-${d.stillWeak?.length ? `<h2>Still weak, no swap</h2><p>${d.stillWeak.map(escapeHtml).join("; ")}.</p>` : ""}
+${d.stillWeak?.length ? `<h2>Still weak, no ${venue ? "offer" : "swap"}</h2><p>${d.stillWeak.map(escapeHtml).join("; ")}.</p>` : ""}
 ${venue ? acts : ideas}
 ${d.angles.length ? `<h2>${venue ? "Locked headliners: an opener idea" : "Locked nights: an idea for the sponsor"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>

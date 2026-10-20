@@ -483,9 +483,9 @@ class FixStage {
     const found = p.discovered;
     const city = cityOfLabel(state.analysis!.market.label);
     const fromRating = ratingWord(p.from.z);
-    const cited = [found ? `People in ${city} like ${found.name} more than people in most towns do.` : "", p.whySource === "model" ? "Wording drafted by an AI from the checked facts." : ""].filter(Boolean).join(" ");
+    const cited = [found && !p.why.includes(`People in ${city} like ${found.name} more than people in most towns do.`) ? `People in ${city} like ${found.name} more than people in most towns do.` : "", p.whySource === "model" ? "Wording drafted by an AI from the checked facts." : ""].filter(Boolean).join(" ");
     const shown = d === "approved" ? p.to.z : p.from.z;
-    const sub = d === "approved" ? "Approved." : d === "rejected" ? "Rejected. Kept as planned." : `${fromRating} → ${toRating(p)}`;
+    const sub = d === "approved" ? "Approved." : d === "rejected" ? "Rejected. Kept as planned." : "";
 
     const takenElsewhere = new Set(this.swaps.filter((o) => o.id !== p.id).map((o) => effective(o).toThemeId));
     const pool = [top.toThemeId, ...top.alternates.map((a) => a.toThemeId)].filter((id) => id !== p.toThemeId);
@@ -520,7 +520,7 @@ class FixStage {
         "div",
         { class: "meta" },
         h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDate(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Date and sponsor stay")),
-        h("div", { class: "idx" }, h("span", { class: "k" }, "Fit"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, found && d === "approved" ? toRating(p) : ratingWord(shown)), h("div", { class: "pp" }, sub)),
+        h("div", { class: "idx" }, h("span", { class: "k" }, "Fit"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, !d ? `${fromRating} \u2192 ${toRating(p)}` : found && d === "approved" ? toRating(p) : ratingWord(shown)), sub ? h("div", { class: "pp" }, sub) : null),
       ),
       h(
         "div",
@@ -692,7 +692,7 @@ class FixStage {
     this.qloo(p.fromThemeId, `Taste lookup · the weak ${copy().night}`, quick);
     await wait(520);
     if (!live()) return;
-    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, fitWord("found")), h("div", { class: "m" }, h("b", null, p.discovered.name), ` People in ${cityOfLabel(state.analysis!.market.label)} like it more than people in most towns do. ${state.kind === "venue" ? "No theme of ours that close in genre was a strong fit for this date." : "No theme of ours was a strong fit for this night."} It has no fit rating of its own: it was found, not graded.`))], quick);
+    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, fitWord("found")), h("div", { class: "m" }, h("b", null, p.discovered.name), ` People in ${cityOfLabel(state.analysis!.market.label)} like it more than people in most towns do. ${state.kind === "venue" ? "No act of ours that close in genre was a strong fit for this date." : "No theme of ours was a strong fit for this night."} It has no fit rating of its own: it was found, not graded.`))], quick);
     else this.qloo(p.toThemeId, "Taste lookup · the better fit", quick);
     await wait(520);
     if (!live()) return;

@@ -261,6 +261,8 @@ const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 export function noSwapLine(c: { strong: number; used: number; wrong: number }, city: string, venue: boolean): string {
   if (c.strong === 0) return `No swap: none of our ${venue ? "acts" : "themes"} is a strong fit in ${city} right now.`;
   const parts = [c.used > 0 ? `already on your calendar (${c.used})` : "", c.wrong > 0 ? `wrong for this ${venue ? "date" : "night"} (${c.wrong})` : ""].filter(Boolean);
+  const other = c.strong - c.used - c.wrong;
+  if (other > 0) parts.push(`given to another swap (${other})`);
   return `No swap: ${city}'s ${c.strong} strong ${c.strong === 1 ? "theme is" : "themes are"} ${parts.length ? parts.join(" or ") : "not available here"}.`;
 }
 
