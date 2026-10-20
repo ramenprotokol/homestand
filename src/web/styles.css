@@ -480,3 +480,76 @@ body.why-open .nav{visibility:hidden}
   .ticket{grid-template-columns:118px minmax(0,1fr)!important}
   .ticket::before,.ticket::after{left:calc(118px - 9px)!important}
 }
+
+/* ---- round 10 add-on: panels and states ---- */
+/* Informational text is never under 12px, and the dim blue-greys are lifted for contrast on navy. */
+.tag,.scrollcue,.pk-t3,.pinbar small,.st .k,.ln span,.ms,.cnav,.skip,.foot p+p,.nav .step .n,.tk-k,.trace-kind,.now-k,.tally .t span,.pinbar{font-size:12px!important}
+.ms,.sample,.dnote,.lb-info .src,.foot,.idx .k,.idx .pp{color:#b4bbe2}
+.memo-sheet table,.memo-sheet th,.memo-sheet td{font-size:max(12px,1em)}
+/* Could not fix: the nights are facts, not buttons. */
+.nofix-list{gap:2px 14px}
+.nofix-list li{padding:0;border:0;border-radius:0;background:none;font-size:13.5px}
+.nofix-list li+li::before{content:"";}
+/* Family movies and acts: plain text, not pills. */
+.idea-chips{list-style:none;padding:0;margin:8px 0 0;display:flex;flex-wrap:wrap;gap:2px 16px}
+.idea-chips .idea,.ideas .idea{padding:0;border:0;border-radius:0;background:none;font-size:14px;color:#e6e8f7}
+.idea-chips .idea small{color:#b4bbe2;font-size:12.5px}
+.opener-list{list-style:none;padding:0;margin:10px 0 0;display:grid;gap:8px;font-size:14px;line-height:1.4;color:#e6e8f7}
+.opener-list b{color:#fff}
+/* Check: the pick stays visible as one line. */
+.picked-line{font-size:13.5px;color:#d3d7ee;margin:6px 0}
+.linkbtn{background:none;border:0;padding:0;color:var(--gold2);text-decoration:underline;font:inherit;cursor:pointer;min-height:24px}
+/* Every step: names that matched on their own fold into one line. */
+.trace-fold summary{cursor:pointer;color:var(--gold2)}
+.trace-fold ol{margin-top:6px}
+/* Use your own: rows checked on the same screen, and a table to edit them. */
+.rowcheck{margin-top:12px}
+.rc-ok{color:#9df0e0;font-weight:600}
+.rc-warn{color:#ffd97a;font-weight:600}
+.rc-bad{list-style:none;padding:0;margin:6px 0 0;display:grid;gap:6px;font-size:13px}
+.rc-bad li{padding:6px 10px;border-left:3px solid #e8566a;background:rgba(232,86,106,.12);border-radius:3px}
+.rc-bad code{display:block;margin-top:2px;font:12px/1.4 ui-monospace,Menlo,monospace;color:#ffb3bd;overflow-wrap:anywhere}
+.rowtable{margin-top:12px;overflow-x:auto}
+.rows-ed{width:100%;border-collapse:collapse;font-size:13px}
+.rows-ed th{text-align:left;font-family:var(--cond);letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--gold2);padding:4px 6px}
+.rows-ed td{padding:3px 4px}
+.rows-ed input[type=text]{width:100%;min-width:90px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,.22);background:rgba(8,10,40,.6);color:#fff;font:inherit}
+.rows-ed input[type=checkbox]{width:20px;height:20px}
+@media (max-width:640px){
+  .rows-ed thead{position:absolute;left:-9999px}
+  .rows-ed,.rows-ed tbody,.rows-ed tr,.rows-ed td{display:block}
+  .rows-ed tr{border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:6px;margin-bottom:8px}
+  .rows-ed td::before{content:attr(data-label);display:block;font-size:12px;color:#b4bbe2}
+}
+/* The sample picker note and the "Pick a club to start" nav line. */
+.pick-note{margin:0 auto 14px;max-width:44ch;text-align:center;font-weight:600}
+.pick-first{font-family:var(--cond);letter-spacing:.2em;text-transform:uppercase;font-size:13px;color:var(--gold2);text-decoration:none;margin-inline:auto}
+.steps-off{display:none}
+.nav .club{text-decoration:none}
+.club-change{margin-left:8px;color:var(--gold2);text-decoration:underline;letter-spacing:.1em}
+@media (max-width:1100px){.nav .club{display:none}}
+/* The Study link is quieter than the steps. */
+.nav .study-link{font-family:var(--cond);font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.78);text-decoration:none;padding:10px 6px;min-height:44px;display:inline-flex;align-items:center}
+.nav .study-link:hover,.nav .study-link[aria-current]{color:var(--gold2);text-decoration:underline}
+@media (max-width:640px){
+  .nav{flex-wrap:nowrap;gap:8px;padding-inline:10px}
+  .nav .steps{gap:10px}
+  .nav .study-link{font-size:12px;letter-spacing:.1em;padding:10px 2px}
+  .pick-first{font-size:12px;letter-spacing:.1em}
+}
+/* Home: the Send picture, drawn in code. */
+.memo-art{display:grid;place-items:center;padding:6px}
+.memo-art svg{width:min(100%,360px);height:auto;filter:drop-shadow(0 12px 20px rgba(0,0,0,.45))}
+.nav .club{max-width:none;overflow:visible}
+.nav .steps-off{display:none!important}
+.paper .help,.paper .small{color:#5b4f38}
+.paper .rc-ok{color:#0b6b5c}
+.paper .rc-warn{color:#8a5a00}
+.paper .rows-ed th{color:#6b5a3a}
+.paper .rows-ed td::before{color:#5b4f38}
+.paper .rows-ed input[type=text]{background:#fff;color:#14233c;border:1px solid #b7a47a}
+.paper .rc-bad code{color:#9b1c2e}
+.paper .rc-bad li{background:rgba(180,40,60,.1)}
+.pick-first{white-space:nowrap}
+@media (max-width:640px){.nav .logo{font-size:22px}.pick-first{flex:1;text-align:center;font-size:12px;letter-spacing:.06em}}
+.ideas{margin-bottom:20px}

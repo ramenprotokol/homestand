@@ -29,7 +29,7 @@ export interface Copy {
 
 export const COPY: Record<Kind, Copy> = {
   club: { place: "town", markets: "towns", season: "season", night: "night", nights: "nights", themeNight: "theme night", themeNights: "theme nights", sample: "sample club", memoTitle: "Theme-night rationale", slab: "THEME NIGHT" },
-  venue: { place: "city", markets: "cities", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "" },
+  venue: { place: "city", markets: "towns", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "" },
 };
 
 export const copyFor = (k: Kind | undefined): Copy => COPY[k ?? "club"];

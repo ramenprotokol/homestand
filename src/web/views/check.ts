@@ -1,5 +1,5 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { bridgeSentence, classicReason, comparisonSentence, FIT_MEANING, fitWord, marketLevelSentence, methodWords, NEAR_TOP_NOTE, vsMarketsWords, type FitLabel } from "../../app/score";
+import { bridgeSentence, classicReason, comparisonSentence, fitMeaning, fitWord, marketLevelSentence, NEAR_TOP_NOTE, vsMarketsWords, type FitLabel } from "../../app/score";
 import { cityOfLabel } from "../../app/kind";
 import { themeById } from "../../app/themes/artists";
 import { checkResultLine, cleanTitle, fitSummary, lockedLine } from "../../app/text";
@@ -12,7 +12,7 @@ import { onCleanup, onMount, route, routeContext } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
 import { rand } from "../foil/rng";
 import { bokeh, garland, lamp, ridge } from "../foil/scenery";
-import { openWhy, refreshWhy } from "../foil/why";
+import { closeWhy, openWhy, refreshWhy } from "../foil/why";
 import { icon } from "../icons";
 import { step } from "../../app/trace";
 import { addTrace, copy, state, swapTitle, ui, viewOf, type NightView } from "../store";
@@ -27,8 +27,19 @@ function fitList(views: NightView[]): HTMLElement {
     order.flatMap((fit) => {
       const n = views.filter((v) => v.fit === fit).length;
       if (fit === "found" && n === 0) return [];
-      return [h("li", { class: `fl${fit === "leans-away" ? " away" : ""}`, "data-k": fit }, gemChip(fit), h("b", { class: "fl-n" }, String(n)), h("span", { class: "fl-t" }, h("b", null, fitWord(fit)), ` ${FIT_MEANING[fit]}`))];
+      return [h("li", { class: `fl${fit === "leans-away" ? " away" : ""}`, "data-k": fit }, gemChip(fit), h("b", { class: "fl-n" }, String(n)), h("span", { class: "fl-t" }, h("b", null, fitWord(fit)), ` ${fitMeaning(fit, state.kind)}`))];
     }),
+  );
+}
+
+/** The choice between the themes a name could mean. The same buttons sit in the ask box and in the "?" card's panel. */
+function choiceButtons(n: NightView["night"], closeAfter = false): HTMLElement {
+  return h(
+    "div",
+    { class: "ask-b" },
+    n.candidates.map((id) =>
+      h("button", { type: "button", class: "btn ghost sm", onclick: () => { state.choices[n.index] = id; logChoice(n.theme, themeById(id)?.label ?? id); if (closeAfter) closeWhy(false); window.dispatchEvent(new HashChangeEvent("hashchange")); } }, themeById(id)?.label ?? id),
+    ),
   );
 }
 
@@ -38,7 +49,7 @@ const city = (): string => cityOfLabel(state.analysis?.market.label ?? "");
 function logChoice(night: string, theme: string): void {
   const vs = state.analysis!.nights.map(viewOf);
   const n = (f: NightView["fit"]): number => vs.filter((x) => x.fit === f).length;
-  addTrace("Check: your choice", [step(new Date().toISOString(), "note", `Director chose ${theme} for "${night}": now ${fitSummary({ in: n("leans-in"), average: n("average"), away: n("leans-away"), notScored: n("not-scored"), classic: n("classic"), found: n("found") })}`)]);
+  addTrace("Check: your choice", [step(new Date().toISOString(), "note", `You chose ${theme} for "${night}": now ${fitSummary({ in: n("leans-in"), average: n("average"), away: n("leans-away"), notScored: n("not-scored"), classic: n("classic"), found: n("found") })}`)]);
 }
 
 /** Sponsor and lock, in words under the card: the card art is too small to carry them. */
@@ -78,7 +89,7 @@ export function checkView(): HTMLElement {
         "div",
         { class: "notice notice--warn", role: "note" },
         icon("warning"),
-        h("div", null, h("strong", null, `${state.parseErrors.length} row${state.parseErrors.length === 1 ? " was" : "s were"} skipped. `), "The rest were checked.", h("ul", null, state.parseErrors.map((e) => h("li", null, `Line ${e.line}: ${e.message}`)))),
+        h("div", null, h("strong", null, `${state.parseErrors.length} row${state.parseErrors.length === 1 ? " was" : "s were"} skipped. `), "The rest were checked. ", state.sampleId ? null : h("a", { href: "#/own", "data-testid": "back-to-rows" }, "Back to my rows"), h("ul", null, state.parseErrors.map((e) => h("li", null, `Line ${e.line}: ${e.message}`)))),
       ),
     );
   }
@@ -95,16 +106,15 @@ export function checkView(): HTMLElement {
     h(
       "div",
       { class: "ask", role: "group", "aria-label": `Which theme is "${v.night.theme}"?`, "data-ask": v.night.index },
-      h("div", { class: "q" }, `Score ${formatDate(v.night.date)} as ${v.night.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}?`),
+      h("div", { class: "q" }, `${formatDate(v.night.date)}: score it as ${v.night.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}?`),
       h("p", null, `"${v.night.theme}" fits more than one theme. We never guess.`),
-      h(
-        "div",
-        { class: "ask-b" },
-        v.night.candidates.map((id) =>
-          h("button", { type: "button", class: "btn ghost sm", onclick: () => { state.choices[v.night.index] = id; logChoice(v.night.theme, themeById(id)?.label ?? id); window.dispatchEvent(new HashChangeEvent("hashchange")); } }, themeById(id)?.label ?? id),
-        ),
-      ),
+      choiceButtons(v.night),
     ),
+  );
+  // After a pick the choice stays on screen as one line, with a way back.
+  const picked = views.filter((v) => v.night.resolution.kind === "ambiguous" && state.choices[v.night.index] !== undefined).map((v) =>
+    h("p", { class: "picked-line", "data-testid": "picked-line" }, `${formatDate(v.night.date)} scored as ${v.themeLabel}: ${fitWord(v.fit).toLowerCase()}. `,
+      h("button", { type: "button", class: "linkbtn", onclick: () => { delete state.choices[v.night.index]; window.dispatchEvent(new HashChangeEvent("hashchange")); } }, "Change")),
   );
 
   const grid = h("div", { class: "grids" });
@@ -144,6 +154,7 @@ export function checkView(): HTMLElement {
       h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
       h("p", { class: "check-line", "data-testid": "summary" }, result),
       asks,
+      picked,
       notices,
     ),
     h(
@@ -230,11 +241,10 @@ function loadingView(): HTMLElement {
 
 const rel = (z: number | null): string => (z === null ? "n/a" : `${z >= 0 ? "+" : ""}${z.toFixed(2)}`);
 
-function sourceLine(s: ThemeScoreOut, boardAt: string | null): string {
+function sourceLine(s: ThemeScoreOut): string {
   if (s.source === "synthetic") return `Synthetic test data generated ${formatDateTime(s.fetchedAt)}. Not from Qloo.`;
-  // "Checked again" is said only after this director has asked for fresh data; until then it is when the data was checked.
-  if (rechecked[s.themeId]) return `Checked again ${formatDateTime(s.fetchedAt)}${boardAt && s.fetchedAt !== boardAt ? ` (the rest was checked ${formatDateTime(boardAt)})` : ""}. "Get fresh data" asks Qloo again.`;
-  return `Checked ${formatDateTime(s.fetchedAt)}. "Get fresh data" asks Qloo again.`;
+  // One timestamp per card: after "Get fresh data" the message below carries the new time, so this line steps aside.
+  return rechecked[s.themeId] ? "" : `Checked ${formatDateTime(s.fetchedAt)}.`;
 }
 
 const rechecked: Record<string, string> = {};
@@ -258,7 +268,7 @@ function backOf(v: NightView): BackSpec {
     : v.fit === "classic"
       ? classicReason(state.kind)
       : v.needsChoice
-        ? `"${n.theme}" fits more than one theme. Pick one on the board and it gets a rating.`
+        ? `"${n.theme}" fits more than one theme. Pick one above and it gets a rating.`
         : (s?.reason ?? noDataReason(n));
   const checkedAt = s?.fetchedAt ?? state.analysis!.recordedAt;
   return {
@@ -318,7 +328,7 @@ function whyInfo(index: number): Child {
     return out;
   }
   if (v.needsChoice) {
-    out.push(h("p", { class: "panel-box" }, `"${n.theme}" fits more than one theme (${n.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}). Close this panel and pick one on the board.`));
+    out.push(h("p", { class: "panel-box" }, `"${n.theme}" fits more than one theme (${n.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}). Pick one here.`), choiceButtons(n, true));
     return out;
   }
   if (n.pool) {
@@ -336,7 +346,7 @@ function whyInfo(index: number): Child {
     out.push(h("p", { class: "panel-box" }, s.reason ?? "We have no data for this one."));
   } else {
     // The card back and this line say the one plain thing: how the town rates it against its own other themes. The comparison with other towns is under "Show the numbers".
-    out.push(h("div", { class: "panel-box" }, h("p", { style: "font-weight:650", "data-testid": "fit-line" }, comparisonSentence(theme.label, s.label, city()))));
+    out.push(h("div", { class: "panel-box" }, h("p", { style: "font-weight:650", "data-testid": "fit-line" }, comparisonSentence(theme.label, s.label, city(), state.kind))));
   }
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${cleanTitle(e.name)} (${e.type.replace("_", " ")})`)))),
@@ -350,7 +360,7 @@ function whyInfo(index: number): Child {
       h(
         "div",
         { class: "panel-box" },
-        h("p", { class: "small" }, methodWords(state.kind)),
+        h("p", { class: "small" }, "Raw scores sit near 0.99 everywhere, so we compare the small gaps. ", h("a", { href: "#/study" }, "How this works and how we tested it")),
         vsOthers ? h("p", { "data-testid": "vs-others" }, vsOthers, bridgeSentence(s.label, s.z, city()) ? ` ${bridgeSentence(s.label, s.z, city())}` : "") : null,
         h("p", { class: "small" }, marketLevelSentence(s.marketMeanZ, state.kind)),
         s.score !== null && s.score >= 0.9 && s.ref && s.ref.sd < 0.01 ? h("p", { class: "small", "data-testid": "near-top-note" }, NEAR_TOP_NOTE) : null,
@@ -361,26 +371,27 @@ function whyInfo(index: number): Child {
           "dl",
           { class: "kv kv--sum" },
           h("dt", null, "This theme's score here"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
-          h("dt", null, `Typical ${copy().place} (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
-          h("dt", null, `Usual difference between ${copy().markets} (spread)`), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
-          h("dt", null, "z = (score - typical) / spread"), h("dd", null, rel(s.z)),
-          h("dt", null, `This ${copy().place}'s average z across ${s.scoredThemes} themes`), h("dd", null, rel(s.marketMeanZ)),
-          h("dt", null, "Fit number = z - this town's average"), h("dd", null, rel(s.index)),
-          h("dt", null, "Cut-offs for a strong or weak fit"), h("dd", null, "+0.50 / -0.50"),
+          h("dt", null, `Average of ${s.ref?.n ?? "n/a"} other towns`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
+          h("dt", null, "Normal gap between towns"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
+          h("dt", null, `${city()} vs. other towns`), h("dd", null, rel(s.z)),
+          h("dt", null, `${city()}'s usual`), h("dd", null, rel(s.marketMeanZ)),
+          h("dt", null, `${theme.label} vs. ${city()}'s usual`), h("dd", null, rel(s.index)),
         ),
+        h("p", { class: "small" }, "Weak below \u22120.5 \u00b7 Strong above +0.5"),
+        h("p", { class: "small" }, `${city()}'s usual is the average over the themes Qloo had data for here.`),
         a.reference.synthetic ? h("p", { class: "small" }, "The typical-town numbers are a synthetic placeholder until the comparison set is pulled.") : null,
       ),
     );
   }
 
-  out.push(h("p", { class: "small", "data-testid": "why-footer" }, h("a", { href: "#/study" }, state.kind === "venue" ? "See how we tested this on baseball" : "See how we tested this")));
+  out.push(h("p", { class: "small", "data-testid": "why-footer" }, h("a", { href: "#/study" }, state.kind === "venue" ? "We tested this on baseball, not concerts." : "See how we tested this")));
   const caps = a.caps;
   const disabled = caps.recheckDisabled || recheckBusy;
   out.push(
     h(
       "div",
       { class: "panel-box" },
-      h("p", { class: "small", "data-testid": "source-line" }, sourceLine(s, a.recordedAt)),
+      sourceLine(s) ? h("p", { class: "small", "data-testid": "source-line" }, sourceLine(s)) : null,
       h(
         "button",
         {
@@ -392,7 +403,8 @@ function whyInfo(index: number): Child {
             try {
               const r = await recheckTheme(v.themeId!);
               rechecked[v.themeId!] = new Date().toISOString();
-              recheckMessage = r === "recent" ? "Checked within the last day: same answer." : r === "changed" ? `Checked again: the rating changed to ${fitWord(state.analysis!.themes[v.themeId!]!.label)}. Earlier swaps were cleared.` : "Checked again: same answer.";
+              const at = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+              recheckMessage = r === "changed" ? `Fresh data at ${at}: changed, now ${fitWord(state.analysis!.themes[v.themeId!]!.label)}. Earlier swaps were cleared.` : `Fresh data at ${at}: same result.`;
             } catch (err) {
               recheckMessage = err instanceof ApiFailure ? err.message : "Getting fresh data failed. Try again.";
             }

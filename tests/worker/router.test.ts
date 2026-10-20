@@ -930,7 +930,7 @@ describe("taste graph angles for locked nights", () => {
     const again = (await (await route(post("/api/propose", { market: body.market, nights: plan, allowDuplicates: false }), h.deps)).json()) as ProposeResponse;
     expect(h.qlooUrls.filter((u) => u.searchParams.has("signal.interests.entities"))).toHaveLength(0);
     expect(again.angles[0]!.text).toBe(p.angles[0]!.text);
-    expect(again.trace.some((s) => /saved taste graph for fans of Star Trek/.test(s.text))).toBe(true);
+    expect(again.trace.some((s) => /saved list of what fans of Star Trek/.test(s.text))).toBe(true);
   });
 
   it("asks with a single candidate, and widens to the same audience of any kind when the same-kind set is empty", async () => {
@@ -988,6 +988,6 @@ describe("one pulled-from-Qloo time", () => {
     expect(cached.recordedAt).toBe("2026-10-15T12:00:00.000Z");
     expect(cached.recordedOn).toBe("2026-10-15");
     expect(cached.themes["bluey"]!.fetchedAt).toBe(cached.recordedAt);
-    expect(cached.trace.some((s) => s.detail === "Cached, recorded 2026-10-15T12:00:00.000Z.")).toBe(true);
+    expect(cached.trace.some((s) => s.detail === "Saved 2026-10-15T12:00:00.000Z.")).toBe(true);
   });
 });

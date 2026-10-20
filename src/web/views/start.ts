@@ -1,20 +1,20 @@
 import type { GeoHit } from "../../app/api-types";
-import { CSV_TEMPLATE, parseCalendar } from "../../app/calendar/csv";
+import { CSV_HEADER, CSV_TEMPLATE, csvField, parseCalendar, type CalendarRow } from "../../app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../app/markets";
 import { exampleCsv, sampleCsv } from "../../app/samples";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
-import { Fireworks } from "../foil/fx";
 import { heroShell } from "../foil/hero";
 import { makeCard, type CardSpec } from "../foil/cards";
 import { emblemFor } from "../foil/emblems";
-import { onCleanup, onMount, onResize, routeContext, whileVisible } from "../foil/lifecycle";
+import { onMount, routeContext } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
 import { packEl } from "../foil/pack";
 import { ridge } from "../foil/scenery";
 import { startCheck } from "../flow";
 import { icon } from "../icons";
 import { loadStudy } from "../study-data";
+import { ui } from "../store";
 
 function teaser(): HTMLElement {
   const r = loadStudy().results;
@@ -46,13 +46,21 @@ function demoCards(): HTMLElement[] {
   });
 }
 
+/** A memo page beside a calendar page, drawn in code: the revised calendar and the one-page memo that Send makes. */
+function memoArt(): HTMLElement {
+  const t = document.createElement("template");
+  t.innerHTML =
+    '<svg viewBox="0 0 220 150" role="img" aria-label="A one-page memo and a calendar"><rect x="14" y="22" width="92" height="116" rx="4" fill="#fbf3de" stroke="#d9c79a"/><rect x="26" y="34" width="52" height="7" rx="2" fill="#16194a"/><g fill="#8a7a58"><rect x="26" y="50" width="68" height="4" rx="2"/><rect x="26" y="60" width="62" height="4" rx="2"/><rect x="26" y="70" width="68" height="4" rx="2"/><rect x="26" y="86" width="40" height="4" rx="2"/><rect x="26" y="96" width="64" height="4" rx="2"/><rect x="26" y="106" width="50" height="4" rx="2"/></g>' +
+    '<g transform="rotate(5 160 80)"><rect x="112" y="14" width="96" height="116" rx="4" fill="#fff" stroke="#c9cdea"/><rect x="112" y="14" width="96" height="22" rx="4" fill="#c9283c"/><text x="160" y="30" text-anchor="middle" font-size="11" fill="#fff" font-family="sans-serif" letter-spacing="2">JUNE</text><g fill="#e9ebf7"><rect x="120" y="46" width="16" height="14" rx="2"/><rect x="141" y="46" width="16" height="14" rx="2"/><rect x="162" y="46" width="16" height="14" rx="2"/><rect x="183" y="46" width="16" height="14" rx="2"/><rect x="120" y="66" width="16" height="14" rx="2"/><rect x="162" y="66" width="16" height="14" rx="2"/><rect x="183" y="66" width="16" height="14" rx="2"/><rect x="120" y="86" width="16" height="14" rx="2"/><rect x="141" y="86" width="16" height="14" rx="2"/><rect x="183" y="86" width="16" height="14" rx="2"/></g><rect x="141" y="66" width="16" height="14" rx="2" fill="#f0b94a"/><rect x="162" y="86" width="16" height="14" rx="2" fill="#3fd6c0"/></g></svg>';
+  return t.content.firstElementChild as HTMLElement;
+}
+
 function teaseSection(): HTMLElement {
   const cards = demoCards();
-  const burst = h("canvas", { class: "tease-fx", "aria-hidden": "true" });
   const beats = [
-    { n: "1", name: "Check", text: "See which nights your town is likely to like, and which it won't.", art: h("div", { class: "fan3", "aria-hidden": "true" }, cards) },
+    { n: "1", name: "Check", text: "See which nights fit your town. Each card shows its rating in words.", art: h("div", { class: "fan3", "aria-hidden": "true" }, cards) },
     { n: "2", name: "Fix", text: "Approve or reject swaps for the weak nights.", art: h("div", { class: "pack-art", "aria-hidden": "true" }, packEl("div", "", "swaps · sealed")) },
-    { n: "3", name: "Send", text: "Export the new calendar and a one-page memo.", art: h("div", { class: "fw-art", "aria-hidden": "true" }, h("div", { class: "fw-box" }, burst)) },
+    { n: "3", name: "Send", text: "Export the new calendar and a one-page memo.", art: h("div", { class: "memo-art", "aria-hidden": "true" }, memoArt()) },
   ];
   const section = h(
     "section",
@@ -68,20 +76,13 @@ function teaseSection(): HTMLElement {
       h("div", { class: "page-end" }, h("a", { class: "btn pri", href: "#/sample", "data-testid": "end-try-sample" }, "Try a sample club", icon("arrowRight"))),
     ),
   );
-  onMount(() => mountTease(section, cards, burst));
+  onMount(() => mountTease(section, cards));
   return section;
 }
 
-function mountTease(section: HTMLElement, cards: HTMLElement[], canvas: HTMLCanvasElement): void {
+function mountTease(section: HTMLElement, cards: HTMLElement[]): void {
   const ctx = routeContext();
-  const fw = new Fireworks(canvas, { rate: 0.7, top: [0.12, 0.55], big: 0.9, sparks: 90, fireflies: 8 });
-  onResize(() => fw.size());
-  onCleanup(() => fw.stop());
-  if (reduced()) {
-    fw.drawStill();
-    return;
-  }
-  whileVisible(canvas, () => fw.start(), () => fw.stop());
+  if (reduced()) return;
   ctx.add(() => {
     const beats = gsap.utils.toArray<HTMLElement>(".beat", section);
     for (const b of beats) gsap.from(b, { opacity: 0, y: 44, duration: 0.8, ease: "power3.out", scrollTrigger: { trigger: b, start: "top 88%", once: true } });
@@ -94,11 +95,6 @@ function mountTease(section: HTMLElement, cards: HTMLElement[], canvas: HTMLCanv
       .to(".pack-art .pk-strip", { rotation: -24, x: "34%", y: -86, opacity: 0, transformOrigin: "0% 100%", ease: "power2.in" }, 0)
       .fromTo(".pack-art .pk-burst", { scale: 0.2, opacity: 1 }, { scale: 1.1, opacity: 0, ease: "power2.out" }, 0.25);
   });
-  const io = new IntersectionObserver((es) => {
-    if (es.some((e) => e.isIntersecting)) fw.salvo(2);
-  }, { threshold: 0.5 });
-  io.observe(canvas);
-  onCleanup(() => io.disconnect());
 }
 
 export function startView(): HTMLElement {
@@ -154,6 +150,7 @@ export function pickView(): HTMLElement {
       "div",
       { class: "wrap" },
       sceneHead("Get started · Pick a club", "Pick a", "sample club", "Real towns. Made-up schedules and sponsors."),
+      ui.pickNote ? h("p", { class: "notice pick-note", role: "status", "data-testid": "pick-note" }, "Pick a club first.") : null,
       h("div", { class: "tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "club").map(ticketFor)),
       h("div", { class: "eyebrow venue-eyebrow" }, "Also works for concert venues"),
       h("p", { class: "lede venue-lede" }, "Same Check, Fix and Send on a touring-act calendar. This one is a made-up summer calendar for a sample amphitheatre."),
@@ -163,14 +160,63 @@ export function pickView(): HTMLElement {
   );
 }
 
+/** A new row starts a week after the last one, so it is a valid date from the first moment. */
+function nextWeek(rows: CalendarRow[]): string {
+  const last = rows.map((r) => r.date).sort().pop();
+  const d = last ? new Date(`${last}T12:00:00Z`) : new Date();
+  d.setUTCDate(d.getUTCDate() + 7);
+  return d.toISOString().slice(0, 10);
+}
+
+/** What was typed on the last run, so "Back to my rows" on Check finds it again. */
+let lastText = "";
+let lastChosen: GeoHit | null = null;
+
 export function ownView(): HTMLElement {
-  let chosen: GeoHit | null = null;
+  let chosen: GeoHit | null = lastChosen;
   const status = h("p", { class: "help", role: "status" });
   const results = h("ul", { class: "results" });
   const q = h("input", { id: "city", type: "search", autocomplete: "off", placeholder: "For example, Tulsa" });
   const file = h("input", { id: "csvfile", type: "file", accept: ".csv,text/csv,.txt", "aria-label": "Upload a CSV file" });
   const paste = h("textarea", { id: "csvtext", "aria-describedby": "csvhelp", spellcheck: "false", placeholder: CSV_TEMPLATE });
   const errors = h("div", { role: "alert", class: "error" });
+  const check = h("div", { class: "rowcheck", "data-testid": "rowcheck", "aria-live": "polite" });
+  const table = h("div", { class: "rowtable", "data-testid": "rowtable" });
+
+  /** Rows as the editor shows them, written back into the paste box (lines that failed are kept as typed, at the end). */
+  function writeRows(rows: CalendarRow[], badLines: string[]): void {
+    const lines = rows.map((r) => [r.date, r.theme, r.sponsor, r.locked ? "yes" : "no", r.notes].map(csvField).join(","));
+    paste.value = [CSV_HEADER, ...lines, ...badLines].join("\n") + "\n";
+    refresh();
+  }
+  /** Checks the pasted rows on this screen, before anything runs, and draws the table. */
+  function refresh(): void {
+    const text = paste.value;
+    if (text.trim() === "") { check.replaceChildren(); table.replaceChildren(); return; }
+    const { rows, errors: bad } = parseCalendar(text);
+    const raw = text.split(/\r?\n/);
+    const badRaw = bad.map((e) => raw[e.line - 1] ?? "").filter((x) => x.trim() !== "");
+    check.replaceChildren(
+      h("p", { class: bad.length ? "rc-warn" : "rc-ok" }, `${rows.length} ${rows.length === 1 ? "night" : "nights"} ready.${bad.length ? ` ${bad.length} ${bad.length === 1 ? "needs" : "need"} a fix:` : ""}`),
+      ...(bad.length ? [h("ul", { class: "rc-bad" }, bad.map((e) => h("li", null, h("b", null, `Line ${e.line}`), ` ${e.message}`, h("code", null, raw[e.line - 1] ?? ""))))] : []),
+    );
+    const cell = (r: CalendarRow, key: "date" | "theme" | "sponsor", label: string): HTMLElement =>
+      h("input", { type: "text", value: r[key], "aria-label": `${label}, row ${r.line}`, onchange: (e: Event) => { r[key] = (e.target as HTMLInputElement).value; writeRows(rows, badRaw); } });
+    table.replaceChildren(
+      h("table", { class: "rows-ed" },
+        h("thead", null, h("tr", null, ["Date", "Theme", "Sponsor", "Locked", ""].map((t) => h("th", null, t)))),
+        h("tbody", null, rows.map((r) => h("tr", null,
+          h("td", { "data-label": "Date" }, cell(r, "date", "Date")),
+          h("td", { "data-label": "Theme" }, cell(r, "theme", "Theme")),
+          h("td", { "data-label": "Sponsor" }, cell(r, "sponsor", "Sponsor")),
+          h("td", { "data-label": "Locked" }, h("input", { type: "checkbox", checked: r.locked, "aria-label": `Locked, row ${r.line}`, onchange: (e: Event) => { r.locked = (e.target as HTMLInputElement).checked; writeRows(rows, badRaw); } })),
+          h("td", null, h("button", { type: "button", class: "btn ghost sm dark", "aria-label": `Delete row ${r.line}`, onclick: () => writeRows(rows.filter((x) => x !== r), badRaw) }, "Delete")),
+        ))),
+      ),
+      h("button", { type: "button", class: "btn ghost sm dark", "data-testid": "add-row", onclick: () => writeRows([...rows, { line: 0, date: nextWeek(rows), theme: "New night", sponsor: "", locked: false, notes: "" }], badRaw) }, "Add row"),
+    );
+  }
+  paste.addEventListener("input", refresh);
   const go = h("button", { type: "button", class: "btn pri", "data-testid": "check-mine" }, "Check my calendar", icon("arrowRight"));
 
   async function search(): Promise<void> {
@@ -184,7 +230,7 @@ export function ownView(): HTMLElement {
     status.textContent = "Searching...";
     try {
       const { results: hits } = await api.geocode(text);
-      status.textContent = hits.length ? "Choose your home city." : "No match. Try the city name only.";
+      status.textContent = hits.length ? "Choose your home city." : `No city called "${text}". Check the spelling, for example "Tulsa, OK".`;
       for (const hit of hits) {
         const b = h(
           "button",
@@ -214,6 +260,7 @@ export function ownView(): HTMLElement {
       return;
     }
     paste.value = await f.text();
+    refresh();
   });
   q.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
@@ -227,6 +274,8 @@ export function ownView(): HTMLElement {
       errors.textContent = "Search for your city and choose it first.";
       return;
     }
+    lastText = paste.value;
+    lastChosen = chosen;
     const { rows, errors: rowErrors } = parseCalendar(paste.value);
     if (rows.length === 0) {
       errors.replaceChildren(...rowErrors.map((e) => h("p", null, `Line ${e.line}: ${e.message}`)));
@@ -235,6 +284,8 @@ export function ownView(): HTMLElement {
     void startCheck({ label: chosen.label, lon: chosen.lon, lat: chosen.lat, sig: chosen.sig }, rows, rowErrors, null);
   });
 
+  if (lastText) { paste.value = lastText; refresh(); }
+  if (lastChosen) status.textContent = `Home city: ${lastChosen.label}.`;
   return h(
     "section",
     { class: "scene scene--pick" },
@@ -264,11 +315,14 @@ export function ownView(): HTMLElement {
           h(
             "div",
             { class: "actions" },
-            h("button", { type: "button", class: "btn gold sm", "data-testid": "load-example", onclick: () => { paste.value = exampleCsv(); errors.replaceChildren(); } }, "Load an example"),
+            h("button", { type: "button", class: "btn gold sm", "data-testid": "load-example", onclick: () => { paste.value = exampleCsv(); errors.replaceChildren(); refresh(); } }, "Load an example"),
             h("button", { type: "button", class: "btn ghost sm dark", onclick: () => download("homestand-template.csv", "text/csv", CSV_TEMPLATE) }, icon("download"), "Download the template"),
             file,
           ),
+          h("p", { class: "help" }, "Paste from a spreadsheet, or edit the rows in the table below."),
           paste,
+          check,
+          table,
         ),
         errors,
         h("div", { class: "actions" }, go),

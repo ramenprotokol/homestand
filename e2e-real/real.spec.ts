@@ -56,14 +56,14 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Fit number = z - this town's average/)).toBeVisible();
+  await expect(why.getByText(/Raw scores sit near 0.99 everywhere/)).toBeVisible();
   await expect(why).toContainText(/Compared with other towns, this town scores/);
   await expect(why.getByTestId("why-footer")).toContainText("See how we tested this");
   await expect(why).not.toContainText("coin flip");
   await expect(why.getByTestId("source-line")).toContainText(/Checked /);
   await shot(page, info, "why");
   await why.getByTestId("recheck").click();
-  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked within the last day: same answer/);
+  await expect(why.getByTestId("recheck-message")).toContainText(/Fresh data at .*: (same result|changed)/);
   await expect(why.getByTestId("recheck-message")).toBeInViewport();
   await page.screenshot({ path: `test-results/screens-real/${info.project.name}-why-viewport.png` });
   await page.keyboard.press("Escape");
@@ -200,7 +200,7 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why).toContainText(/Compared with other cities, this city scores/);
+  await expect(why).toContainText(/Compared with other towns, this city scores/);
   await expect(why).not.toContainText(/ballpark/i);
   await snap("2-why");
   await page.keyboard.press("Escape");
@@ -215,9 +215,9 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await page.screenshot({ path: `${dir}/${info.project.name}-venue-3b-viewport.png` });
   expect(await page.locator(".slide").count()).toBeGreaterThanOrEqual(1);
   expect(await page.getByTestId("angle").count()).toBe(5);
-  await expect(page.getByTestId("angle").first()).toContainText(/(Support act idea: fans of .+ near Raleigh also like|Fans of .+ near Raleigh also like .+ promo tie-in)/);
+  await expect(page.getByTestId("angle").first()).toContainText(/\(.+\) → opener idea: .+/);
   // On real data every Raleigh headliner gets a real support-act line, not the generic sponsor angle.
-  for (const t of await page.getByTestId("angle").allInnerTexts()) expect(t).toMatch(/Support act idea: fans of .+ near Raleigh also like .+, so an act like .+ could fit the opening slot\./);
+  for (const t of await page.getByTestId("angle").allInnerTexts()) expect(t).toMatch(/\(.+\) → opener idea: (?!a pre-show).+/);
   await expect(page.getByTestId("ideas")).toContainText(/Acts Raleigh likes more than most cities/);
   await expect(page.getByTestId("disc-badge").first()).toBeVisible(); // at least one swap is an act Qloo found
   if ((page.viewportSize()?.width ?? 0) >= 900) {

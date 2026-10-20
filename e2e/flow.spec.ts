@@ -93,11 +93,13 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(why.getByText("Fit number = z")).toHaveCount(0);
   await expect(why.getByText(/standard step/)).toHaveCount(0);
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Fit number = z - this town's average/)).toBeVisible();
+  await expect(why.getByText(/Raw scores sit near 0.99 everywhere/)).toBeVisible();
+  await expect(why.getByText("Normal gap between towns")).toBeVisible();
+  await expect(why.getByText("Akron's usual", { exact: true })).toBeVisible();
   await expect(why.getByTestId("vs-others")).toContainText(/Bluey here: (well )?(below|above|about typical for) (most )?towns\./);
   await why.getByTestId("recheck").click();
   // One live re-check per theme and market per day: the first run asks Qloo, a repeat returns the saved answer.
-  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked within the last day: same answer/);
+  await expect(why.getByTestId("recheck-message")).toContainText(/Fresh data at .*: (same result|changed)/);
   await expect(why.getByTestId("source-line")).toContainText(/Checked |Synthetic test data/);
   await expect(why.getByTestId("recheck-message")).toBeInViewport();
   await shot(page, info, "04-why");
@@ -162,8 +164,8 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await page.getByTestId("open-trace").click();
   const trace = page.getByRole("dialog");
   await expect(trace).toContainText(/Asked Qloo|Used the saved ratings/);
-  await expect(trace).toContainText("constraint");
-  await expect(trace).toContainText("model");
+  await expect(trace).toContainText("Rule check");
+  await expect(trace).toContainText("AI wording");
   await expect(trace).toContainText(/Getting fresh data|checked with Qloo within the last day/);
   await expect(trace).not.toContainText("No usable reply");
   await shot(page, info, "07-trace");
@@ -312,7 +314,7 @@ test("own club: the example is a full season and the headings read naturally", a
   await expect(page.getByTestId("summary")).toBeVisible();
   expect(await page.locator(".tile").count()).toBeGreaterThanOrEqual(15);
   await expect(page.getByRole("heading", { name: /^Check: Fresno, CA$/ })).toBeVisible();
-  await expect(page.locator(".nav .club")).toHaveText("Fresno, CA");
+  await expect(page.locator(".nav .club")).toContainText("Fresno, CA");
 });
 
 test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Send, CSV, ICS and the memo", async ({ page }) => {
@@ -333,7 +335,7 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   await page.getByTestId("to-fix").click();
   // The ideas panel: up to six titles, the under-25 line, and where they come from.
   const ideas = page.getByTestId("ideas");
-  await expect(ideas).toContainText("Family movies Akron likes more than most towns. Try one for a family night.");
+  await expect(ideas).toContainText("Family movies Akron likes more than most towns. Use one for a family night.");
   expect(await ideas.locator(".idea").count()).toBeLessThanOrEqual(3);
   expect(await ideas.locator(".idea").count()).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("ideas")).not.toContainText("under-25");
@@ -387,7 +389,7 @@ test("Could not fix is one grouped block, not a card for each night", async ({ p
   await page.route("**/api/propose", async (route) => {
     const res = await route.fetch();
     const body = await res.json();
-    body.unfixed = [4, 6, 8].map((index) => ({ index, date: body.proposals[0].date, reason: "No family theme leans in here that fits this date." }));
+    body.unfixed = [4, 6, 8].map((index) => ({ index, date: body.proposals[0].date, reason: "No family theme is a strong fit here for this date.", counts: { strong: 8, used: 5, wrong: 3 } }));
     await route.fulfill({ response: res, json: body });
   });
   await page.goto("/#/check/akron");
@@ -395,7 +397,7 @@ test("Could not fix is one grouped block, not a card for each night", async ({ p
   await page.getByTestId("to-fix").click();
   const block = page.getByTestId("unfixed-block");
   await expect(block).toContainText("Could not fix: 3 nights");
-  await expect(block).toContainText("No better kids' theme fits Akron on these 3 nights, so they stay as planned.");
+  await expect(block).toContainText("No swap for these 3 nights. Akron's 8 strong themes are already on your calendar (5) or wrong for a kids' night (3).");
   await expect(block).toContainText("Next step");
   await expect(block.locator(".nofix-list li")).toHaveCount(3);
   await expect(page.locator(".stamp", { hasText: "COULD NOT" })).toHaveCount(0);

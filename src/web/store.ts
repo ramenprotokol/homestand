@@ -110,6 +110,17 @@ export function addTrace(title: string, steps: TraceStep[]): void {
   state.traceGroups.push({ title, at: new Date().toISOString(), steps });
 }
 
+/** Your own approvals, rejections and picks, in the same "Every step" list. */
+export function logYou(text: string): void {
+  const at = new Date().toISOString();
+  let g = state.traceGroups.find((x) => x.title === "Your choices");
+  if (!g) {
+    g = { title: "Your choices", at, steps: [] };
+    state.traceGroups.push(g);
+  }
+  g.steps.push({ at, kind: "note", text });
+}
+
 /** Anything that changes scores or themes makes earlier proposals stale. */
 export function invalidateProposals(): void {
   state.propose = null;
@@ -179,4 +190,4 @@ export function approvedSwaps(): ShownProposal[] {
 }
 
 /** Transient screen status. */
-export const ui = { loading: false, error: null as string | null, proposing: false, proposeError: null as string | null, dupesBefore: null as string | null, dupesNote: null as string | null };
+export const ui = { pickNote: false, loading: false, error: null as string | null, proposing: false, proposeError: null as string | null, dupesBefore: null as string | null, dupesNote: null as string | null };

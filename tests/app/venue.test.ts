@@ -183,7 +183,7 @@ describe("a venue run end to end on the synthetic data", () => {
       expect(x.text).toMatch(/^.+ on .+ is locked, so it stays exactly as planned\. Support act idea: fans of .+ near Raleigh also like .+, so an act like .+ could fit the opening slot\.$/);
       expect(x.act?.name).toBeTruthy();
     }
-    expect(p.trace.map((t) => t.text).join(" ")).toMatch(/taste graph/);
+    expect(p.trace.map((t) => t.text).join(" ")).toMatch(/what fans of .+ also like/);
   });
   it("calls it a promo tie-in, not a support act, when no act sits a tier below the headliner", async () => {
     // Every pool act is at the headliners' own tier, so none sits a tier below.

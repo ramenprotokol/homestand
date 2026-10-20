@@ -1,3 +1,4 @@
+import type { TraceStep } from "../../app/trace";
 import { shortDate } from "../../app/dates";
 import { cleanTitle } from "../../app/text";
 import { fitWord, pullBand, type FitLabel } from "../../app/score";
@@ -15,8 +16,8 @@ import { worthABooking } from "../../app/acts";
 import { GENRE_WORDS } from "../../app/themes/library";
 import { cityOfLabel } from "../../app/kind";
 import { worthAnIdea } from "../../app/discovery";
-import type { Discovered } from "../../app/propose/propose";
-import { approvedSwaps, copy, effective, invalidateProposals, pack, saveWork, shownAngles, state, swapTitle, ui, viewOf, type ShownProposal } from "../store";
+import { noSwapLine, type Discovered } from "../../app/propose/propose";
+import { approvedSwaps, copy, effective, invalidateProposals, logYou, pack, saveWork, shownAngles, state, swapTitle, ui, viewOf, type ShownProposal } from "../store";
 
 const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hashchange"));
 const label = (id: string): string => themeById(id)?.label ?? id;
@@ -61,7 +62,7 @@ export function fixView(): HTMLElement {
         "div",
         { class: "wrap" },
         h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Working out ", h("em", null, "the fixes")), h("p", { class: "lede", role: "status" }, "Checking each swap against your locks, dates and audience."))),
-        h("div", { class: "fix-grid" }, h("div", { class: "stage2" }, h("div", { class: "pack-wrap" }, packEl("div", "", "swaps · sealing", copy().season === "season" ? undefined : "Summer swaps"))), h("aside", { class: "agent" }, h("div", { class: "ag-h" }, h("i"), "How Homestand decided"), h("div", { class: "skeleton", style: "min-height:160px;margin-top:12px" }))),
+        h("div", { class: "fix-grid" }, h("div", { class: "stage2" }, h("div", { class: "pack-wrap" }, packEl("div", "", state.kind === "venue" ? "offers · sealing" : "swaps · sealing", copy().season === "season" ? undefined : "Summer offers", state.kind === "venue"))), h("aside", { class: "agent" }, h("div", { class: "ag-h" }, h("i"), "How Homestand decided"), h("div", { class: "skeleton", style: "min-height:160px;margin-top:12px" }))),
       ),
     );
   }
@@ -115,7 +116,7 @@ export function fixView(): HTMLElement {
     ),
   );
 
-  const lead = swaps.length > 0 && state.kind === "venue" ? `${swaps.length} open date${swaps.length === 1 ? "" : "s"}: here is who to send an offer to instead of each weak-fit hold. Nothing changes until you approve it. Locked dates are never touched, and every date keeps its sponsor.` : swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
+  const lead = swaps.length > 0 && state.kind === "venue" ? `${swaps.length} offer${swaps.length === 1 ? "" : "s"} ready: here is who to send an offer to instead of each weak date. Nothing changes until you approve it. Locked dates are never touched, and every date keeps its sponsor.` : swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
   const section = h(
     "section",
     { class: "fix", id: "fix" },
@@ -124,11 +125,10 @@ export function fixView(): HTMLElement {
       { class: "wrap" },
       h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `the weak ${copy().nights}`)), h("p", { class: "lede" }, lead))),
       synth,
-      state.kind === "venue" ? actsPanel(p.acts, a.market.label) : null,
+      state.kind === "venue" ? actsPanel(p.acts, a.market.label) : ideasPanel(p.discovery, a.market.label),
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
       settings,
-      state.kind === "venue" ? null : ideasPanel(p.discovery, a.market.label),
       shownAngles().length > 0 ? anglesSection() : null,
       p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
     ),
@@ -140,7 +140,31 @@ export function fixView(): HTMLElement {
 
 /** The locked-night ideas. Redrawn when the director switches a swap, so an act or theme that has become a swap is never also offered as an add-on. */
 function anglesSection(): HTMLElement {
-  return h("section", { class: "sect side", id: "angles" }, h("h2", null, state.kind === "venue" ? "Locked headliners: keep them, add a support act" : `Locked ${copy().nights}: keep them, add a sponsor idea`), h("div", { class: "side-list" }, shownAngles().map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))));
+  const venue = state.kind === "venue";
+  const city = cityOfLabel(state.analysis!.market.label);
+  if (venue) {
+    return h("section", { class: "sect side", id: "angles" },
+      h("h2", null, "Locked headliners: an opener idea"),
+      h("p", { class: "small" }, `Their fans near ${city} also like these acts.`),
+      h("ul", { class: "opener-list" }, shownAngles().map((x) => h("li", { "data-testid": "angle" }, h("b", null, openerLine(x).split(" \u2192 ")[0]!), ` \u2192 ${openerLine(x).split(" \u2192 ")[1]}`))),
+    );
+  }
+  return h("section", { class: "sect side", id: "angles" }, h("h2", null, "Locked nights: an idea for the sponsor"), h("div", { class: "side-list" }, shownAngles().map((x) => {
+    const [head, body, extra] = clubAngleParts(x, city);
+    return sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), head), h("p", null, body), extra ? h("p", { class: "small" }, extra) : null));
+  })));
+}
+
+/** "Dave Matthews Band (May 7) \u2192 opener idea: Umphrey's McGee". */
+export function openerLine(x: { themeId: string; toThemeId: string; date: string; act?: { name: string } }): string {
+  return `${label(x.themeId)} (${shortDate(x.date).replace(/^\w{3} /, "")}) \u2192 opener idea: ${x.act ? x.act.name : x.toThemeId !== x.themeId ? label(x.toThemeId) : "a pre-show playlist or promo tie-in"}`;
+}
+
+/** One locked night's sponsor idea in three plain pieces: the date and theme, the idea, and what fans also like. */
+export function clubAngleParts(x: { themeId: string; toThemeId: string; date: string; sponsor: string }, city: string): [string, string, string] {
+  const theme = label(x.themeId);
+  const also = x.toThemeId !== x.themeId ? label(x.toThemeId) : "";
+  return [`${shortDate(x.date)}: ${theme}`, `Give ${x.sponsor || "the sponsor"} a moment: a PA read, the first pitch, or a ${theme} giveaway.`, also ? `Fans of ${theme} near ${city} also like ${also}, so a small ${also} touch fits too.` : ""];
 }
 
 function repaintAngles(): void {
@@ -161,7 +185,7 @@ function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLE
   return h(
     "section",
     { class: "ideas", "data-testid": "ideas", "aria-label": `Family movies ${city} likes more than most towns` },
-    h("h2", null, `Family movies ${city} likes more than most towns. Try one for a family night.`),
+    h("h2", null, `Family movies ${city} likes more than most towns. Use one for a family night.`),
     h("ul", { class: "idea-chips" }, titles.map((t) => h("li", { class: "idea" }, t))),
   );
 }
@@ -192,26 +216,23 @@ function unfixedBlock(list: ProposeResponse["unfixed"]): HTMLElement {
   const young = list.filter((u) => u.reason.startsWith("No family theme")).length;
   const city = cityOfLabel(state.analysis!.market.label);
   const these = `these ${list.length === 1 ? copy().night : `${list.length} ${copy().nights}`}`;
-  const why =
-    state.kind === "venue"
-      ? `No act in the same or a related genre is a strong fit in ${city} for ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`
-      : young === list.length
-        ? `No better kids' theme fits ${city} on ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`
-        : young === 0
-          ? `No better theme fits ${city} on ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`
-          : `No better theme fits ${city} on ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`;
+  const c = list.find((u) => u.counts)?.counts;
+  const what = young === list.length ? "a kids' night" : `this ${copy().night}`;
+  const why = c
+    ? `No swap for ${these}. ${noSwapLine(c, city, state.kind === "venue").replace(/^No swap: /, "").replace(`wrong for this ${copy().night}`, `wrong for ${what}`)}`
+    : `No swap for ${these}: nothing on our list is a strong fit in ${city} that passes the rules, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`;
   return h(
     "section",
     { class: "sect nofix", "data-testid": "unfixed-block" },
     h("h2", null, `Could not fix: ${list.length} ${list.length === 1 ? copy().night : copy().nights}`),
     h("p", { class: "nofix-why" }, why),
-    h("p", { class: "next-step" }, copy().night === "date" ? "Next step: keep the original dates, or change an act in your own calendar and check again." : "Next step: keep the original nights, or change a theme in your own calendar and check again."),
+    h("p", { class: "next-step" }, state.sampleId ? "Next step: use your own calendar to test other themes." : `Next step: keep the original ${copy().nights}, or change one in your calendar and check again.`),
     h(
       "ul",
       { class: "nofix-list" },
       list.map((u) => {
         const n = state.analysis!.nights[u.index]!;
-        return h("li", null, h("b", null, shortDate(u.date)), ` ${n.theme}${n.sponsor ? ` · ${n.sponsor}` : ""}`, state.kind === "venue" ? h("small", null, ` · ${u.reason}`) : null);
+        return h("li", null, h("b", null, shortDate(u.date)), ` ${n.theme}${n.sponsor ? ` · ${n.sponsor}` : ""}`, null);
       }),
     ),
   );
@@ -287,8 +308,8 @@ class FixStage {
   private buildPack(): void {
     const n = this.swaps.length;
     const wrap = h("div", { class: "pack-wrap", id: "packWrap" });
-    const pack = packEl("button", `Open the pack: ${n} swap${n === 1 ? "" : "s"}`, `${n} new card${n === 1 ? "" : "s"} · sealed`, copy().season === "season" ? undefined : "Summer swaps");
-    const hint = h("p", { class: "pack-hint" }, `Homestand has ${n} swap${n === 1 ? "" : "s"} ready. Tap the pack to tear it open.`);
+    const pack = packEl("button", `Open the pack: ${n} ${state.kind === "venue" ? "offer" : "swap"}${n === 1 ? "" : "s"}`, `${n} new card${n === 1 ? "" : "s"} · sealed`, copy().season === "season" ? undefined : "Summer offers", state.kind === "venue");
+    const hint = h("p", { class: "pack-hint" }, `Homestand has ${n} ${state.kind === "venue" ? "offer" : "swap"}${n === 1 ? "" : "s"} ready. Tap the pack to tear it open.`);
     const skip = h("button", { type: "button", class: "btn ghost sm", "data-testid": "skip-pack", onclick: () => this.open(false) }, "Skip the tearing");
     wrap.append(pack, hint, skip);
     pack.addEventListener("click", () => this.open(true));
@@ -544,6 +565,7 @@ class FixStage {
     if (this.busy) return;
     const id = s.top.id;
     state.decisions[id] = "approved";
+    logYou(`You approved ${s.top.date}: ${shownSwap(s)}.`);
     this.repaintTally();
     this.layout();
     if (reduced()) {
@@ -584,6 +606,7 @@ class FixStage {
 
   private reject(s: Slide): void {
     state.decisions[s.top.id] = "rejected";
+    logYou(`You rejected ${s.top.date}: ${shownSwap(s)}.`);
     this.repaintTally();
     this.layout();
     if (!reduced()) {
@@ -600,6 +623,7 @@ class FixStage {
     if (this.busy) return;
     const was = state.decisions[s.top.id];
     delete state.decisions[s.top.id];
+    if (was) logYou(`You undid your ${was === "approved" ? "approval" : "rejection"} for ${s.top.date}.`);
     this.repaintTally();
     this.layout();
     if (was === "approved") {
@@ -634,8 +658,8 @@ class FixStage {
   private idleAgent(): void {
     const a = state.analysis!, p = state.propose!;
     this.steps.replaceChildren();
-    this.add([h("div", { class: "ic" }, "A"), h("div", null, h("div", { class: "k" }, "Ready"), h("div", { class: "m" }, `Homestand rated all ${a.nights.length} ${copy().nights} against ${cityOfLabel(a.market.label)}'s own taste and found `, h("b", null, `${p.proposals.length} swap${p.proposals.length === 1 ? "" : "s"}`), `, ${p.angles.length} ${state.kind === "venue" ? "support-act" : "sponsor"} idea${p.angles.length === 1 ? "" : "s"} and ${p.unfixed.length} ${p.unfixed.length === 1 ? copy().night : copy().nights} it could not fix.`))], true);
-    this.add([h("div", { class: "ic" }, "★"), h("div", null, h("div", { class: "k" }, "Next"), h("div", { class: "m" }, "Open the pack. Each swap keeps its ", h("b", null, "date and sponsor"), ". You decide, one at a time."))], true);
+    this.add([h("div", { class: "ic" }, "A"), h("div", null, h("div", { class: "k" }, "Ready"), h("div", { class: "m" }, `Homestand rated all ${a.nights.length} ${copy().nights} against ${cityOfLabel(a.market.label)}'s own taste and found `, h("b", null, `${p.proposals.length} ${state.kind === "venue" ? "offer" : "swap"}${p.proposals.length === 1 ? "" : "s"}`), `, ${p.angles.length} ${state.kind === "venue" ? "opener" : "sponsor"} idea${p.angles.length === 1 ? "" : "s"} and ${p.unfixed.length} ${p.unfixed.length === 1 ? copy().night : copy().nights} it could not fix.`))], true);
+    this.add([h("div", { class: "ic" }, "★"), h("div", null, h("div", { class: "k" }, "Next"), h("div", { class: "m" }, `Open the pack. Each ${state.kind === "venue" ? "offer" : "swap"} keeps its `, h("b", null, "date and sponsor"), ". You decide, one at a time."))], true);
   }
 
   /** The last line of the stream: where the swap stands (approved, rejected or waiting). */
@@ -645,7 +669,7 @@ class FixStage {
     const el =
       d === "approved" ? this.add([h("div", { class: "ic ok" }, "✓"), h("div", null, h("div", { class: "k" }, "Approved"), h("div", { class: "m" }, h("b", null, toLabel(p)), ` lands on ${shortDate(p.date)}. ${night.sponsor ? `${night.sponsor} stays.` : "The date stays."}`))], quick)
       : d === "rejected" ? this.add([h("div", { class: "ic" }, "–"), h("div", null, h("div", { class: "k" }, "Rejected"), h("div", { class: "m" }, "Kept as planned. You can still approve it."))], quick)
-      : this.add([h("div", { class: "ic" }, "…"), h("div", { class: "wait" }, h("div", { class: "k" }, "Waiting for your approval"), h("div", { class: "m" }, "Approve the swap or reject it", h("span", { class: "dots" }, h("span", null, "."), h("span", null, "."), h("span", null, "."))))], quick);
+      : this.add([h("div", { class: "ic" }, "…"), h("div", { class: "wait" }, h("div", { class: "k" }, "Waiting for your approval"), h("div", { class: "m" }, state.kind === "venue" ? "Approve the offer or reject it" : "Approve the swap or reject it", h("span", { class: "dots" }, h("span", null, "."), h("span", null, "."), h("span", null, "."))))], quick);
     el.classList.add("tail");
   }
 
@@ -714,6 +738,35 @@ function sparks(card: HTMLElement): void {
 /** "No usable reply." reads like an error to a director, so it goes to the console instead. */
 const quiet = (detail: string | undefined): boolean => !!detail && /no usable reply/i.test(detail);
 
+const TAGS: Record<string, string> = { resolve: "Name match", constraint: "Rule check", propose: "Swap idea", model: "AI wording", qloo: "Data", score: "Rating", note: "Note" };
+const isAutoMatch = (s: TraceStep): boolean => s.kind === "resolve" && / matched /.test(s.text);
+
+/** Steps as list rows. Names that matched on their own fold into one line, so the ones that needed a look stand out. */
+function traceItems(title: string, steps: TraceStep[]): HTMLElement[] {
+  const row = (s: TraceStep): HTMLElement => {
+    if (quiet(s.detail)) console.debug(`[homestand] ${title}: ${s.text} ${s.detail}`);
+    return h("li", null, h("span", { class: "trace-kind" }, `${TAGS[s.kind] ?? s.kind} at ${new Date(s.at).toLocaleTimeString("en-US")}`), h("span", null, localizeDates(s.text)), s.detail && !quiet(s.detail) ? h("span", { class: "small" }, localizeDates(s.detail)) : null);
+  };
+  const auto = steps.filter(isAutoMatch);
+  if (auto.length < 3) return steps.map(row);
+  const out: HTMLElement[] = [];
+  let placed = false;
+  for (const s of steps) {
+    if (!isAutoMatch(s)) { out.push(row(s)); continue; }
+    if (placed) continue;
+    placed = true;
+    out.push(h("li", { class: "trace-fold" }, h("details", null, h("summary", null, `${auto.length} names matched automatically (show)`), h("ol", { class: "trace-list" }, auto.map(row)))));
+  }
+  return out;
+}
+
+/** "Bluey Day to PAW Patrol Day", for the log. */
+function shownSwap(s: Slide): string {
+  const from = state.analysis!.nights[s.top.index]?.theme ?? "";
+  const e = effective(s.top);
+  return `${from} to ${e.discovered?.name ?? themeById(e.toThemeId)?.label ?? e.toThemeId}`;
+}
+
 export function openTrace(): void {
   openDrawer("How Homestand decided", () => [
     h("p", { class: "small" }, "Every step, in order: how names were matched, each Qloo call (saved or live, with time), each rule check, and each AI call. Code does the scoring and the choosing. The AI only words the reasons."),
@@ -725,10 +778,7 @@ export function openTrace(): void {
         h(
           "ol",
           { class: "trace-list" },
-          g.steps.map((s) => {
-            if (quiet(s.detail)) console.debug(`[homestand] ${g.title}: ${s.text} ${s.detail}`);
-            return h("li", null, h("span", { class: "trace-kind" }, `${s.kind} at ${new Date(s.at).toLocaleTimeString("en-US")}`), h("span", null, localizeDates(s.text)), s.detail && !quiet(s.detail) ? h("span", { class: "small" }, localizeDates(s.detail)) : null);
-          }),
+          traceItems(g.title, g.steps),
         ),
       ),
     ),

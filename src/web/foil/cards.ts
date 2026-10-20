@@ -153,7 +153,7 @@ function backFace(b: BackSpec): HTMLElement {
   if (scored && ix !== null) {
     body.push(
       h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Fit", h("b", null, fitName(b.fit)))),
-      h("div", { class: "bk-why", "data-testid": "bk-line" }, fitLine(b.themeName, b.city, ix)),
+      h("div", { class: "bk-why", "data-testid": "bk-line" }, fitLine(b.themeName, b.city, ix, copy().night === "date" ? "venue" : "club")),
     );
   } else {
     body.push(h("div", { class: "bk-why" }, h("b", null, fitName(b.fit)), b.reason ?? ""));

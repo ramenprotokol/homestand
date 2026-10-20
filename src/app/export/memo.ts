@@ -40,6 +40,9 @@ export interface MemoData {
   recordedLabel: string | null;
   /** Qloo's local family ideas for this area, when they were available. */
   ideas?: { city: string; titles: string[]; scored: number; poolSize: number };
+  /** Nights still rated a weak fit with no swap made, and swaps the user turned down. */
+  stillWeak?: string[];
+  rejected?: string[];
   /** True for a sample calendar we wrote (the memo then says so). */
   sample?: boolean;
   /** Venue runs: acts that stand out near the venue, when the pool was scored. */
@@ -63,8 +66,9 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "sugg
   const suggested = Math.max(d.suggested, approved);
   const head = `Homestand checked ${d.nights} ${copyFor(d.kind).themeNights} for ${d.club} against local taste data from Qloo.`;
   if (suggested === 0) return `${head} It suggested no swaps, so the calendar is unchanged.`;
-  const said = `It suggested ${suggested} swap${suggested === 1 ? "" : "s"}; ${approved === 0 ? "none is" : approved === 1 ? "1 is" : `${approved} are`} in the revised calendar.`;
-  return `${head} ${said} ${approved === 0 ? "The calendar is unchanged." : "Each approved swap keeps its original date and sponsor."}`;
+  const noun = d.kind === "venue" ? "offer" : "swap";
+  const said = `It suggested ${suggested} ${noun}${suggested === 1 ? "" : "s"}; ${approved === 0 ? "none is" : approved === 1 ? "1 is" : `${approved} are`} in the revised calendar.`;
+  return `${head} ${said} ${approved === 0 ? "The calendar is unchanged." : `Each approved ${noun} keeps its original date and sponsor.`}`;
 }
 
 /** One printable page. Cites the local pull (index) behind each swap; never the per-entity Qloo values. */
@@ -90,7 +94,7 @@ export function buildMemoHtml(d: MemoData): string {
       })
       .join("") + (collapse ? `<li>For the themes from our list, the new theme is a stronger fit for this town than the planned one. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>` : "");
   const ideas = d.ideas && d.ideas.titles.length > 0
-    ? `<h2>Family movies ${escapeHtml(d.ideas.city)} likes more than most towns</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}. Try one for a family night.</p>`
+    ? `<h2>Family movies ${escapeHtml(d.ideas.city)} likes more than most towns</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}. Use one for a family night.</p>`
     : "";
   const acts = d.acts && d.acts.names.length > 0
     ? `<h2>Acts ${escapeHtml(d.acts.city)} likes more than most cities</h2><p>${d.acts.names.map(escapeHtml).join(", ")}.</p>`
@@ -103,14 +107,16 @@ export function buildMemoHtml(d: MemoData): string {
 <p class="meta">Prepared ${escapeHtml(longDate(d.generatedOn))} with Homestand.${recorded}${venue && d.sample ? " This is a made-up calendar for a sample amphitheatre, not a real venue's schedule." : ""}</p>
 ${banner}
 <p>${escapeHtml(memoOpener(d))}</p>
-${d.swaps.length ? `<h2>Approved swaps</h2>
+${d.swaps.length ? `<h2>Approved ${venue ? "offers" : "swaps"}</h2>
 <div class="memo-scroll"><table><thead><tr><th>${C.night.replace(/^./, (c) => c.toUpperCase())}</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Fit: before \u2192 after</th></tr></thead><tbody>${rows}</tbody></table></div>
-<h2>Why</h2><ul>${whys}</ul>` : `<p>No swaps were approved. The calendar is unchanged.</p>`}
+<h2>Why</h2><ul>${whys}</ul>` : `<p>No ${venue ? "offers were" : "swaps were"} approved. The calendar is unchanged.</p>`}
+${d.rejected?.length ? `<h2>Rejected</h2><p>${d.rejected.map(escapeHtml).join("; ")}.</p>` : ""}
+${d.stillWeak?.length ? `<h2>Still weak, no swap</h2><p>${d.stillWeak.map(escapeHtml).join("; ")}.</p>` : ""}
 ${venue ? acts : ideas}
-${d.angles.length ? `<h2>${venue ? "Locked headliners: support-act ideas" : "Locked nights: sponsor ideas"}</h2><ul>${angles}</ul>` : ""}
+${d.angles.length ? `<h2>${venue ? "Locked headliners: an opener idea" : "Locked nights: an idea for the sponsor"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
 <p>Strong, average and weak compare each theme with this ${C.place}'s other themes. They describe taste, not ticket sales.</p>
-<p>${d.nights} ${C.nights} were reviewed; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : "(fireworks, giveaways, heritage nights and similar)"} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
+<p>${d.nights} ${C.nights} were reviewed; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : "(fireworks, giveaways, heritage nights and similar)"} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded. Taste data comes from Qloo. Every ${venue ? "offer" : "swap"} keeps its date and sponsor.</p>
 </article>`;
 }
 

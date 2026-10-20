@@ -5,8 +5,10 @@ import { buildMemoHtml, memoDocument, type MemoData } from "../../app/export/mem
 import { themeById } from "../../app/themes/artists";
 import { syntheticBanner } from "../components";
 import { makeCard, specOf } from "../foil/cards";
-import { actIdeas, ideaTitles } from "./fix";
+import { actIdeas, clubAngleParts, ideaTitles, openerLine } from "./fix";
 import { cityOfLabel } from "../../app/kind";
+import { fitWord } from "../../app/score";
+import { shortDate } from "../../app/dates";
 import { Fireworks } from "../foil/fx";
 import { onCleanup, onMount, onResize, route, routeContext, whileVisible } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
@@ -24,7 +26,7 @@ function exportRows(): ExportRow[] {
     const v = viewOf(n);
     // A venue's swapped date is a new hold: the old note ("offer out") belongs to the act that was dropped, so it is never inherited.
     const note = !v.swappedFrom ? n.notes : state.kind === "venue" ? `New hold${v.discovered ? " (local favorite)" : ""}: withdraw the offer to ${n.theme}` : [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", local favorite" : ""})`].filter(Boolean).join(". ");
-    return { date: n.date, theme: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: note };
+    return { date: n.date, theme: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: note, fit: fitWord(v.fit) };
   });
 }
 
@@ -48,9 +50,13 @@ function memoData(): MemoData {
     date: p.date, weekday: p.weekday, from: a.nights[p.index]!.theme, to: swapTitle(a.nights[p.index]!.theme, p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId), sponsor: p.sponsor,
     fromZ: p.from.z, toZ: p.to.z, fromEntities: (a.themes[p.fromThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), toEntities: p.discovered ? [p.discovered.name] : (a.themes[p.toThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
   }));
+  const views = a.nights.map(viewOf);
+  const stillWeak = views.filter((v) => v.fit === "leans-away" && !v.swappedFrom).map((v) => `${shortDate(v.night.date)} ${v.night.theme}`);
+  const rejected = (state.propose?.proposals ?? []).filter((p) => state.decisions[p.id] === "rejected").map((p) => `${a.nights[p.index]!.theme} \u2192 ${p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId} (${shortDate(p.date)})`);
   return {
+    stillWeak, rejected,
     ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : {}), club: a.market.label, city: cityOfLabel(a.market.label), generatedOn: localDay(), swaps,
-    angles: shownAngles().map((x) => x.text), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
+    angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : clubAngleParts(x, cityOfLabel(a.market.label)).filter(Boolean).join(" ")), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
     ...(state.kind === "venue" ? { acts: actsOf(a.market.label) } : {}),
     synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedLabel: a.recordedAt ? formatDateTime(a.recordedAt) : null,
@@ -70,7 +76,7 @@ export function sendView(): HTMLElement {
   const data = memoData();
 
   const weakLeft = views.filter((v) => v.fit === "leans-away").length;
-  const summary = swaps.length === 0 ? `No swaps made, so the calendar is unchanged. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left. You can still download the memo.` : `${swaps.length} swap${swaps.length === 1 ? "" : "s"} made. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left.`;
+  const summary = swaps.length === 0 ? `No ${state.kind === "venue" ? "offers" : "swaps"} made, so the calendar is unchanged. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left. You can still download the memo.` : `${swaps.length} ${state.kind === "venue" ? "offer" : "swap"}${swaps.length === 1 ? "" : "s"} made. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left.`;
 
   // The fan: every approved swap, landed, in the glowing frame.
   const fan = h("div", { class: "fan" });
@@ -93,7 +99,7 @@ export function sendView(): HTMLElement {
     { class: "final" },
     h("h2", { class: "final-h" }, "The finished deck"),
     h("div", { class: "grid grid--final" }, views.map((v) => {
-      const c = makeCard(specOf(v), { inert: true, extra: v.swappedFrom ? [h("div", { class: "stamp stamp--swap" }, "SWAPPED")] : [] });
+      const c = makeCard(specOf(v), { inert: true, extra: v.swappedFrom ? [h("div", { class: "stamp stamp--swap" }, state.kind === "venue" ? "OFFER" : "SWAPPED")] : [] });
       c.dataset.notilt = "1";
       if (v.swappedFrom) c.classList.add("tile--swapped");
       return h("div", { class: "slot" }, c);

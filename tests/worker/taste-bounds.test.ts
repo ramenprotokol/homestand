@@ -54,7 +54,7 @@ describe("the taste graph is bounded", () => {
     });
     const out = await proposeSwaps(d, { market, nights, allowDuplicates: false });
     expect(tasteCalls(urls)).toHaveLength(MAX_LIVE_TASTE);
-    expect(out.trace.some((t) => /at most 5 live taste lookups are made per request/.test(t.text))).toBe(true);
+    expect(out.trace.some((t) => /at most 5 live lookups are made per request/.test(t.text))).toBe(true);
     expect(out.angles.filter((a) => a.options === undefined).length).toBe(3); // generic wording for the three beyond the cap
     // Asking again finishes the rest from what is recorded plus up to five more.
     urls.length = 0;

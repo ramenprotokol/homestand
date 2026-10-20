@@ -29,9 +29,10 @@ function topbar(route: string): HTMLElement {
     "header",
     { class: "nav", id: "nav" },
     h("a", { class: "logo brand", href: "#/", "aria-label": "Homestand, start" }, "Homestand"),
+    ready ? null : h("a", { class: "pick-first", href: "#/sample", "data-testid": "pick-first" }, "Pick a club to start"),
     h(
       "nav",
-      { "aria-label": "Steps" },
+      { "aria-label": "Steps", class: ready ? "" : "steps-off" },
       h(
         "ol",
         { class: "steps" },
@@ -45,8 +46,8 @@ function topbar(route: string): HTMLElement {
     h(
       "div",
       { class: "nav-r" },
-      state.market ? h("span", { class: "club" }, h("i"), shortLabel(state.market.label)) : null,
-      h("a", { class: "out study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
+      state.market ? h("a", { class: "club", href: "#/sample", "data-testid": "change-club", "aria-label": `${shortLabel(state.market.label)}. Change club` }, h("i"), shortLabel(state.market.label), h("span", { class: "club-change" }, "Change club")) : null,
+      h("a", { class: "study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
     ),
   );
 }
@@ -62,6 +63,11 @@ function view(route: string): HTMLElement {
   route = baseOf(route) === "/check" ? "/check" : route;
   // A reload on Fix or Send re-checks the saved club first: show Check's loading or error screen until it is ready.
   if ((route === "/fix" || route === "/send") && !state.analysis && (ui.loading || ui.error)) return checkView();
+  if ((route === "/fix" || route === "/send") && !state.analysis && !ui.loading && !ui.error) {
+    ui.pickNote = true;
+    navigate("#/sample");
+    return h("div");
+  }
   switch (route) {
     case "/sample": return pickView();
     case "/own": return ownView();
@@ -69,8 +75,13 @@ function view(route: string): HTMLElement {
     case "/fix": return fixView();
     case "/send": return sendView();
     case "/study": return studyView();
-    default: return startView();
+    case "/": return startView();
+    default: return notFoundView();
   }
+}
+
+function notFoundView(): HTMLElement {
+  return h("section", { class: "scene" }, h("div", { class: "wrap narrow" }, h("h1", { class: "h2", tabindex: "-1" }, "That page doesn't exist"), h("p", { class: "lede" }, "The link may be old or mistyped."), h("div", { class: "actions" }, h("a", { class: "btn pri", href: "#/", "data-testid": "go-home" }, "Go to the home page"))));
 }
 
 const TITLES: Record<string, string> = { "/check": "Check", "/fix": "Fix", "/send": "Send", "/study": "The Study", "/sample": "Pick a sample club", "/own": "Use your own" };
@@ -87,6 +98,7 @@ function render(): void {
   // Stop every loop, tween and observer the last screen started before its elements are removed.
   teardown();
   routeState.entering = changed;
+  if (route !== "/sample") ui.pickNote = false;
   clear(app);
   const main = h("main", { id: "main", tabindex: "-1" });
   main.append(view(route));

@@ -17,7 +17,7 @@ export const FIT_WORDS: Record<FitLabel, string> = {
 export const fitWord = (fit: FitLabel): string => FIT_WORDS[fit];
 
 /** What each rating means, in one plain line (the legend, and the first thing a newcomer reads). Always "compared with this town's other themes". */
-export const FIT_MEANING: Record<FitLabel, string> = {
+const FIT_MEANING_CLUB: Record<FitLabel, string> = {
   "leans-in": "People here like it more than this town's other themes.",
   average: "People here like it about as much as this town's other themes.",
   "leans-away": "People here like it less than this town's other themes.",
@@ -25,6 +25,10 @@ export const FIT_MEANING: Record<FitLabel, string> = {
   classic: "A tried-and-true promo. We leave it alone.",
   found: "People in this town like it more than people in most towns do.",
 };
+
+/** The same lines for a venue say "acts" where a club says "themes". */
+export const fitMeaning = (fit: FitLabel, kind?: Kind): string => (kind === "venue" ? FIT_MEANING_CLUB[fit].replace("other themes", "other acts").replace("this name", "this act") : FIT_MEANING_CLUB[fit]);
+export const FIT_MEANING = FIT_MEANING_CLUB;
 
 /** z at or beyond these cut-offs is a Strong fit / a Weak fit. */
 export const Z_CUT = 0.5;
@@ -109,29 +113,30 @@ export function centre(zs: ReadonlyArray<number | null>): Centred {
 export function marketLevelSentence(meanZ: number | null, kind?: Kind): string {
   if (meanZ === null) return "";
   const level = meanZ <= -0.25 ? "lower than usual" : meanZ >= 0.25 ? "higher than usual" : "about the same as usual";
-  return `Compared with other ${copyFor(kind).markets}, this ${copyFor(kind).place} scores ${level} on most themes.`;
+  return `Compared with other ${copyFor(kind).markets}, this ${copyFor(kind).place} scores ${level} on most ${kind === "venue" ? "acts" : "themes"}.`;
 }
 
 /** The one plain line that says what a rating means for this theme, always against the town's own other themes. */
-export function comparisonSentence(themeLabel: string, label: FitLabel, city = "This town"): string {
+export function comparisonSentence(themeLabel: string, label: FitLabel, city = "This town", kind?: Kind): string {
+  const others = kind === "venue" ? "its other acts" : "its other themes";
   switch (label) {
     case "leans-in":
-      return `${city} likes ${themeLabel} more than its other themes.`;
+      return `${city} likes ${themeLabel} more than ${others}.`;
     case "leans-away":
-      return `${city} likes ${themeLabel} less than its other themes.`;
+      return `${city} likes ${themeLabel} less than ${others}.`;
     case "average":
-      return `${city} likes ${themeLabel} about as much as its other themes.`;
+      return `${city} likes ${themeLabel} about as much as ${others}.`;
     default:
       return "";
   }
 }
 
 /** The same line, from the size of the gap: "Biloxi likes Star Wars much less than its other themes." */
-export function fitLine(themeLabel: string, city: string, index: number | null): string {
+export function fitLine(themeLabel: string, city: string, index: number | null, kind?: Kind): string {
   const band = pullBand(index);
   if (band === null) return "";
   const how = band === "well below" ? "much less than" : band === "below" ? "less than" : band === "about" ? "about as much as" : band === "above" ? "more than" : "much more than";
-  return `${city} likes ${themeLabel} ${how} its other themes.`;
+  return `${city} likes ${themeLabel} ${how} ${kind === "venue" ? "its other acts" : "its other themes"}.`;
 }
 
 /** How the method works, in plain words. Shown only under "Show the numbers". */

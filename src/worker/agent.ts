@@ -135,7 +135,7 @@ async function reserveQloo(d: Deps, n: number, trace?: TraceStep[]): Promise<boo
   } catch (err) {
     if (!(err instanceof CounterError)) throw err;
     d.countersDown = true;
-    trace?.push(step(iso(d), "qloo", "The usage counters are unavailable right now, so no live Qloo request is made. Recorded results are used where there are any."));
+    trace?.push(step(iso(d), "qloo", "The usage counters are unavailable right now, so no live Qloo request is made. Saved results are used where there are any."));
     return false;
   }
 }
@@ -208,7 +208,7 @@ export async function getScores(d: Deps, m: MarketIn, trace: TraceStep[]): Promi
     try {
       const stored = JSON.parse(hit) as StoredLibrary;
       if (stored.v === 1) {
-        trace.push(step(iso(d), "qloo", "Used the saved ratings for this town (no new Qloo call).", `Cached, recorded ${stored.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", "Used the saved ratings for this town (no new Qloo call).", `Saved ${stored.fetchedAt}.`));
         return { stored, source: "cache" };
       }
     } catch {
@@ -295,7 +295,7 @@ async function tasteRanked(d: Deps, m: MarketIn, run: TasteRun, trace: TraceStep
     try {
       const s = JSON.parse(hit) as StoredTaste;
       if (s.v === 2) {
-        trace.push(step(iso(d), "qloo", `Used the saved taste graph for fans of ${spec.label} near ${spec.city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", `Used the saved list of what fans of ${spec.label} near ${spec.city} also like (no new Qloo call).`, `Saved ${s.fetchedAt}.`));
         return settle(s);
       }
     } catch {
@@ -303,11 +303,11 @@ async function tasteRanked(d: Deps, m: MarketIn, run: TasteRun, trace: TraceStep
     }
   }
   if (run.live >= MAX_LIVE_TASTE) {
-    trace.push(step(iso(d), "qloo", `Skipped the taste graph for ${spec.label}: at most ${MAX_LIVE_TASTE} live taste lookups are made per request, so the wording stays generic until it is recorded.`));
+    trace.push(step(iso(d), "qloo", `Skipped what fans of ${spec.label} also like: at most ${MAX_LIVE_TASTE} live lookups are made per request, so the wording stays generic until it is saved.`));
     return settle(null);
   }
   if ((d.gate && !(await d.gate.allow("taste"))) || !(await reserveQloo(d, 1, trace))) {
-    trace.push(step(iso(d), "qloo", `Skipped the taste graph for ${spec.label}: the daily allowance is used up or could not be checked, so the wording stays generic.`));
+    trace.push(step(iso(d), "qloo", `Skipped what fans of ${spec.label} also like: the daily allowance is used up or could not be checked, so the wording stays generic.`));
     return settle(null);
   }
   try {
@@ -321,11 +321,11 @@ async function tasteRanked(d: Deps, m: MarketIn, run: TasteRun, trace: TraceStep
     }).sort((x, y) => y.affinity - x.affinity || x.themeId.localeCompare(y.themeId));
     const stored: StoredTaste = { v: 2, fetchedAt: iso(d), ranked };
     await safePut(d.kv, spec.key, JSON.stringify(stored), { expirationTtl: TTL });
-    trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${spec.label} near ${spec.city} also like, among ${spec.cands.length} ${spec.what} (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${spec.label} near ${spec.city} also like, among ${spec.cands.length} ${spec.what} (one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
     return settle(stored);
   } catch (err) {
     console.error("taste graph failed", err instanceof Error ? err.message : String(err));
-    trace.push(step(iso(d), "qloo", `The taste graph for ${spec.label} was not available right now, so the wording stays generic.`));
+    trace.push(step(iso(d), "qloo", `What fans of ${spec.label} also like was not available right now, so the wording stays generic.`));
     return settle(null);
   }
 }
@@ -419,7 +419,7 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     try {
       const s = JSON.parse(hit) as StoredDiscovery;
       if (s.v === 2) {
-        trace.push(step(iso(d), "qloo", `Used the saved family-title scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", `Used the saved family-title scores near ${city} (no new Qloo call).`, `Saved ${s.fetchedAt}.`));
         return { all: s.all, movies: s.movies, shows: s.shows, scored: s.scored, poolSize: s.poolSize, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
       }
     } catch {
@@ -502,7 +502,7 @@ export async function discoverActs(d: Deps, m: MarketIn, trace: TraceStep[]): Pr
     try {
       const s = JSON.parse(hit) as StoredActs;
       if (s.v === 1) {
-        trace.push(step(iso(d), "qloo", `Used the saved touring-act scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", `Used the saved touring-act scores near ${city} (no new Qloo call).`, `Saved ${s.fetchedAt}.`));
         return { acts: s.acts, scored: s.scored, poolSize: s.poolSize, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
       }
     } catch {
@@ -757,10 +757,10 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     const res = resolutions[i]!;
     const text =
       recognised[i] ? `"${r.theme}" is a theme we recognise (${recognised[i]}), but we have no Qloo scores for it yet, so it is left alone.`
-      : res.kind === "theme" ? `"${r.theme}" matched ${d.library.find((t) => t.id === res.themeId)?.label ?? res.themeId} (${res.method === "alias" ? "name list" : "model"}).`
+      : res.kind === "theme" ? `"${r.theme}" matched ${d.library.find((t) => t.id === res.themeId)?.label ?? res.themeId} (${res.method === "alias" ? "our theme list" : "AI wording"}).`
       : res.kind === "pool" ? `"${r.theme}" is the family title ${res.name}: rated from its own local data, not from one of our themes.`
       : res.kind === "classic" ? `"${r.theme}" is a proven promo, so it is not graded.`
-      : res.kind === "ambiguous" ? `"${r.theme}" fits more than one theme, so the director is asked to choose.`
+      : res.kind === "ambiguous" ? `"${r.theme}" fits more than one theme, so you are asked to choose.`
       : `"${r.theme}" is not a theme we can place, so there is no data for it.`;
     trace.push(step(at, "resolve", text));
   });

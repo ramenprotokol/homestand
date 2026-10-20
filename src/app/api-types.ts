@@ -130,7 +130,7 @@ export interface ProposeResponse {
   /** Venue runs only: the acts that stand out near the venue. Null when unavailable; absent for a club run. */
   acts?: ActsOut | null;
   angles: SponsorAngle[];
-  unfixed: Array<{ index: number; date: string; reason: string }>;
+  unfixed: Array<{ index: number; date: string; reason: string; counts?: { strong: number; used: number; wrong: number } }>;
   trace: TraceStep[];
   caps: Caps;
 }

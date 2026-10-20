@@ -145,7 +145,8 @@ export interface ProposeResult {
   proposals: Proposal[];
   angles: SponsorAngle[];
   /** Leans-away nights that could not be fixed, with the reason. */
-  unfixed: Array<{ index: number; date: string; reason: string }>;
+  /** `counts` explain the miss: strong themes, how many are already used, how many are wrong for the night. */
+  unfixed: Array<{ index: number; date: string; reason: string; counts?: { strong: number; used: number; wrong: number } }>;
   trace: TraceStep[];
 }
 
@@ -256,6 +257,13 @@ export function hungarian(cost: number[][]): number[] {
 
 const cap = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** "No swap: Biloxi's 8 strong themes are already on your calendar (5) or wrong for this night (3)." Built from the real counts. */
+export function noSwapLine(c: { strong: number; used: number; wrong: number }, city: string, venue: boolean): string {
+  if (c.strong === 0) return `No swap: none of our ${venue ? "acts" : "themes"} is a strong fit in ${city} right now.`;
+  const parts = [c.used > 0 ? `already on your calendar (${c.used})` : "", c.wrong > 0 ? `wrong for this ${venue ? "date" : "night"} (${c.wrong})` : ""].filter(Boolean);
+  return `No swap: ${city}'s ${c.strong} strong ${c.strong === 1 ? "theme is" : "themes are"} ${parts.length ? parts.join(" or ") : "not available here"}.`;
+}
+
 const REJECT_WORDS: Record<RejectReason, string> = { duplicate: "already used in the season", window: "outside its date window", audience: "wrong audience for this night", "same-theme": "the planned theme" };
 
 /** Ranking and constraints are plain code. Locked nights are filtered out before any candidate is considered. */
@@ -280,7 +288,7 @@ export function propose(input: ProposeInput): ProposeResult {
   const leaning = library
     .filter((t) => fits[t.id]?.label === "leans-in")
     .sort((a, b) => (fits[b.id]!.z ?? 0) - (fits[a.id]!.z ?? 0) || a.id.localeCompare(b.id));
-  trace.push(step(now, "propose", `${leaning.length} theme${leaning.length === 1 ? "" : "s"} from our list ${leaning.length === 1 ? "is" : "are"} a strong fit here and can be offered.`));
+  trace.push(step(now, "propose", `${leaning.length} ${venue ? "act" : "theme"}${leaning.length === 1 ? "" : "s"} from our list ${leaning.length === 1 ? "is" : "are"} a strong fit here and can be offered.`));
 
   // Worst first, so the weakest nights are handled first (the order the trace and the pack read in).
   const ordered = [...away].sort((a, b) => (fits[a.themeId!]!.z ?? 0) - (fits[b.themeId!]!.z ?? 0) || a.index - b.index);
@@ -295,6 +303,7 @@ export function propose(input: ProposeInput): ProposeResult {
   interface Gathered {
     passing: Array<{ theme: Theme; detail: string }>;
     rejected: string;
+    counts: { strong: number; used: number; wrong: number };
   }
   /** Every library theme that passes the rules for one night, best first. Uses the themes on the calendar as "used", so all nights see the same pool. */
   const gather = (night: PlanNight, original: Theme): Gathered => {
@@ -313,7 +322,7 @@ export function propose(input: ProposeInput): ProposeResult {
     passing.sort((x, y) => rankOf(original, x.theme) - rankOf(original, y.theme));
     // A venue run never crosses into another genre family: only the same genre or a related one.
     if (venue) passing.splice(0, passing.length, ...passing.filter((x) => genreTier(original.genre, x.theme.genre) <= 1));
-    return { passing, rejected };
+    return { passing, rejected, counts: { strong: leaning.length, used: rejects.duplicate + rejects["same-theme"], wrong: rejects.audience + rejects.window } };
   };
 
   // Assign swaps jointly, not first come first served: the set of swaps with the best total fit wins, so a night that has one good
@@ -376,7 +385,7 @@ export function propose(input: ProposeInput): ProposeResult {
     if (mine?.kind === "act") {
       const found = actPool[mine.idx]!;
       const actTier = mine.tier;
-      trace.push(step(now, "constraint", `${night.date} ${original.label}: ${g.passing.length === 0 ? "no theme from our list passed" : "no theme from our list that close in genre was as good a fit"}, so an act of ${actTier === 0 ? "the same genre" : "a related genre"} that people in ${city} like more than most towns do is offered: ${found.name}.`, `Local favorite: not graded against our theme list.${rejected ? ` Themes ruled out: ${rejected}.` : ""}`));
+      trace.push(step(now, "constraint", `${night.date} ${original.label}: ${g.passing.length === 0 ? `no ${venue ? "act" : "theme"} from our list passed` : `no ${venue ? "act" : "theme"} from our list that close in genre was as good a fit`}, so an act of ${actTier === 0 ? "the same genre" : "a related genre"} that people in ${city} like more than most towns do is offered: ${found.name}.`, `Local favorite: not graded against our list.${rejected ? ` Ruled out: ${rejected}.` : ""}`));
       proposals.push({
         id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor,
         fromThemeId: original.id, toThemeId: discoveredId(found), alternates: [], from: fits[original.id]!, to: { label: "found", z: null, score: null },
@@ -397,7 +406,7 @@ export function propose(input: ProposeInput): ProposeResult {
     if (!chosen && isYoung(original.audience) && standing >= 0) {
       const found = pool.splice(standing, 1)[0]!;
       const toId = discoveredId(found);
-      trace.push(step(now, "constraint", `${night.date} ${original.label}: no theme from our list passed, so a family ${found.type === "movie" ? "movie" : "show"} that people in ${city} like more than most towns do is offered: ${found.name}.`, `Local favorite: not graded against our theme list.${rejected ? ` Themes ruled out: ${rejected}.` : ""}`));
+      trace.push(step(now, "constraint", `${night.date} ${original.label}: no theme from our list passed, so a family ${found.type === "movie" ? "movie" : "show"} that people in ${city} like more than most towns do is offered: ${found.name}.`, `Local favorite: not graded against our list.${rejected ? ` Ruled out: ${rejected}.` : ""}`));
       proposals.push({
         id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor,
         fromThemeId: original.id, toThemeId: toId, alternates: [], from: fits[original.id]!, to: { label: "found", z: null, score: null },
@@ -441,7 +450,7 @@ export function propose(input: ProposeInput): ProposeResult {
       const decentIdx = originalZ <= -1 ? pool.findIndex((x) => (x.z ?? -9) >= 0) : -1;
       if (decentIdx >= 0) {
         const found = pool.splice(decentIdx, 1)[0]!;
-        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience is a strong fit here, so a well-known family ${found.type === "movie" ? "movie" : "show"} that holds up in ${city} is offered as its best option: ${found.name}.`, "Local favorite: not graded against our theme list."));
+        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience is a strong fit here, so a well-known family ${found.type === "movie" ? "movie" : "show"} that holds up in ${city} is offered as its best option: ${found.name}.`, "Local favorite: not graded against our list."));
         proposals.push({
           ...common, toThemeId: discoveredId(found), to: { label: "found", z: null, score: null }, discovered: found,
           checks: checks.map((c) => (c.startsWith("Same audience") ? "A well-known family title, so it suits a kids or family night." : c)),
@@ -452,14 +461,14 @@ export function propose(input: ProposeInput): ProposeResult {
     }
     if (!chosen) {
       const young = isYoung(original.audience);
-      unfixed.push({ index: night.index, date: night.date, reason: venue ? `No ${original.genre ? `${GENRE_WORDS[original.genre]} ` : ""}act, or act in a related genre, is a strong fit here for this date.` : young ? "No family theme is a strong fit here for this date." : "No strong-fit theme passes the date, audience and no-repeat checks." });
-      trace.push(step(now, "constraint", `${night.date} ${original.label}: no candidate passed (${rejected || "none left"}).`));
+      unfixed.push({ index: night.index, date: night.date, reason: venue ? `No ${original.genre ? `${GENRE_WORDS[original.genre]} ` : ""}act, or act in a related genre, is a strong fit here for this date.` : young ? "No family theme is a strong fit here for this date." : "No strong-fit theme passes the date, audience and no-repeat checks.", counts: g.counts });
+      trace.push(step(now, "constraint", `${night.date} ${original.label}: ${noSwapLine(g.counts, city, venue)}`));
       continue;
     }
     const tier = venue
       ? TIER_WORDS[genreTier(original.genre, chosen.genre)]
       : ["same kind of theme", "same audience", "another theme that fits the night"][likeness(original, chosen)]!;
-    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by ${venue ? "same genre, then a related genre" : "same kind of theme"} first, then same audience, then how strong a fit (this one: ${tier}).${rejected ? ` Other themes ruled out: ${rejected}.` : ""}`));
+    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by ${venue ? "same genre, then a related genre" : "same kind of theme"} first, then same audience, then how strong a fit (this one: ${tier}).${rejected ? ` Others ruled out: ${rejected}.` : ""}`));
     ranked.set(`${night.date}-${night.index}`, passing.slice(1).map((x) => x.theme.id));
     if (!allowDuplicates) used.add(chosen.id);
     proposals.push({
