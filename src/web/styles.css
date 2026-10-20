@@ -93,7 +93,7 @@ h1.h2,h2.h2{overflow-wrap:anywhere}
 .ticket:hover,.ticket:focus-visible{transform:translateY(-4px) rotate(-.6deg);box-shadow:0 30px 60px rgba(0,0,0,.55),0 0 50px rgba(255,217,122,.35),inset 0 0 0 1px rgba(168,56,44,.35)}
 .tk-stub{display:flex;flex-direction:column;justify-content:center;gap:8px;padding:18px 14px 18px 18px;background:linear-gradient(160deg,#c9283c,#8e1530);color:#ffe9c4;border-right:2px dashed rgba(255,233,196,.6)}
 .tk-k{font-family:var(--cond);font-size:11px;letter-spacing:.24em;text-transform:uppercase}
-.tk-city{font-family:var(--script);font-size:clamp(24px,2.4vw,32px);line-height:1;color:#fff}
+.tk-city{font-family:var(--accent);font-style:italic;font-weight:700;font-size:clamp(24px,2.4vw,32px);line-height:1;color:#fff}
 .tk-main{display:flex;flex-direction:column;gap:6px;padding:18px 20px;justify-content:center}
 .tk-main b{font-family:var(--slab);font-weight:400;font-size:clamp(17px,1.5vw,21px);color:#16194a;line-height:1.15}
 .tk-main span{font-size:13.5px;color:#4a3a20}
