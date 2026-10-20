@@ -189,7 +189,7 @@ async function askQloo(d: Deps, m: MarketIn, themes: readonly LiveTheme[], trace
     });
     for (const r of rows) byId.set(r.entityId, r.affinity);
     const got = rows.filter((r) => r.affinity !== null).length;
-    trace.push(step(iso(d), "qloo", `Asked Qloo about ${ids.length} ${type.replace("_", " ")} entit${ids.length === 1 ? "y" : "ies"} around the market (80 km).`, `Live call at ${iso(d)}. ${got} of ${ids.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    trace.push(step(iso(d), "qloo", `Asked Qloo about ${ids.length} ${type.replace("_", " ")} item${ids.length === 1 ? "" : "s"} around the town (80 km).`, `Live call at ${iso(d)}. ${got} of ${ids.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
   }
   const out: Record<string, StoredTheme> = {};
   for (const t of themes) out[t.id] = { fetchedAt: at, entities: t.entities.map((e) => ({ key: e.key, name: e.names[0]!, type: e.type, affinity: byId.get(e.id) ?? null })) };
@@ -208,7 +208,7 @@ export async function getScores(d: Deps, m: MarketIn, trace: TraceStep[]): Promi
     try {
       const stored = JSON.parse(hit) as StoredLibrary;
       if (stored.v === 1) {
-        trace.push(step(iso(d), "qloo", "Used the recorded scores for this market (no new Qloo call).", `Cached, recorded ${stored.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", "Used the saved ratings for this town (no new Qloo call).", `Cached, recorded ${stored.fetchedAt}.`));
         return { stored, source: "cache" };
       }
     } catch {
@@ -250,7 +250,7 @@ function allOut(d: Deps, s: Scores): Record<string, ThemeScoreOut> {
     if (o.z !== null) {
       if (o.index === null) {
         o.label = "not-scored";
-        o.reason = "Too few themes were scored at this market to compare one theme with its average.";
+        o.reason = "Too few themes had data in this town to compare one theme with its other themes.";
       } else o.label = labelForZ(o.index);
     }
   });
@@ -295,7 +295,7 @@ async function tasteRanked(d: Deps, m: MarketIn, run: TasteRun, trace: TraceStep
     try {
       const s = JSON.parse(hit) as StoredTaste;
       if (s.v === 2) {
-        trace.push(step(iso(d), "qloo", `Used the recorded taste graph for fans of ${spec.label} near ${spec.city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", `Used the saved taste graph for fans of ${spec.label} near ${spec.city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
         return settle(s);
       }
     } catch {
@@ -321,7 +321,7 @@ async function tasteRanked(d: Deps, m: MarketIn, run: TasteRun, trace: TraceStep
     }).sort((x, y) => y.affinity - x.affinity || x.themeId.localeCompare(y.themeId));
     const stored: StoredTaste = { v: 2, fetchedAt: iso(d), ranked };
     await safePut(d.kv, spec.key, JSON.stringify(stored), { expirationTtl: TTL });
-    trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${spec.label} near ${spec.city} also lean toward, among ${spec.cands.length} ${spec.what} (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    trace.push(step(iso(d), "qloo", `Asked Qloo what fans of ${spec.label} near ${spec.city} also like, among ${spec.cands.length} ${spec.what} (taste graph, one call).`, `Live call at ${iso(d)}. ${ranked.length} came back with a reading.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
     return settle(stored);
   } catch (err) {
     console.error("taste graph failed", err instanceof Error ? err.message : String(err));
@@ -373,7 +373,7 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
     });
     const sameKind = ranked.filter((t) => categoryGroup(t.category) === categoryGroup(original.category));
     const who = angle.sponsor || "the sponsor";
-    const options: AngleOption[] = (sameKind.length > 0 ? sameKind : ranked).slice(0, 10).map((t) => ({ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${t.label}, so if ${who} is open to it, a small ${t.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` }));
+    const options: AngleOption[] = (sameKind.length > 0 ? sameKind : ranked).slice(0, 10).map((t) => ({ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also like ${t.label}, so if ${who} is open to it, a small ${t.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` }));
     if (options.length === 0) {
       out.push(angle);
       continue;
@@ -419,7 +419,7 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
     try {
       const s = JSON.parse(hit) as StoredDiscovery;
       if (s.v === 2) {
-        trace.push(step(iso(d), "qloo", `Used the recorded family-title scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", `Used the saved family-title scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
         return { all: s.all, movies: s.movies, shows: s.shows, scored: s.scored, poolSize: s.poolSize, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
       }
     } catch {
@@ -450,14 +450,14 @@ export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promis
       everything.push(...all);
       ranked[type] = all.filter((x) => x.major === true && (x.popularity ?? 0) >= IDEA_POPULARITY).slice(0, 12);
       const n = ref.pool.filter((p) => p.type === type).length;
-      trace.push(step(iso(d), "qloo", `Asked Qloo about ${n} family-friendly animated ${type === "movie" ? "movies" : "shows"} near ${city} (80 km), and compared each with its spread over ${ref.markets} ballpark markets, centred on this market's own average over the pool.`, `Live call at ${iso(d)}. Qloo had local data for ${all.length} of ${n}. ${all.filter(standsOut).length} stand out here.${synthetic}`));
+      trace.push(step(iso(d), "qloo", `Asked Qloo about ${n} family-friendly animated ${type === "movie" ? "movies" : "shows"} near ${city} (80 km), and compared each with how much people in ${ref.markets} other towns like it, then with this town's own average over the pool.`, `Live call at ${iso(d)}. Qloo had local data for ${all.length} of ${n}. ${all.filter(standsOut).length} stand out here.${synthetic}`));
     }
     const stored: StoredDiscovery = { v: 2, all: everything.map((x) => ({ name: x.name, entityId: x.entityId, type: x.type, affinity: x.affinity, z: x.z, zRaw: x.zRaw, popularity: x.popularity, ...(x.major ? { major: true } : {}) })), fetchedAt: iso(d), movies: ranked.movie, shows: ranked.tv_show, scored, poolSize: ref.pool.length };
     await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
     return { all: stored.all, movies: stored.movies, shows: stored.shows, scored, poolSize: ref.pool.length, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
   } catch (err) {
     console.error("discovery failed", err instanceof Error ? err.message : String(err));
-    trace.push(step(iso(d), "qloo", `Family titles near ${city} were not available right now, so swaps use library themes only.`));
+    trace.push(step(iso(d), "qloo", `Family titles near ${city} were not available right now, so swaps use only the themes on our list.`));
     return null;
   }
 }
@@ -502,7 +502,7 @@ export async function discoverActs(d: Deps, m: MarketIn, trace: TraceStep[]): Pr
     try {
       const s = JSON.parse(hit) as StoredActs;
       if (s.v === 1) {
-        trace.push(step(iso(d), "qloo", `Used the recorded touring-act scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
+        trace.push(step(iso(d), "qloo", `Used the saved touring-act scores near ${city} (no new Qloo call).`, `Cached, recorded ${s.fetchedAt}.`));
         return { acts: s.acts, scored: s.scored, poolSize: s.poolSize, source: d.mode === "synthetic" ? "synthetic" : "cache", fetchedAt: s.fetchedAt };
       }
     } catch {
@@ -524,11 +524,11 @@ export async function discoverActs(d: Deps, m: MarketIn, trace: TraceStep[]): Pr
     const ranked = rankActs(readings, ref);
     const stored: StoredActs = { v: 1, fetchedAt: iso(d), acts: ranked.filter((x) => (x.popularity ?? 0) >= ACT_POPULARITY).slice(0, 15), scored: ranked.length, poolSize: ref.pool.length };
     await safePut(d.kv, key, JSON.stringify(stored), { expirationTtl: TTL });
-    trace.push(step(iso(d), "qloo", `Asked Qloo about ${ref.pool.length} touring acts near ${city} (80 km, ${batches.length} request${batches.length === 1 ? "" : "s"}), and compared each with its spread over ${ref.markets} reference markets.`, `Live call at ${iso(d)}. Qloo had local data for ${ranked.length} of ${ref.pool.length}. ${ranked.filter((x) => worthABooking(x)).length} stand out here and are well known.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
+    trace.push(step(iso(d), "qloo", `Asked Qloo about ${ref.pool.length} touring acts near ${city} (80 km, ${batches.length} request${batches.length === 1 ? "" : "s"}), and compared each with its spread over ${ref.markets} other cities.`, `Live call at ${iso(d)}. Qloo had local data for ${ranked.length} of ${ref.pool.length}. ${ranked.filter((x) => worthABooking(x)).length} stand out here and are well known.${d.mode === "synthetic" ? " SYNTHETIC test data, not Qloo." : ""}`));
     return { acts: stored.acts, scored: stored.scored, poolSize: stored.poolSize, source: d.mode === "synthetic" ? "synthetic" : "live", fetchedAt: stored.fetchedAt };
   } catch (err) {
     console.error("touring acts failed", err instanceof Error ? err.message : String(err));
-    trace.push(step(iso(d), "qloo", `Touring acts near ${city} were not available right now, so swaps use library themes only.`));
+    trace.push(step(iso(d), "qloo", `Touring acts near ${city} were not available right now, so swaps use only the themes on our list.`));
     return null;
   }
 }
@@ -596,8 +596,8 @@ async function supportActAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], ni
       const c = all.find((x) => x.ref === r.themeId);
       if (!c || used.has(c.ref)) return []; // an act already on the calendar cannot open for another date
       const text = promo
-        ? `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also lean toward ${c.label}, so a pre-show playlist or promo tie-in could work for ${who}.`
-        : `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Support act idea: fans of ${original.label} near ${city} also lean toward ${c.label}, so an act like ${c.label} could fit the opening slot.`;
+        ? `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also like ${c.label}, so a pre-show playlist or promo tie-in could work for ${who}.`
+        : `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Support act idea: fans of ${original.label} near ${city} also like ${c.label}, so an act like ${c.label} could fit the opening slot.`;
       return [{ toThemeId: c.ref, text, act: { name: c.label, discovered: c.discovered } }];
     }).slice(0, 10);
     if (options.length === 0) {
@@ -758,10 +758,10 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     const text =
       recognised[i] ? `"${r.theme}" is a theme we recognise (${recognised[i]}), but we have no Qloo scores for it yet, so it is left alone.`
       : res.kind === "theme" ? `"${r.theme}" matched ${d.library.find((t) => t.id === res.themeId)?.label ?? res.themeId} (${res.method === "alias" ? "name list" : "model"}).`
-      : res.kind === "pool" ? `"${r.theme}" is the family title ${res.name}: scored from its own local reading, not from a library theme.`
-      : res.kind === "classic" ? `"${r.theme}" is a classic ${W.night}, so it is not scored.`
+      : res.kind === "pool" ? `"${r.theme}" is the family title ${res.name}: rated from its own local data, not from one of our themes.`
+      : res.kind === "classic" ? `"${r.theme}" is a proven promo, so it is not graded.`
       : res.kind === "ambiguous" ? `"${r.theme}" fits more than one theme, so the director is asked to choose.`
-      : `"${r.theme}" is not a theme we can place, so it is not scored.`;
+      : `"${r.theme}" is not a theme we can place, so there is no data for it.`;
     trace.push(step(at, "resolve", text));
   });
 
@@ -769,8 +769,8 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
   const scores = await getScores(d, input.market, trace);
   const themes = allOut(d, scores);
   trace.push(step(iso(d), "score", venue
-    ? `Compared ${Object.keys(themes).length} artist and music themes with ${d.reference.markets || "the"} reference markets${d.reference.synthetic ? " (synthetic placeholder reference)" : ""}.`
-    : `Compared ${Object.keys(themes).length} library themes with ${d.reference.markets || "the"} reference ballpark markets${d.reference.synthetic ? " (synthetic placeholder reference)" : ""}.`));
+    ? `Compared ${Object.keys(themes).length} artist and music themes with ${d.reference.markets || "the"} other cities${d.reference.synthetic ? " (synthetic placeholder comparison)" : ""}.`
+    : `Compared ${Object.keys(themes).length} themes with ${d.reference.markets || "the"} other towns${d.reference.synthetic ? " (synthetic placeholder comparison)" : ""}.`));
 
   // The family titles named on the calendar are scored from the discovery pass (cached, or two live requests).
   const poolRows = resolutions.some((x) => x.kind === "pool") ? await discover(d, input.market, trace) : null;
@@ -797,7 +797,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     };
   });
   const count = (l: FitLabel): number => nights.filter((n) => n.label === l).length;
-  trace.push(step(iso(d), "score", `Flagged: ${count("leans-in")} lean in, ${count("average")} about average, ${count("leans-away")} lean away, ${count("not-scored")} not scored, ${count("classic")} classic.`));
+  trace.push(step(iso(d), "score", `Rated: ${count("leans-in")} strong fit, ${count("average")} average fit, ${count("leans-away")} weak fit, ${count("not-scored")} no data, ${count("classic")} proven promo.`));
 
   return {
     market: input.market, ...(venue ? { kind: "venue" as const } : {}), mode: d.mode, recordedOn: scores.source === "cache" ? scores.stored.fetchedAt.slice(0, 10) : null, recordedAt: scores.stored.fetchedAt, themes, nights,
@@ -809,6 +809,15 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
 
 function fitsOf(themes: Record<string, ThemeScoreOut>): Record<string, ThemeFit> {
   return Object.fromEntries(Object.entries(themes).map(([id, t]) => [id, { label: t.label, z: t.index, score: t.score }]));
+}
+
+/**
+ * The model's sentence must read the plain way ("People in Biloxi like X more than Y, compared with their other themes"): both theme names and the town, the word
+ * "like", and none of the old private vocabulary.
+ */
+export function whyShapeOk(text: string, planned: string, proposed: string, town: string): boolean {
+  const t = text.toLowerCase();
+  return t.includes(planned.toLowerCase()) && t.includes(proposed.toLowerCase()) && t.includes(town.toLowerCase()) && /\blikes?\b/.test(t) && !/\b(lean|leans|leaning|market|markets|fans|fan)\b/.test(t);
 }
 
 /** The model words only the taste comparison. These words mean it wandered off the facts it was given. */
@@ -827,14 +836,13 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   trace.push(...res.trace);
 
   const whys = new Map<string, string>();
-  const libraryProposals = res.proposals.filter((p) => !p.discovered);
+  const libraryProposals = res.proposals.filter((p) => !p.discovered && p.kind !== "best-option");
   if (libraryProposals.length > 0) {
     const label = (id: string): string => d.library.find((t) => t.id === id)?.label ?? id;
     const pairOf = (p: (typeof libraryProposals)[number]): string => `${label(p.fromThemeId)}>${label(p.toThemeId)}`;
-    // The wording depends only on the two theme names, so each pair's validated model text is saved on its own and shared across
-    // markets. Only genuine, validated model text is ever saved: never template text, and never a failure.
+    // The wording depends only on the town and the two theme names, so each pair's validated model text is saved on its own for that town. Only genuine, validated model text is ever saved: never template text, and never a failure.
     const byPair: Record<string, string> = {};
-    const pairKey = async (pair: string): Promise<string> => `ai:why:v2:${await sha256Hex(pair)}`;
+    const pairKey = async (pair: string): Promise<string> => `ai:why:v3:${await sha256Hex(`${city}|${pair}`)}`;
     const wanted = [...new Set(libraryProposals.map(pairOf))];
     for (const pair of wanted) {
       const saved = await safeGet(d.kv, await pairKey(pair));
@@ -845,10 +853,10 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
     if (savedCount > 0) trace.push(step(iso(d), "model", `Writing the reasons for the swaps: used saved model wording for ${savedCount} of ${wanted.length}${missing.length > 0 ? `, so the model is asked only for the other ${missing.length}` : " (no model call)"}.`));
     if (missing.length > 0) {
       // Opaque ids: the real ones contain the date, which the model has no business seeing.
-      const facts = missing.map((p, i) => ({ id: String(i + 1), planned: label(p.fromThemeId), proposed: label(p.toThemeId) }));
+      const facts = missing.map((p, i) => ({ id: String(i + 1), town: city, planned: label(p.fromThemeId), proposed: label(p.toThemeId) }));
       const reply = await runModel(
         d,
-        "For each swap write ONE sentence of at most 22 words, in this shape: \"Fans here lean toward <proposed> more than <planned>, compared with this market's usual.\" Use only the two theme names given. No digits. Never mention sponsors, dates, tickets, sales, attendance or revenue. Reply with JSON only: [{\"id\": string, \"why\": string}].",
+        `For each swap write ONE sentence of at most 22 words, in this shape: "People in ${city} like <proposed> more than <planned>, compared with their other themes." Use only the two theme names given and the town name ${city}. No digits. Never say "fans", "market", "lean" or "prefer". Never mention sponsors, dates, tickets, sales, attendance or revenue. Reply with JSON only: [{"id": string, "why": string}].`,
         JSON.stringify(facts),
         trace,
         missing.length === wanted.length ? "Writing the reasons for the swaps" : `Writing the reasons for ${missing.length} new swap${missing.length === 1 ? "" : "s"}`,
@@ -860,7 +868,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
           if (typeof item?.id !== "string" || typeof item.why !== "string") continue;
           const p = missing[Number(item.id) - 1];
           const text = item.why.trim();
-          if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text)) {
+          if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text) && whyShapeOk(text, label(p.fromThemeId), label(p.toThemeId), city)) {
             byPair[pairOf(p)] = text;
             await safePut(d.kv, await pairKey(pairOf(p)), text, { expirationTtl: TTL });
           } else trace.push(step(iso(d), "model", `Dropped the model's reason for swap ${item.id}: it went beyond the taste comparison, so the template text is used.`));
@@ -892,13 +900,13 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   if ((await safeGet(d.kv, rcKey)) !== null) {
     const scores = await getScores(d, input.market, trace);
     const all = allOut(d, scores);
-    trace.push(step(iso(d), "note", `Re-check ${theme.label}: checked with Qloo within the last day, so the saved answer is returned.`));
+    trace.push(step(iso(d), "note", `Fresh data for ${theme.label}: checked with Qloo within the last day, so the saved answer is returned.`));
     return { theme: all[theme.id]!, themes: all, trace, caps: await capsOf(d), withinDay: true };
   }
   if (d.gate && !(await d.gate.allow("recheck"))) throw d.gate.broken ? new CappedError(true) : new QuotaError("recheck");
   const need = new Set(theme.entities.map((e) => e.type)).size;
   if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
-  trace.push(step(iso(d), "note", `Re-checking ${theme.label} live, ignoring the recorded result.`));
+  trace.push(step(iso(d), "note", `Getting fresh data for ${theme.label}, ignoring the saved result.`));
   const fresh = (await askQloo(d, input.market, [theme], trace))[theme.id]!;
   // The market's own average moves when one theme is re-read, so every index is recomputed from the updated record.
   const scores = await getScores(d, input.market, trace);

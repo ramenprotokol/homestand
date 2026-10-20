@@ -81,14 +81,14 @@ describe("copy", () => {
     expect(withArticle("Latin act")).toBe("a Latin act");
   });
   it("says in plain words when the label and the other-markets line disagree", () => {
-    expect(bridgeSentence("leans-in", -1.2, "Winnipeg")).toBe("Below most markets, but strong for Winnipeg's own usual taste.");
-    expect(bridgeSentence("leans-away", 1.2, "Winnipeg")).toBe("Above most markets, but weak for Winnipeg's own usual taste.");
+    expect(bridgeSentence("leans-in", -1.2, "Winnipeg")).toBe("Below most towns, but strong for Winnipeg's usual taste.");
+    expect(bridgeSentence("leans-away", 1.2, "Winnipeg")).toBe("Above most towns, but weak for Winnipeg's usual taste.");
     expect(bridgeSentence("leans-in", 0.8, "Winnipeg")).toBe("");
     expect(bridgeSentence("average", -1.2, "Winnipeg")).toBe("");
   });
-  it("calls a venue's classic night a classic date and its CSV column act", () => {
-    expect(fitWord("classic", "venue")).toBe("Classic date");
-    expect(fitWord("classic", "club")).toBe("Classic night");
+  it("calls a classic night a proven promo for a club and a venue alike, and its CSV column act", () => {
+    expect(fitWord("classic")).toBe("Proven promo (not graded)");
+    expect(fitWord("classic")).toBe("Proven promo (not graded)");
     const rows = [{ date: "2027-06-01", theme: "Journey", sponsor: "", locked: false, notes: "" }];
     expect(exportCsv(rows, "venue").split("\r\n")[0]).toBe("date,act,sponsor,locked,notes");
     expect(exportCsv(rows).split("\r\n")[0]).toBe("date,theme,sponsor,locked,notes");
@@ -108,13 +108,13 @@ describe("booking tiers", () => {
 
 describe("the sponsor memo", () => {
   const swap = { date: "2027-06-26", weekday: "Saturday", from: "Green Day", to: "Mt. Joy", sponsor: "Triangle Taproom", fromZ: -1, toZ: 0.5, fromScore: 0.9, toScore: 0.9, why: "Mt. Joy stands out.", source: "template" as const, fromEntities: ["Green Day"], toEntities: ["Mt. Joy"], discovered: true };
-  const data = { kind: "venue" as const, club: "Raleigh, NC sample amphitheatre", generatedOn: "2027-01-01", swaps: [swap], angles: [], nights: 18, suggested: 2, classic: 2, synthetic: false, recordedLabel: null };
+  const data = { kind: "venue" as const, club: "Raleigh, NC sample amphitheatre", city: "Raleigh", generatedOn: "2027-01-01", swaps: [swap], angles: [], nights: 18, suggested: 2, classic: 2, synthetic: false, recordedLabel: null };
   it("lists the Qloo entities checked, says it once about attendance, and never says 'you approved'", async () => {
     const { buildMemoHtml, memoOpener } = await import("../../src/app/export/memo");
     const html = buildMemoHtml(data);
     expect(html).toContain("Qloo checked Green Day for the planned date (");
-    expect(html).toContain("Mt. Joy for the swap (found by Qloo, not scored against the library)");
-    expect(html.match(/attendance/gi)).toHaveLength(1);
+    expect(html).toContain("Mt. Joy for the swap (local favorite: people in Raleigh like it more than people in most towns do)");
+    expect(html.match(/ticket sales/gi)).toHaveLength(1);
     expect(memoOpener(data)).not.toMatch(/you approved/i);
     expect(memoOpener(data)).toContain("1 is in the revised calendar");
   });

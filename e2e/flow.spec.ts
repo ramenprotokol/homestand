@@ -22,13 +22,13 @@ const overlap = (a: { x: number; y: number; width: number; height: number }, b: 
 
 test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Your market, not the national chart." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Theme nights your town will actually like." })).toBeVisible();
   await expect(page.getByTestId("study-link")).toBeVisible();
   await expect(page.getByTestId("study-teaser")).toContainText("385 real 2025 theme nights");
   await expect(page.getByTestId("study-teaser")).not.toContainText("coin flip");
   // The hero says what the app is, and what it is not, in plain words on readable panels.
-  await expect(page.getByTestId("hero-intro")).toContainText("Planning next season's theme nights? Homestand checks each one against what fans in your town like");
-  await expect(page.getByTestId("hero-intro")).toContainText("Every swap comes with a cited reason you can show a sponsor.");
+  await expect(page.getByTestId("hero-intro")).toContainText("Planning next season's theme nights? Homestand rates each one against what people in your town like");
+  await expect(page.getByTestId("hero-intro")).toContainText("every swap comes with a reason you can show a sponsor.");
   // The hero leads with what the tool is for. The coin-flip result lives on the Study page only.
   await expect(page.getByTestId("hero-honest")).toContainText("It reads what your town likes. It doesn't forecast ticket sales, and we tested that: see The Study.");
   await expect(page.getByTestId("hero-honest")).not.toContainText(/coin flip|49|385/);
@@ -54,7 +54,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.locator(".rings")).toHaveCount(0); // no stray ring glyph beside the board
   // The result line comes from the cards themselves.
   const awayCards = await page.locator('.card.tile[data-fit="leans-away"]').count();
-  await expect(page.getByTestId("check-result")).toHaveText(awayCards === 0 ? /^None of the 24 nights lean away from what Akron likes\.$/ : new RegExp(`^${awayCards} of 24 nights? leans? away from what Akron likes\\.$`));
+  await expect(page.getByTestId("summary")).toHaveText(awayCards === 0 ? /^None of the 24 nights is a weak fit for Akron\.$/ : new RegExp(`^${awayCards} of 24 nights? (is|are) a weak fit for Akron\\.$`));
   // Sponsor and locks are in words under the cards.
   expect(await page.locator(".slot-note").count()).toBeGreaterThan(5);
   expect(await page.locator('.slot-note[data-locked="1"]').count()).toBe(await page.locator(".grids .card .lk").count());
@@ -62,14 +62,14 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   const tiles = page.locator(".card.tile");
   expect(await tiles.count()).toBe(24);
   // Every card carries its fit in words, not just a colour.
-  for (const word of ["Classic night", "Not scored"]) await expect(page.locator(`.fitword:has-text("${word}")`).first()).toBeVisible();
-  expect(await page.locator(".fitword:has-text('Leans in'), .fitword:has-text('Leans away'), .fitword:has-text('About average')").count()).toBeGreaterThan(5);
+  for (const word of ["Proven promo", "No data"]) await expect(page.locator(`.fitword:has-text("${word}")`).first()).toBeVisible();
+  expect(await page.locator(".fitword:has-text('Strong fit'), .fitword:has-text('Weak fit'), .fitword:has-text('Average fit')").count()).toBeGreaterThan(5);
   await expect(page.locator(".card .lk").first()).toBeVisible();
   // The ambiguous night asks, and does not guess.
   const ask = page.getByRole("group", { name: /Elvis and the Beatles Night/ });
   await expect(ask).toBeVisible();
-  // The question is above the colour key, so it shows without scrolling past the legend.
-  expect((await ask.boundingBox())!.y).toBeLessThan((await page.locator(".legend").boundingBox())!.y);
+  // The question is above the list of ratings, so it shows without scrolling past it.
+  expect((await ask.boundingBox())!.y).toBeLessThan((await page.locator(".fitlist").boundingBox())!.y);
   await shot(page, info, "03-check");
   await ask.getByRole("button", { name: "Elvis" }).click();
   await expect(page.getByRole("group", { name: /Elvis and the Beatles Night/ })).toHaveCount(0);
@@ -78,34 +78,35 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await page.getByRole("button", { name: /Bluey Day/ }).click();
   const why = page.getByRole("dialog");
   await expect(why).toBeVisible();
-  await expect(why).toContainText(/Against its own average/);
+  await expect(why.getByTestId("fit-line")).toContainText(/Akron likes Bluey (more than|less than|about as much as) its other themes\./);
   await expect(why).toContainText("What Qloo looked at");
-  await expect(why.locator(".face.back .bk-idx")).toContainText(/Local pull\s*(well )?(below|above|about) this town's usual/);
-  await expect(why.getByTestId("bk-vs")).toContainText(/here: (well )?(below|above|about typical for) (most )?ballpark markets/);
-  // Each piece once: the card back holds the glance, the side panel the detail.
-  await expect(why.getByTestId("why-pull")).toHaveCount(0);
+  await expect(why.locator(".face.back .bk-idx")).toContainText(/Fit\s*(Strong|Average|Weak) fit/);
+  await expect(why.locator(".face.back").getByTestId("bk-line")).toContainText(/Akron likes Bluey .* its other themes\./);
+  // The card back says the one plain thing. The comparison with other towns, and every number, wait behind "Show the numbers".
+  await expect(why.locator(".face.back")).not.toContainText(/most towns|ballpark|market/i);
+  await expect(why.getByTestId("vs-others")).toHaveCount(0);
   expect(await why.getByText("What Qloo looked at").count()).toBe(1);
-  expect(await why.getByText(/Local pull/).count()).toBe(1);
     // Plain words, not 0.99: the card back carries no raw taste number.
   await expect(why.locator(".face.back")).not.toContainText(/\d\.\d\d/);
-  await expect(why.locator(".bk-idx")).toContainText("Local pull");
-  await expect(why).not.toContainText(/affinity|\bindex\b/i);
-  await expect(why.getByText("Local pull = z")).toHaveCount(0);
+  await expect(why.locator(".face.back")).toContainText(/Checked /);
+  await expect(why).not.toContainText(/affinity|\bindex\b|local pull|leans? (in|away)/i);
+  await expect(why.getByText("Fit number = z")).toHaveCount(0);
   await expect(why.getByText(/standard step/)).toHaveCount(0);
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Local pull = z - market average/)).toBeVisible();
+  await expect(why.getByText(/Fit number = z - this town's average/)).toBeVisible();
+  await expect(why.getByTestId("vs-others")).toContainText(/Bluey here: (well )?(below|above|about typical for) (most )?towns\./);
   await why.getByTestId("recheck").click();
   // One live re-check per theme and market per day: the first run asks Qloo, a repeat returns the saved answer.
-  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked with Qloo within the last day: same answer/);
-  await expect(why.getByTestId("source-line")).toContainText(/Re-checked live at|Saved result, pulled from Qloo|Synthetic test data/);
+  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked within the last day: same answer/);
+  await expect(why.getByTestId("source-line")).toContainText(/Checked |Synthetic test data/);
   await expect(why.getByTestId("recheck-message")).toBeInViewport();
   await shot(page, info, "04-why");
   await page.keyboard.press("Escape");
   await expect(why).toHaveCount(0);
 
-  // A classic night says why it is not scored.
+  // A proven promo says why it is not graded.
   await page.getByRole("button", { name: /Fireworks/ }).click();
-  await expect(page.getByRole("dialog")).toContainText("Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.");
+  await expect(page.getByRole("dialog")).toContainText("Proven promos (fireworks, giveaways, heritage nights) aren't graded, because they aren't a pop-culture taste. They stay as planned.");
   await page.keyboard.press("Escape");
 
   // ---- Fix: a sealed pack, torn open, then the swap carousel
@@ -113,7 +114,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible();
   await expect(page.getByText("Step 2 of 3 · Fix")).toBeVisible();
   await expect(page.getByText("How Homestand decided")).toBeVisible();
-  // The repeat switch sits under "Advanced", closed until asked for.
+  // The repeat switch sits under "Settings and details", closed until asked for.
   await expect(page.getByText("Off by default: each theme is used once")).toBeHidden();
   await page.getByTestId("advanced").locator("summary").click();
   await expect(page.getByText("Off by default: each theme is used once")).toBeVisible();
@@ -134,7 +135,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("approve")).toBeInViewport({ ratio: 1 });
   await expect(page.getByTestId("reject")).toBeInViewport({ ratio: 1 });
   // The new night and its reason show before anything is approved: no black flash box, no hidden meter.
-  await expect(page.getByTestId("now-card")).toContainText("Would be");
+  await expect(page.getByTestId("now-card")).toContainText("Swap to");
   await expect(page.getByTestId("now-card").locator(".card")).toHaveCount(1);
   if ((page.viewportSize()?.width ?? 0) >= 900) {
     await expect(page.getByTestId("now-card")).toBeInViewport({ ratio: 1 });
@@ -142,13 +143,13 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
     await expect(page.locator(".idx")).toBeInViewport({ ratio: 1 });
     const bar = (await page.locator(".acts").boundingBox())!;
     const idx = (await page.locator(".idx").boundingBox())!;
-    expect(overlap(bar, idx), "the Approve bar covers the local-pull meter").toBe(false);
+    expect(overlap(bar, idx), "the Approve bar covers the fit meter").toBe(false);
   }
   await noSideScroll(page);
   // The cited comparison replaces the repeated sentence; the why is not said twice.
-  await expect(card.getByTestId("cited")).toContainText(/(above|below|in line with) this market's average\./);
-  await expect(card).not.toContainText("leans toward");
-  await expect(page.locator(".idx")).toContainText(/now (well )?(below|above|about usual) \u2192 proposed (well )?(below|above|about usual)/);
+  await expect(card.getByTestId("swap-line")).toContainText(/: (Strong|Average|Weak) fit.*: (Strong|Average|Weak) fit|: Local favorite/s);
+  await expect(card).not.toContainText(/leans toward|lean toward|market/i);
+  await expect(page.locator(".idx")).toContainText(/(Strong|Average|Weak) fit \u2192 (Strong fit|Average fit|Local favorite)/);
   await expect(page.locator(".idx")).not.toContainText(/\d\.\d/);
   await expect(card).not.toContainText(/\d\.\d/); // no raw index in the swap text
   if ((await page.getByTestId("angle").count()) > 0) {
@@ -157,12 +158,13 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
     expect(angle).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   }
   await shot(page, info, "06-carousel");
+  await page.getByTestId("advanced").evaluate((el) => { (el as HTMLDetailsElement).open = true; });
   await page.getByTestId("open-trace").click();
   const trace = page.getByRole("dialog");
-  await expect(trace).toContainText(/Asked Qloo|Used the recorded scores/);
+  await expect(trace).toContainText(/Asked Qloo|Used the saved ratings/);
   await expect(trace).toContainText("constraint");
   await expect(trace).toContainText("model");
-  await expect(trace).toContainText(/Re-checking|checked with Qloo within the last day/);
+  await expect(trace).toContainText(/Getting fresh data|checked with Qloo within the last day/);
   await expect(trace).not.toContainText("No usable reply");
   await shot(page, info, "07-trace");
   await page.keyboard.press("Escape");
@@ -177,9 +179,8 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
     await expect(page.getByTestId("swap-line")).toContainText(altName);
     expect(await page.getByTestId("swap-line").innerText()).not.toBe(before);
   }
-  // Approving flips the card into the new theme; the date and sponsor stay pinned; the tally follows.
+  // Approving flips the card into the new theme; the date and sponsor stay pinned.
   const pinned = await page.locator(".pinbar").innerText();
-  const inBefore = Number(await page.locator('.tally.mini [data-k="leans-in"] b').innerText());
   const toName = (await page.getByTestId("swap-line").innerText()).split("\n").pop()!.trim();
   await page.getByTestId("approve").click();
   await expect(page.locator(".decision")).toContainText("Approved");
@@ -188,7 +189,6 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.locator("#steps .st .k", { hasText: "Taste lookup" })).toHaveCount(2);
   await expect(page.locator("#steps .st .k", { hasText: "Rules" })).toHaveCount(1);
   await expect(page.locator("#steps .st .k", { hasText: "Approved" })).toHaveCount(1);
-  await expect(page.locator('.tally.mini [data-k="leans-in"] b')).toHaveText(String(inBefore + 1));
   await expect(page.locator(".slide.cur .face.alt")).toContainText(toName.split(" ")[0]!);
   await expect.poll(() => flipAngle(page, ".slide.cur .flipper")).toBeLessThan(-0.99);
   expect(await page.locator(".pinbar").innerText()).toBe(pinned);
@@ -221,8 +221,8 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("memo")).toContainText(/Homestand checked 24 theme nights for Akron, OH sample club against local taste data from Qloo\. It suggested \d+ swaps?; 1 is in the revised calendar\. Each approved swap keeps its original date and sponsor\./);
   await expect(page.getByTestId("memo")).not.toContainText(/coin flip/);
   await expect(page.getByTestId("memo")).not.toContainText(/Bundle score|preference for certain/);
-  expect(await page.locator(".memo-scroll").evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
-  await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
+  if ((page.viewportSize()?.width ?? 0) > 640) expect(await page.locator(".memo-scroll").evaluate((el) => getComputedStyle(el).overflowX)).toBe("auto");
+  await expect(page.getByTestId("send-summary")).toContainText("1 swap made");
   await expect(page.locator(".tile--swapped .stamp")).toHaveCount(1);
   await expect(page.locator(".tile--swapped .stamp")).toHaveText("SWAPPED");
   // The stamp never covers the pennant with the date.
@@ -253,10 +253,9 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await shot(page, info, "09-study-call");
   await page.getByTestId("call-yes").click();
   await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
-  await expect(page.getByTestId("audit-line")).toContainText("It doesn't predict ticket sales");
-  await expect(page.getByTestId("stamp-plain")).toHaveText("Not enough evidence to overturn: taste didn't predict bigger crowds.");
+  await expect(page.getByTestId("stamp-plain")).toHaveText(/^Local taste did not pick the bigger crowd: \d+ times in 100, about a coin flip\.$/);
   // The user's own call is answered once, in one line.
-  await expect(page.getByTestId("you-said")).toHaveText("You said Yes. The data didn't show it at this sample size.");
+  await expect(page.getByTestId("you-said")).toHaveText("You said Yes. The data didn't back that up.");
   expect(await page.getByText(/You said Yes/).count()).toBe(1);
   await expect(page.getByTestId("plain-result")).toBeVisible();
   await expect(page.locator(".dnote")).toContainText("385 theme nights at 120 clubs. The 89 clubs that ran two or more different themes made 521 same-ballpark pairs");
@@ -264,15 +263,15 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   const stampBox = (await page.locator(".stampv").boundingBox())!;
   expect(overlap(stampBox, (await page.getByTestId("stamp-plain").boundingBox())!), "stamp overlaps its plain line").toBe(false);
   await expect(page.getByTestId("results-pending")).toHaveCount(0);
-  await expect(page.getByTestId("h1-text")).toContainText("range we are confident in: 43.2% to 54.9%");
-  await expect(page.getByText("Pre-registration and Amendments 1 to 5")).toBeVisible();
+  await expect(page.getByTestId("h1-text")).toContainText("likely range: 43.2% to 54.9%");
+  await expect(page.getByText("Our plan, written before we looked")).toBeVisible();
   await noSideScroll(page);
   await shot(page, info, "10-study-result");
 });
 
 test("own club: city search, pasted calendar with a bad row", async ({ page }, info) => {
   await page.goto("/#/own");
-  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByLabel("1. Your home city").fill("Tulsa");
   await page.getByRole("button", { name: "Search" }).click();
   await page.getByRole("button", { name: "Tulsa, OK" }).click();
   await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\n2026-04-11,Bluey Day,Prairie Bank,no,\nsoon,Star Wars Night,,no,\n2026-04-18,Fireworks Friday,,no,\n2026-05-02,Dolly Parton Night,,yes,\n");
@@ -293,7 +292,7 @@ test("own club: Load an example fills the rows and explains the columns", async 
   await expect(page.locator(".cols dt")).toHaveText(["date", "theme", "sponsor", "locked", "notes"]);
   await page.getByTestId("load-example").click();
   await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/Bluey Day,Sunrise Dental Group,no,Day game/);
-  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByLabel("1. Your home city").fill("Tulsa");
   await page.getByRole("button", { name: "Search" }).click();
   await page.getByRole("button", { name: "Tulsa, OK" }).click();
   await page.getByTestId("check-mine").click();
@@ -306,7 +305,7 @@ test("own club: the example is a full season and the headings read naturally", a
   await page.getByTestId("load-example").click();
   const rows = (await page.getByLabel("2. Your theme nights").inputValue()).trim().split("\n");
   expect(rows.length - 1).toBeGreaterThanOrEqual(15);
-  await page.getByLabel("1. Your ballpark's city").fill("Fresno");
+  await page.getByLabel("1. Your home city").fill("Fresno");
   await page.getByRole("button", { name: "Search" }).click();
   await page.getByRole("button", { name: "Fresno, CA" }).click();
   await page.getByTestId("check-mine").click();
@@ -334,36 +333,33 @@ test("Discovered by Qloo: the ideas panel, a discovered swap through approve, Se
   await page.getByTestId("to-fix").click();
   // The ideas panel: up to six titles, the under-25 line, and where they come from.
   const ideas = page.getByTestId("ideas");
-  await expect(ideas).toContainText("Family titles that stand out near Akron");
+  await expect(ideas).toContainText("Family movies Akron likes more than most towns. Try one for a family night.");
   expect(await ideas.locator(".idea").count()).toBeLessThanOrEqual(3);
   expect(await ideas.locator(".idea").count()).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("ideas")).not.toContainText("under-25");
-  await expect(page.getByTestId("ideas-note")).toContainText(/Qloo had local data for \d+ of our \d+ family titles near Akron/);
-  await expect(ideas).toContainText("come from Qloo's taste data for this area");
+  await expect(ideas).not.toContainText(/Qloo had local data|ballpark/);
   await page.getByRole("button", { name: /Open the pack/ }).focus();
   await page.keyboard.press("Enter");
   const now = page.getByTestId("now-card");
-  await expect(page.getByTestId("disc-badge")).toHaveText("Discovered by Qloo");
+  await expect(page.getByTestId("disc-badge")).toHaveText("Local favorite");
   await expect(page.getByTestId("swap-line")).toContainText("Moonpie Pirates (made up)");
-  await expect(page.getByTestId("cited")).toContainText("Found by Qloo");
-  await expect(now.locator(".fitword")).toHaveText("Found by Qloo");
+  await expect(page.getByTestId("cited")).toContainText("People in Akron like Moonpie Pirates (made up) more than people in most towns do.");
+  await expect(now.locator(".fitword")).toHaveText("Local favorite");
   await expect(page.locator(".swap-why")).toHaveText("Qloo ranks Moonpie Pirates (made up) among the top family movies for fans near Akron.");
-  await expect(page.locator("#steps")).toContainText("Discovered by Qloo");
-  await expect(page.locator(".idx")).toContainText("found by Qloo");
+  await expect(page.locator("#steps")).toContainText("Local favorite");
+  await expect(page.locator(".idx")).toContainText("Local favorite");
   await page.getByTestId("approve").click();
   await expect(page.locator(".decision")).toContainText("Approved: Moonpie Pirates (made up) now holds");
-  await expect(page.locator('.tally.mini [data-k="found"] b')).toHaveText("1");
   await page.getByTestId("to-send").click();
-  await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
+  await expect(page.getByTestId("send-summary")).toContainText("1 swap made");
   const memo = page.getByTestId("memo");
-  await expect(memo).toContainText(/Moonpie Pirates \(made up\) (Day|Night|Friday|Giveaway|Showdown) \(Discovered by Qloo\)/);
-  await expect(memo).toContainText(/found by Qloo/i);
-  await expect(memo).toContainText("Family titles that stand out near Akron");
-  await expect(memo).toContainText("come from Qloo's taste data for this area");
+  await expect(memo).toContainText(/Moonpie Pirates \(made up\) (Day|Night|Friday|Giveaway|Showdown) \(Local favorite\)/);
+  await expect(memo).toContainText(/local favorite/i);
+  await expect(memo).toContainText("Family movies Akron likes more than most towns");
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-csv").click()]);
   const csvText = await readFile((await csv.path())!, "utf8");
   expect(csvText).toContain("Moonpie Pirates (made up)");
-  expect(csvText).toContain("discovered by Qloo");
+  expect(csvText).toContain("local favorite");
   const [ics] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-ics").click()]);
   expect(await readFile((await ics.path())!, "utf8")).toContain("Moonpie Pirates (made up)");
   await expect(page.locator(".tile--swapped").first()).toBeVisible();
@@ -399,7 +395,7 @@ test("Could not fix is one grouped block, not a card for each night", async ({ p
   await page.getByTestId("to-fix").click();
   const block = page.getByTestId("unfixed-block");
   await expect(block).toContainText("Could not fix: 3 nights");
-  await expect(block).toContainText("A kids' night stays a kids' night");
+  await expect(block).toContainText("No better kids' theme fits Akron on these 3 nights, so they stay as planned.");
   await expect(block).toContainText("Next step");
   await expect(block.locator(".nofix-list li")).toHaveCount(3);
   await expect(page.locator(".stamp", { hasText: "COULD NOT" })).toHaveCount(0);
@@ -422,10 +418,11 @@ test("the step log shows the discovery calls to Qloo", async ({ page }) => {
   await expect(page.getByTestId("summary")).toBeVisible();
   await page.getByTestId("to-fix").click();
   await expect(page.getByTestId("ideas")).toBeVisible();
+  await page.getByTestId("advanced").evaluate((el) => { (el as HTMLDetailsElement).open = true; });
   await page.getByTestId("open-trace").click();
   const log = page.getByRole("dialog");
   // The first Akron run in this server asks Qloo; later ones show the recorded answers. Either way the three calls are named.
-  await expect(log).toContainText(/Asked Qloo about \d+ family-friendly animated movies near Akron|Used the recorded family-title scores near Akron/);
+  await expect(log).toContainText(/Asked Qloo about \d+ family-friendly animated movies near Akron|Used the saved family-title scores near Akron/);
   await expect(log).not.toContainText("under-25");
 });
 
@@ -477,6 +474,7 @@ async function cspTour(page: Page): Promise<void> {
   await expect(page.locator("#carousel")).toBeVisible();
   await page.getByTestId("approve").click();
   await expect(page.locator(".decision")).toContainText("Approved");
+  await page.getByTestId("advanced").evaluate((el) => { (el as HTMLDetailsElement).open = true; });
   await page.getByTestId("open-trace").click();
   await page.keyboard.press("Escape");
   await page.getByTestId("to-send").click();
@@ -491,7 +489,7 @@ async function cspTour(page: Page): Promise<void> {
   await expect(page.getByTestId("verdict")).toBeVisible();
   await page.goto(`${BASE}/#/own`);
   await page.getByTestId("load-example").click();
-  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByLabel("1. Your home city").fill("Tulsa");
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page.getByRole("button", { name: "Tulsa, OK" })).toBeVisible();
   await page.waitForTimeout(300);
@@ -510,7 +508,7 @@ async function cspTour(page: Page): Promise<void> {
 test("deep links: a sample club opens cold, and a cold step with no club goes to the picker", async ({ page }) => {
   await page.goto("/#/check/biloxi");
   await expect(page.getByRole("heading", { name: /Check: Biloxi, MS sample club/ })).toBeVisible();
-  await expect(page.getByTestId("check-result")).toBeVisible();
+  await expect(page.getByTestId("summary")).toBeVisible();
   await page.goto("/#/check/nowhere");
   await expect(page.getByRole("heading", { name: "Pick a sample club" })).toBeVisible();
   for (const hash of ["check", "fix", "send"]) {
@@ -577,7 +575,7 @@ test("the Why flips the card in 3D to its cardboard back and gives focus back on
   await expect(dialog.locator(".face.back")).toHaveCount(1);
   await expect(dialog.locator(".bk-top")).toContainText(/Portland nights/);
   await expect.poll(() => flipAngle(page, ".lb .flipper"), { timeout: 5000 }).toBeLessThan(-0.99);
-  await expect(dialog.locator(".bk-why b")).toContainText(/Why it (fits|misses) Portland|How Portland reads it/);
+  await expect(dialog.locator(".bk-why")).toContainText(/Portland likes .* its other themes|Proven promo|No data/);
   await expect(dialog.getByRole("button", { name: "Close" })).toBeFocused();
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
@@ -587,7 +585,7 @@ test("the Why flips the card in 3D to its cardboard back and gives focus back on
 test("reduced motion: flips are instant, the pack opens straight away and nothing is left hidden", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Your market, not the national chart." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Theme nights your town will actually like." })).toBeVisible();
   await expect(page.locator("#fx")).toHaveCount(1);
   await expect(page.locator("#hero")).toBeVisible();
   await page.goto("/#/sample");
@@ -609,7 +607,7 @@ test("reduced motion: flips are instant, the pack opens straight away and nothin
   expect(await flipAngle(page, ".slide.cur .flipper")).toBeLessThan(-0.99);
   await expect(page.getByTestId("fix-status")).toContainText("1 approved");
   await page.getByTestId("to-send").click();
-  await expect(page.getByTestId("send-summary")).toContainText("1 swap approved");
+  await expect(page.getByTestId("send-summary")).toContainText("1 swap made");
   await page.getByTestId("to-study").click();
   await page.getByTestId("call-no").click();
   await expect(page.getByTestId("verdict")).toBeVisible();

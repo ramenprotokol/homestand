@@ -13,12 +13,13 @@ describe("count wording", () => {
     expect(plural(2, "night")).toBe("nights");
     expect(lockedLine(1)).toBe("1 locked night stays exactly as planned");
     expect(lockedLine(4)).toBe("4 locked nights stay exactly as planned");
-    expect(checkResultLine(0, 1, "Tulsa")).toBe("This night doesn't lean away from what Tulsa likes.");
-    expect(checkResultLine(1, 1, "Tulsa")).toBe("This night leans away from what Tulsa likes.");
-    expect(checkResultLine(1, 25, "Tulsa")).toBe("1 of 25 nights leans away from what Tulsa likes.");
-    expect(checkResultLine(7, 25, "Biloxi")).toBe("7 of 25 nights lean away from what Biloxi likes.");
-    expect(checkResultLine(0, 25, "Biloxi")).toBe("None of the 25 nights lean away from what Biloxi likes.");
-    expect(fitSummary({ in: 1, average: 4, away: 1, notScored: 0, classic: 2 })).toBe("1 leans in, 4 about average, 1 leans away, 0 not scored, 2 classic.");
+    expect(checkResultLine(0, 1, "Tulsa")).toBe("This night isn't a weak fit for Tulsa.");
+    expect(checkResultLine(1, 1, "Tulsa")).toBe("This night is a weak fit for Tulsa.");
+    expect(checkResultLine(1, 25, "Tulsa")).toBe("1 of 25 nights is a weak fit for Tulsa.");
+    expect(checkResultLine(8, 25, "Biloxi")).toBe("8 of 25 nights are a weak fit for Biloxi.");
+    expect(checkResultLine(0, 25, "Biloxi")).toBe("None of the 25 nights is a weak fit for Biloxi.");
+    expect(checkResultLine(2, 18, "Raleigh", "date", "dates")).toBe("2 of 18 dates are a weak fit for Raleigh.");
+    expect(fitSummary({ in: 1, average: 4, away: 1, notScored: 0, classic: 2 })).toBe("1 strong fit, 4 average fit, 1 weak fit, 0 no data, 2 proven promo.");
   });
 });
 
@@ -58,7 +59,7 @@ describe("the own-calendar example", () => {
 
 describe("the Study's personal line", () => {
   it("answers each call for the published result (CALL STANDS)", () => {
-    expect(personalLine("Yes", "CALL STANDS")).toBe("You said Yes. The data didn't show it at this sample size.");
+    expect(personalLine("Yes", "CALL STANDS")).toBe("You said Yes. The data didn't back that up.");
     expect(personalLine("No", "CALL STANDS")).toBe("You said No. That matches what we found.");
     expect(personalLine("Not sure", "CALL STANDS")).toBe("Fair: the data couldn't tell either.");
   });

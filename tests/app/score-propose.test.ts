@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { AUDIT_LINE, bundleScore, centre, comparisonSentence, fitFor, labelForZ, marketLevelSentence, pullWords, vsAverage, zScore } from "../../src/app/score";
+import { AUDIT_LINE, bundleScore, centre, comparisonSentence, fitFor, fitLine, fitPhrase, labelForZ, marketLevelSentence, pullWords, zScore } from "../../src/app/score";
 import { checkCandidate, inWindow, isFamilySlot } from "../../src/app/propose/rules";
 import { BEST_OPTION_GAIN, propose, templateWhy, likeness, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
 import { numbersAreGrounded, numbersIn } from "../../src/app/guard";
@@ -31,13 +31,16 @@ describe("scoring", () => {
     expect(fitFor(0.5, { n: 40, mean: 0.5, sd: 0 }).reason).toContain("barely differ");
   });
   it("explains in plain words without claiming attendance", () => {
-    expect(comparisonSentence("Bluey", "leans-in")).toBe("Against its own average, Bluey stands out above.");
-    expect(comparisonSentence("Bluey", "leans-away")).toContain("stands out below");
-    expect(marketLevelSentence(-1.1)).toBe("Compared with other ballpark markets, this market scores lower than usual on most themes.");
+    expect(comparisonSentence("Bluey", "leans-in", "Biloxi")).toBe("Biloxi likes Bluey more than its other themes.");
+    expect(comparisonSentence("Bluey", "leans-away", "Biloxi")).toBe("Biloxi likes Bluey less than its other themes.");
+    expect(comparisonSentence("Bluey", "average", "Biloxi")).toBe("Biloxi likes Bluey about as much as its other themes.");
+    expect(fitLine("Star Wars", "Biloxi", -1.4)).toBe("Biloxi likes Star Wars much less than its other themes.");
+    expect(marketLevelSentence(-1.1)).toBe("Compared with other towns, this town scores lower than usual on most themes.");
     expect(marketLevelSentence(0.9)).toContain("higher than usual");
     expect(marketLevelSentence(0.1)).toContain("about the same as usual");
-    expect(vsAverage(1.14)).toBe("stands out above this market's average (+1.1)");
-    expect(vsAverage(-0.8)).toBe("sits below this market's average (-0.8)");
+    expect(fitPhrase(1.14)).toBe("a strong fit here");
+    expect(fitPhrase(-0.8)).toBe("a weak fit here");
+    expect(fitPhrase(0.1)).toBe("an average fit here");
   });
 });
 
@@ -190,7 +193,7 @@ describe("proposals", () => {
     const f2 = { ...fits, "paw-patrol": fit("average", 0), pokemon: fit("average", 0) };
     const res = propose({ ...base, fits: weakYoung({ ...f2, "super-mario": fit("leans-away", -1) }), nights: [night(0, "2026-04-11", "super-mario")] });
     expect(res.proposals).toEqual([]);
-    expect(res.unfixed[0]!.reason).toBe("No family theme leans in here that fits this date.");
+    expect(res.unfixed[0]!.reason).toBe("No family theme is a strong fit here for this date.");
   });
   it("a locked Country night is never offered a kids' theme as a touch", () => {
     const f3 = { ...fits, "country": fit("leans-away", -1), dinosaur: fit("leans-in", 3), "paw-patrol": fit("leans-in", 3) };
@@ -209,9 +212,9 @@ describe("proposals", () => {
     expect(res.proposals).toHaveLength(2);
     const [a, b] = res.proposals;
     expect(a).toMatchObject({ fromThemeId: "bluey", toThemeId: "qloo:m1", sponsor: "Sunrise Dental", date: "2026-04-11", to: { label: "found", z: null, score: null }, discovered: { name: "Kite Club" } });
-    expect(a!.why).toBe("Kite Club stands out near Tulsa: fans here like it more than at most of the 40 ballpark markets we compare against.");
+    expect(a!.why).toBe("People in Tulsa like Kite Club more than people in most towns do.");
     expect(b!.toThemeId).toBe("qloo:s1");
-    expect(b!.why).toBe("Puddle Patrol stands out near Tulsa: fans here like it more than at most of the 40 ballpark markets we compare against.");
+    expect(b!.why).toBe("People in Tulsa like Puddle Patrol more than people in most towns do.");
     // Not offered to an adult night, and nothing is left to repeat.
     const adult = propose({ ...base, fits: { ...f2, elvis: fit("leans-away", -2), "grateful-dead": fit("average", 0), yellowstone: fit("average", 0), "taylor-swift": fit("average", 0) }, discovered, nights: [night(0, "2026-04-24", "elvis")] });
     expect(adult.proposals).toEqual([]);
@@ -226,7 +229,7 @@ describe("proposals", () => {
     expect(country.angles[0]!.text).toMatch(/Grateful Dead|Garth Brooks/);
     expect(country.angles[0]!.text).not.toMatch(/Stranger Things|Dinosaur/);
     const lonely = propose({ ...base, fits: { ...f4, "garth-brooks": fit("average", 0), "grateful-dead": fit("average", 0) }, nights: [night(0, "2026-04-11", "country", { locked: true })] });
-    expect(lonely.angles[0]!.text).toContain("A sponsor-friendly angle");
+    expect(lonely.angles[0]!.text).toContain("A sponsor idea");
     // A Yellowstone night is never offered a kids' show as its touch.
     const ys = propose({ ...base, fits: { ...f4, yellowstone: fit("leans-away", -1) }, nights: [night(0, "2026-04-11", "yellowstone", { locked: true })] });
     expect(ys.angles[0]!.text).not.toMatch(/Dinosaur|PAW Patrol|Bluey/);
@@ -236,7 +239,7 @@ describe("proposals", () => {
     const res = propose({ ...base, fits: f5, nights: [night(0, "2027-04-10", "bluey", { sponsor: "Sunrise Dental", notes: "Day game" })] });
     expect(res.proposals).toEqual([]);
     expect(res.unfixed).toHaveLength(1);
-    expect(res.unfixed[0]!.reason).toBe("No family theme leans in here that fits this date.");
+    expect(res.unfixed[0]!.reason).toBe("No family theme is a strong fit here for this date.");
     // The log never claims it ranked "any theme".
     expect(res.trace.map((t) => `${t.text} ${t.detail ?? ""}`).join(" ")).not.toMatch(/any theme/);
   });
@@ -251,7 +254,7 @@ describe("proposals", () => {
       const p = res.proposals[0]!;
       expect(p).toMatchObject({ toThemeId: "princess", kind: "best-option", sponsor: "Sunrise Dental" });
       expect(p.to.label).toBe("average");
-      expect(p.why).toBe("Princess is the strongest kids choice here: about this town's usual, where Bluey sits well below it. The date and the sponsor stay the same.");
+      expect(p.why).toBe("Princess is an average fit here, Bluey is weak. A small step up. The date and the sponsor stay the same.");
       expect(p.why).not.toMatch(/leans in|stands out/);
       expect(res.unfixed).toEqual([]);
       expect(res.trace.some((t) => /best option for it is offered: Princess/.test(t.text))).toBe(true);
@@ -286,7 +289,7 @@ describe("proposals", () => {
       const weak = { name: "Odd Title", entityId: "m8", type: "movie" as const, affinity: 0.8, z: -0.6, popularity: 0.98 };
       const ok = propose({ ...base, fits: f, discovered: [weak, typical], city: "Biloxi", nights: [night(0, "2027-04-10", "bluey", day)] });
       expect(ok.proposals[0]).toMatchObject({ kind: "best-option", discovered: { name: "Big Studio Movie" } });
-      expect(ok.proposals[0]!.why).toBe("Nothing in this audience leans in near Biloxi, so Big Studio Movie is offered as a well-known family title that is at least typical here.");
+      expect(ok.proposals[0]!.why).toBe("Nothing on our list is a strong fit for this night in Biloxi, so Big Studio Movie is offered: a well-known family title that holds up there.");
       const none = propose({ ...base, fits: f, discovered: [weak], nights: [night(0, "2027-04-10", "bluey", day)] });
       expect(none.proposals).toEqual([]);
       const mild = propose({ ...base, fits: { ...f, bluey: fit("leans-away", -0.7) }, discovered: [typical], nights: [night(0, "2027-04-10", "bluey", day)] });
@@ -322,7 +325,7 @@ describe("proposals", () => {
       const p = res.proposals[0]!;
       expect(T(p.toThemeId).category).toBe("film");
       expect(p.toThemeId).toBe("marvel"); // family film, z 0.7 beats z 0.6; Star Trek (teen) is not allowed on a family night; Taylor Swift (z 3) is a different kind
-      expect(res.trace.some((s) => s.detail?.includes("same kind of theme first, then same audience, then local lean"))).toBe(true);
+      expect(res.trace.some((s) => s.detail?.includes("same kind of theme first, then same audience, then how strong a fit"))).toBe(true);
     });
     it("falls back to the same audience, then to anything", () => {
       expect(likeness(T("bluey"), T("paw-patrol"))).toBe(0);

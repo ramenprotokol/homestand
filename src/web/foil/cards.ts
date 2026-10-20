@@ -1,14 +1,15 @@
-import { bridgeSentence, fitWord, pullWords, vsMarketsWords, type FitLabel } from "../../app/score";
+import { fitLine, fitWord, type FitLabel } from "../../app/score";
 import { themeById } from "../../app/themes/artists";
 import { h } from "../dom";
 import { canHover, gsap, reduced } from "./motion";
 import { emblemFor } from "./emblems";
-import { copy, state, swapTitle, type NightView } from "../store";
+import { copy, swapTitle, type NightView } from "../store";
 
 /** A night needing the director's pick is drawn as an unpainted sketch card and says so in words. */
 export type CardFit = FitLabel | "pick";
 
-export const fitName = (fit: CardFit): string => (fit === "pick" ? "Needs your pick" : fitWord(fit, state.kind));
+/** The rating word on a card. A proven promo reads short on the card ("Proven promo"); the full "(not graded)" is in the lists. */
+export const fitName = (fit: CardFit): string => (fit === "pick" ? "Needs your pick" : fit === "classic" ? "Proven promo" : fitWord(fit));
 
 export interface CardSpec {
   title: string;
@@ -45,6 +46,8 @@ export interface BackSpec {
   fit: CardFit;
   /** Shown instead of the stat table when a night has no scores. */
   reason: string | null;
+  /** When this town's data was checked, already formatted ("Oct 15, 8:02 PM"), or null. */
+  checked?: string | null;
 }
 
 const MON = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
@@ -77,7 +80,7 @@ function raw<T extends Element>(html: string): T {
   return t.content.firstElementChild as T;
 }
 
-/** "Bluey Day" becomes the script "Bluey" over the slab "DAY". Anything else gets "THEME NIGHT" (a venue's "SHOW"). */
+/** "Bluey Day" becomes the script "Bluey" over the slab "DAY". Anything else gets "THEME NIGHT" (a venue's act name stands alone). */
 export function nameParts(t: string): [string, string] {
   const w = t.trim().split(/\s+/);
   const last = w[w.length - 1] ?? "";
@@ -115,7 +118,7 @@ export function specOf(v: NightView): CardSpec {
 /** A card for a theme the agent proposes: the night's date and sponsor, the new theme's art and fit. */
 export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel, genre?: string | null): CardSpec {
   const category = themeId === "music" ? "music" : (themeById(themeId)?.category ?? null);
-  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWord(fit, state.kind)}` };
+  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWord(fit)}` };
 }
 
 function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
@@ -134,29 +137,14 @@ function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
     raw(gemSVG(s.fit)),
     penn,
     h("span", { class: "fitword" }, fitName(s.fit)),
-    h("div", { class: "plate" }, h("span", { class: "nm-s", style: `--fs:${fs}cqw` }, script), h("span", { class: "nm-b" }, slab), s.sponsor ? h("span", { class: "spons" }, s.sponsor) : null),
+    h("div", { class: "plate" }, h("span", { class: "nm-s", style: `--fs:${fs}cqw` }, script), slab ? h("span", { class: "nm-b" }, slab) : null, s.sponsor ? h("span", { class: "spons" }, s.sponsor) : null),
     h("div", { class: "foil" }),
     ...extra,
   );
 }
 
 
-export function whyHead(fit: CardFit, city: string): string {
-  return fit === "leans-in" ? `Why it fits ${city}` : fit === "leans-away" ? `Why it misses ${city}` : `How ${city} reads it`;
-}
-
-const whyText = (fit: CardFit): string => {
-  const c = copy();
-  const t = c.night === "date" ? "act" : "theme";
-  const text: Partial<Record<CardFit, string>> = {
-    "leans-in": `People near the ${c.place} like these more than they like the average ${t}, so this ${c.night} fits the market's taste.`,
-    average: `People near the ${c.place} like these about as much as the average ${t}: neither a draw nor a drag.`,
-    "leans-away": `People near the ${c.place} like these less than the average ${t}, so a swap may fit the market's taste better.`,
-  };
-  return text[fit] ?? "";
-};
-
-/** The cardboard stat back: taste match per item, the local pull, and the plain-words reason. */
+/** The cardboard back: one plain line about this theme in this town. The comparison with other towns lives under "Show the numbers", not here. */
 function backFace(b: BackSpec): HTMLElement {
   const pad = (n: number): string => String(n).padStart(2, "0");
   const scored = b.rows.length > 0 || b.index !== null;
@@ -164,10 +152,8 @@ function backFace(b: BackSpec): HTMLElement {
   const body: Node[] = [];
   if (scored && ix !== null) {
     body.push(
-      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Local pull", h("b", null, pullWords(ix)))),
-      h("div", { class: "bk-vs", "data-testid": "bk-vs" }, `${b.themeName} here: ${vsMarketsWords(b.z, state.kind)}`),
-      ...(bridgeSentence(b.fit, b.z, b.city) ? [h("div", { class: "bk-bridge", "data-testid": "bk-bridge" }, bridgeSentence(b.fit, b.z, b.city))] : []),
-      h("div", { class: "bk-why" }, h("b", null, whyHead(b.fit, b.city)), whyText(b.fit)),
+      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Fit", h("b", null, fitName(b.fit)))),
+      h("div", { class: "bk-why", "data-testid": "bk-line" }, fitLine(b.themeName, b.city, ix)),
     );
   } else {
     body.push(h("div", { class: "bk-why" }, h("b", null, fitName(b.fit)), b.reason ?? ""));
@@ -185,7 +171,7 @@ function backFace(b: BackSpec): HTMLElement {
         h("div", { class: "bk-nm" }, b.title),
         h("div", { class: "bk-sub" }, b.dateLine),
         ...body,
-        h("div", { class: "bk-ft" }, h("span", null, "Taste data from Qloo"), h("span", null, b.city)),
+        h("div", { class: "bk-ft" }, h("span", null, b.checked ? `Checked ${b.checked}` : "Taste data from Qloo"), h("span", null, b.city)),
       ),
     ),
   );

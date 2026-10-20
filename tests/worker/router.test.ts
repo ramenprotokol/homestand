@@ -318,8 +318,8 @@ describe("propose", () => {
         const msgs = (input as { messages: Array<{ content: string }> }).messages;
         if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
         calls++;
-        const user = JSON.parse(msgs[1]!.content) as Array<{ id: string }>;
-        return { response: JSON.stringify(user.map((f, i) => ({ id: f.id, why: i === 0 ? "A clean, grounded reason about local taste." : i === 1 ? "This lifts the park by 87 percent." : "This swap will boost attendance." }))) };
+        const user = JSON.parse(msgs[1]!.content) as Array<{ id: string; town: string; planned: string; proposed: string }>;
+        return { response: JSON.stringify(user.map((f, i) => ({ id: f.id, why: i === 0 ? `People in ${f.town} like ${f.proposed} more than ${f.planned}, compared with their other themes.` : i === 1 ? "This lifts the park by 87 percent." : "This swap will boost attendance." }))) };
       },
     };
     const h = harness({}, ai);
@@ -345,18 +345,18 @@ describe("propose", () => {
     expect(p.proposals.length).toBeGreaterThan(0);
   });
 
-  const aiWith = (why: (i: number) => string): AiPort => ({
+  const aiWith = (why: (i: number, f: { town: string; planned: string; proposed: string }) => string): AiPort => ({
     run: async (_m, input) => {
       const msgs = (input as { messages: Array<{ content: string }> }).messages;
       if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
-      const user = JSON.parse(msgs[1]!.content) as Array<{ id: string }>;
-      return { choices: [{ message: { content: JSON.stringify(user.map((f, i) => ({ id: f.id, why: why(i) }))) } }] };
+      const user = JSON.parse(msgs[1]!.content) as Array<{ id: string; town: string; planned: string; proposed: string }>;
+      return { choices: [{ message: { content: JSON.stringify(user.map((f, i) => ({ id: f.id, why: why(i, f) }))) } }] };
     },
   });
 
   it("rejects a model reason that talks about the sponsor, and adds the fixed sentence to a good one", async () => {
     const bad = "Star Trek fits the market better than Margaritaville, but the sponsor does not stay for that night.";
-    const { p } = await proposeOk(harness({}, aiWith((i) => (i === 0 ? bad : "People near the ballpark like this theme more than the average theme and the planned one less."))));
+    const { p } = await proposeOk(harness({}, aiWith((i, f) => (i === 0 ? bad : `People in ${f.town} like ${f.proposed} more than ${f.planned}, compared with their other themes.`))));
     const library = p.proposals.filter((x) => !x.discovered);
     expect(library.some((x) => /sponsor does not stay/.test(x.why))).toBe(false);
     expect(library[0]!.whySource).toBe("template");
@@ -366,11 +366,11 @@ describe("propose", () => {
     for (const x of library) expect(x.why).not.toMatch(/does not stay|tickets|attendance|revenue/i);
   });
 
-  it("rejects model reasons that say 'prefer' or overclaim, and keeps the 'lean toward' wording", async () => {
-    const { p } = await proposeOk(harness({}, aiWith((i) => (i === 0 ? "People prefer Pro wrestling over Star Wars." : i === 1 ? "Fans here favour this one, and it is the best pick." : "Fans here lean toward the new theme more than the planned one, compared with this market's usual."))));
+  it("rejects model reasons that say 'prefer' or overclaim, and keeps the plain like-more-than wording", async () => {
+    const { p } = await proposeOk(harness({}, aiWith((i, f) => (i === 0 ? "People prefer Pro wrestling over Star Wars." : i === 1 ? "Fans here favour this one, and it is the best pick." : `People in ${f.town} like ${f.proposed} more than ${f.planned}, compared with their other themes.`))));
     const library = p.proposals.filter((x) => !x.discovered);
     expect(library.some((x) => /prefer|favou?r|best/i.test(x.why))).toBe(false);
-    expect(library.filter((x) => x.whySource === "model").every((x) => /lean toward/.test(x.why))).toBe(true);
+    expect(library.filter((x) => x.whySource === "model").every((x) => /like .+ more than .+, compared with their other themes/.test(x.why))).toBe(true);
     expect(p.trace.filter((s) => /went beyond the taste comparison/.test(s.text)).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -415,7 +415,7 @@ describe("propose", () => {
       h.qlooUrls.length = 0;
       const again = await proposeOk(h);
       expect(h.qlooUrls.filter((u) => (u.searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-"))).toHaveLength(0);
-      expect(again.p.trace.some((s) => /recorded family-title scores/.test(s.text))).toBe(true);
+      expect(again.p.trace.some((s) => /saved family-title scores/.test(s.text))).toBe(true);
 
       const broken = harness({}, null, async (input, init) => ((new URL(String(input)).searchParams.get("filter.results.entities") ?? "").startsWith("SYN-D-") ? new Response("no", { status: 400 }) : syntheticQlooFetch(input, init)));
       const res = await proposeOk(broken);
@@ -470,7 +470,7 @@ describe("propose", () => {
       expect(x.to).toEqual({ label: "found", z: null, score: null });
       expect(x.date).toBe(loud.date);
       expect(x.sponsor).toBe("Sunrise Dental");
-      expect(x.why).toBe(`${x.discovered!.name} stands out near Akron: fans here like it more than at most of the 40 ballpark markets we compare against.`);
+      expect(x.why).toBe(`People in Akron like ${x.discovered!.name} more than people in most towns do.`);
       expect(loud.p.unfixed.find((q) => q.index === loud.index)).toBeUndefined();
     });
   });
@@ -494,7 +494,7 @@ describe("recheck", () => {
     const out = (await res.json()) as RecheckResponse;
     expect(h.qlooUrls.length).toBe(2); // movie + tv_show
     expect(out.theme).toMatchObject({ themeId: "star-wars", source: "live", fetchedAt: "2026-10-15T12:00:00.000Z" });
-    expect(out.trace.some((s) => /ignoring the recorded result/.test(s.text))).toBe(true);
+    expect(out.trace.some((s) => /ignoring the saved result/.test(s.text))).toBe(true);
     for (const u of h.qlooUrls) expect(u.searchParams.get("filter.results.entities")!.split(",").every((id) => id.startsWith("SYN-star-wars"))).toBe(true);
   });
   it("is switched off, with a clear message, once the daily cap is nearly spent", async () => {
@@ -670,13 +670,13 @@ describe("model answers are cached", () => {
     expect(h.aiCalls).toHaveLength(2);
   });
 
-  it("the same swaps ask the model for reasons once, and share the answer across markets", async () => {
+  it("the same swaps ask the model for reasons once, and keep the answer for that town", async () => {
     const ai: AiPort = {
       run: async (_m, input) => {
         const msgs = (input as { messages: Array<{ content: string }> }).messages;
         if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
-        const user = JSON.parse(msgs[1]!.content) as Array<{ id: string; planned: string; proposed: string }>;
-        return { response: JSON.stringify(user.map((f) => ({ id: f.id, why: `Fans here lean toward ${f.proposed} more than ${f.planned}, compared with this market's usual.` }))) };
+        const user = JSON.parse(msgs[1]!.content) as Array<{ id: string; town: string; planned: string; proposed: string }>;
+        return { response: JSON.stringify(user.map((f) => ({ id: f.id, why: `People in ${f.town} like ${f.proposed} more than ${f.planned}, compared with their other themes.` }))) };
       },
     };
     const h = harness({}, ai);
@@ -695,14 +695,14 @@ describe("model answers are cached", () => {
 
 describe("saved reasons are only ever real model wording", () => {
   const planFor = (out: AnalyzeResponse) => out.nights.map((n) => ({ index: n.index, date: n.date, themeId: n.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes }));
-  const GOOD = (proposed: string, planned: string): string => `Fans here lean toward ${proposed} more than ${planned}, compared with this market's usual.`;
+  const GOOD = (proposed: string, planned: string, town = "Akron"): string => `People in ${town} like ${proposed} more than ${planned}, compared with their other themes.`;
   const swapCalls = (h: Harness) => h.aiCalls.filter((c) => /swap/.test((c as { messages: Array<{ content: string }> }).messages[0]!.content)) as Array<{ messages: Array<{ content: string }> }>;
   const factsOf = (c: { messages: Array<{ content: string }> }) => JSON.parse(c.messages[1]!.content) as Array<{ id: string; planned: string; proposed: string }>;
   const goodAi: AiPort = {
     run: async (_m, input) => {
       const msgs = (input as { messages: Array<{ content: string }> }).messages;
       if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
-      return { response: JSON.stringify((JSON.parse(msgs[1]!.content) as Array<{ id: string; planned: string; proposed: string }>).map((f) => ({ id: f.id, why: GOOD(f.proposed, f.planned) }))) };
+      return { response: JSON.stringify((JSON.parse(msgs[1]!.content) as Array<{ id: string; town: string; planned: string; proposed: string }>).map((f) => ({ id: f.id, why: GOOD(f.proposed, f.planned, f.town) }))) };
     },
   };
   const whyKeys = (h: Harness) => [...h.kv.data.keys()].filter((k) => k.startsWith("ai:why:"));
@@ -739,7 +739,7 @@ describe("saved reasons are only ever real model wording", () => {
     expect(factsOf(swapCalls(h)[1]!)).toHaveLength(1);
     expect(second.trace.some((t) => new RegExp(`used saved model wording for ${modelPairs - 1} of ${modelPairs}, so the model is asked only for the other 1`).test(t.text))).toBe(true);
     // Every reason is still real model wording, and the third visit is free.
-    expect(second.proposals.filter((x) => !x.discovered && !x.kind).every((x) => x.whySource === "model" && /lean toward/.test(x.why))).toBe(true);
+    expect(second.proposals.filter((x) => !x.discovered && !x.kind).every((x) => x.whySource === "model" && /like .+ more than/.test(x.why))).toBe(true);
     await route(post("/api/propose", body), h.deps);
     expect(swapCalls(h)).toHaveLength(2);
   });
@@ -874,8 +874,8 @@ describe("KV writes per visit (the free plan allows about 1,000 a day)", () => {
     const ai: AiPort = { run: async (_m, input) => {
       const msgs = (input as { messages: Array<{ content: string }> }).messages;
       if (!/swap/.test(msgs[0]!.content)) return { response: "{}" };
-      const user = JSON.parse(msgs[1]!.content) as Array<{ id: string }>;
-      return { response: JSON.stringify(user.map((f) => ({ id: f.id, why: "Fans here lean toward the new theme more than the planned one, compared with this market's usual." }))) };
+      const user = JSON.parse(msgs[1]!.content) as Array<{ id: string; town: string; planned: string; proposed: string }>;
+      return { response: JSON.stringify(user.map((f) => ({ id: f.id, why: `People in ${f.town} like ${f.proposed} more than ${f.planned}, compared with their other themes.` }))) };
     } };
     const h = harness({}, ai);
     const puts: string[] = [];
@@ -923,14 +923,14 @@ describe("taste graph angles for locked nights", () => {
     expect(p.angles[0]!.options!.some((o) => o.toThemeId === "star-wars")).toBe(false);
     expect(p.angles).toHaveLength(1);
     expect(p.angles[0]!.toThemeId).toBe("batman");
-    expect(p.angles[0]!.text).toContain("Fans of Star Trek near Akron also lean toward Batman, so if Harbor Credit Union is open to it, a small Batman touch");
-    expect(p.trace.some((s) => /Asked Qloo what fans of Star Trek near Akron also lean toward/.test(s.text))).toBe(true);
+    expect(p.angles[0]!.text).toContain("Fans of Star Trek near Akron also like Batman, so if Harbor Credit Union is open to it, a small Batman touch");
+    expect(p.trace.some((s) => /Asked Qloo what fans of Star Trek near Akron also like/.test(s.text))).toBe(true);
     // Cached: the same answer with no new call.
     h.qlooUrls.length = 0;
     const again = (await (await route(post("/api/propose", { market: body.market, nights: plan, allowDuplicates: false }), h.deps)).json()) as ProposeResponse;
     expect(h.qlooUrls.filter((u) => u.searchParams.has("signal.interests.entities"))).toHaveLength(0);
     expect(again.angles[0]!.text).toBe(p.angles[0]!.text);
-    expect(again.trace.some((s) => /recorded taste graph for fans of Star Trek/.test(s.text))).toBe(true);
+    expect(again.trace.some((s) => /saved taste graph for fans of Star Trek/.test(s.text))).toBe(true);
   });
 
   it("asks with a single candidate, and widens to the same audience of any kind when the same-kind set is empty", async () => {
@@ -955,7 +955,7 @@ describe("taste graph angles for locked nights", () => {
     expect(call).toHaveLength(1);
     expect(call[0]!.searchParams.get("filter.results.entities")).toBe("SYN-barbie:film"); // one candidate, from the toys category, same young audience
     expect(p.angles[0]!.toThemeId).toBe("barbie");
-    expect(p.angles[0]!.text).toContain("Fans of Marvel near Akron also lean toward Barbie, so if Summit Savings is open to it");
+    expect(p.angles[0]!.text).toContain("Fans of Marvel near Akron also like Barbie, so if Summit Savings is open to it");
     expect(p.trace.some((s) => /among 1 theme/.test(s.text))).toBe(true);
   });
 

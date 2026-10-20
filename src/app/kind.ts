@@ -7,9 +7,9 @@ export type Kind = "club" | "venue";
 export const kindOf = (v: unknown): Kind => (v === "venue" ? "venue" : "club");
 
 export interface Copy {
-  /** "ballpark" / "venue": the place the market is around. */
+  /** "town" / "city": the place the ratings are about. */
   place: string;
-  /** What the 40 reference markets are called. They are the same 40 cities for both kinds, so a venue run says "reference markets". */
+  /** What the 40 comparison places are called ("towns", "cities"). They are the same 40 places for both kinds. */
   markets: string;
   /** "the season" / "the summer series". */
   season: string;
@@ -28,8 +28,8 @@ export interface Copy {
 }
 
 export const COPY: Record<Kind, Copy> = {
-  club: { place: "ballpark", markets: "ballpark markets", season: "season", night: "night", nights: "nights", themeNight: "theme night", themeNights: "theme nights", sample: "sample club", memoTitle: "Theme-night rationale", slab: "THEME NIGHT" },
-  venue: { place: "venue", markets: "reference markets", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "SHOW" },
+  club: { place: "town", markets: "towns", season: "season", night: "night", nights: "nights", themeNight: "theme night", themeNights: "theme nights", sample: "sample club", memoTitle: "Theme-night rationale", slab: "THEME NIGHT" },
+  venue: { place: "city", markets: "cities", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "" },
 };
 
 export const copyFor = (k: Kind | undefined): Copy => COPY[k ?? "club"];

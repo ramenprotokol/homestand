@@ -80,7 +80,6 @@ function mountHero(hero: HTMLElement): void {
       .from(".ticks", { opacity: 0, duration: 0.5 }, 0.7)
       .from("#sub", { opacity: 0, y: 14, duration: 0.5 }, 0.7)
       .from("#cta", { opacity: 0, y: 12, duration: 0.5 }, 0.85)
-      .from("#tag", { opacity: 0, y: 12, duration: 0.5 }, 0.93)
       .from(".nav", { opacity: 0, y: -14, duration: 0.6 }, 0.5);
     }
 

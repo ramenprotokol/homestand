@@ -124,7 +124,7 @@ export async function recheckTheme(themeId: string): Promise<"same" | "changed" 
   state.analysis.themes = { ...res.themes, [themeId]: res.theme };
   state.analysis.caps = res.caps;
   invalidateProposals();
-  addTrace(`Re-check live: ${themeId}`, res.trace);
+  addTrace(`Get fresh data: ${themeId}`, res.trace);
   if (res.withinDay) return "recent";
   return before && before.label !== res.theme.label ? "changed" : "same";
 }

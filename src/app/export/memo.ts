@@ -1,5 +1,5 @@
 import { copyFor, type Kind } from "../kind";
-import { methodWords, pullBand } from "../score";
+import { FIT_WORDS, pullBand } from "../score";
 import { longDate } from "../text";
 
 export interface MemoSwap {
@@ -26,6 +26,8 @@ export interface MemoData {
   /** "venue" for the concert-venue sample; left out for a club, whose memo reads exactly as before. */
   kind?: Kind;
   club: string;
+  /** The city alone ("Biloxi"), for plain sentences. */
+  city?: string;
   generatedOn: string;
   swaps: MemoSwap[];
   angles: string[];
@@ -48,11 +50,12 @@ export function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
-/** "well below", "about usual", "above": the local pull in words, never a raw index. */
-const bandText = (z: number | null): string => {
+/** "Strong fit", "Average fit" or "Weak fit": the rating in words, never a raw index. */
+const ratingText = (z: number | null): string => {
   const b = pullBand(z);
-  return b === null ? "n/a" : b === "about" ? "about usual" : b;
+  return b === null ? "No data" : b === "about" ? "Average fit" : b === "above" || b === "well above" ? "Strong fit" : "Weak fit";
 };
+const lower = (t: string): string => t.charAt(0).toLowerCase() + t.slice(1);
 
 /** The memo's first sentence: fixed wording, filled only with counts the app knows. No model writes it. */
 export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "suggested" | "kind">): string {
@@ -70,8 +73,8 @@ export function buildMemoHtml(d: MemoData): string {
   const venue = d.kind === "venue";
   const rows = d.swaps
     .map(
-      (s) => `<tr><td>${escapeHtml(s.weekday.slice(0, 3))} ${escapeHtml(longDate(s.date).replace(/^(\w{3})\w*/, "$1"))}</td><td>${escapeHtml(s.from)}</td><td>${escapeHtml(s.to)}${s.discovered ? " <em>(Discovered by Qloo)</em>" : ""}</td><td>${escapeHtml(s.sponsor || "none")}</td>` +
-        `<td>${s.discovered ? `${bandText(s.fromZ)} to found by Qloo` : `${bandText(s.fromZ)} to ${bandText(s.toZ)}`}</td></tr>`,
+      (s) => `<tr><td data-label="${C.night.replace(/^./, (c) => c.toUpperCase())}">${escapeHtml(s.weekday.slice(0, 3))} ${escapeHtml(longDate(s.date).replace(/^(\w{3})\w*/, "$1"))}</td><td data-label="Was">${escapeHtml(s.from)}</td><td data-label="Now">${escapeHtml(s.to)}${s.discovered ? ` <em>(${FIT_WORDS.found})</em>` : ""}</td><td data-label="Sponsor">${escapeHtml(s.sponsor || "none")}</td>` +
+        `<td data-label="Fit">${ratingText(s.fromZ)} \u2192 ${s.discovered ? FIT_WORDS.found : ratingText(s.toZ)}</td></tr>`,
     )
     .join("");
   // Template reasons for library themes are the same sentence with different names, so they are said once, not once per swap.
@@ -79,39 +82,39 @@ export function buildMemoHtml(d: MemoData): string {
   const whys =
     d.swaps
       .map((s) => {
-        const head = `<strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}${s.discovered ? " (Discovered by Qloo)" : ""}, ${escapeHtml(longDate(s.date))}.</strong>`;
+        const head = `<strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}${s.discovered ? ` (${FIT_WORDS.found})` : ""}, ${escapeHtml(longDate(s.date))}.</strong>`;
         const checked = s.fromEntities?.length || s.toEntities?.length
-          ? ` Qloo checked ${s.fromEntities?.length ? `${escapeHtml(s.fromEntities.join(", "))} for the planned ${C.night} (${bandText(s.fromZ)})` : ""}${s.fromEntities?.length && s.toEntities?.length ? " and " : ""}${s.toEntities?.length ? `${escapeHtml(s.toEntities.join(", "))} for the swap (${s.discovered ? "found by Qloo, not scored against the library" : bandText(s.toZ)})` : ""}.`
+          ? ` Qloo checked ${s.fromEntities?.length ? `${escapeHtml(s.fromEntities.join(", "))} for the planned ${C.night} (${lower(ratingText(s.fromZ))})` : ""}${s.fromEntities?.length && s.toEntities?.length ? " and " : ""}${s.toEntities?.length ? `${escapeHtml(s.toEntities.join(", "))} for the swap (${s.discovered ? `local favorite${d.city ? `: people in ${escapeHtml(d.city)} like it more than people in most towns do` : ""}` : lower(ratingText(s.toZ))})` : ""}.`
           : "";
         return collapse && !s.discovered && s.source !== "model" ? `<li>${head}${checked}</li>` : `<li>${head} ${escapeHtml(s.why)}${checked}</li>`;
       })
-      .join("") + (collapse ? `<li>For the library themes, the new theme stands out above this market's own average and the planned one stands out below it. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>` : "");
+      .join("") + (collapse ? `<li>For the themes from our list, the new theme is a stronger fit for this town than the planned one. ${d.swaps.every((s) => s.sponsor) ? "Dates and sponsors stay." : "Dates stay, and so do sponsors where there is one."}</li>` : "");
   const ideas = d.ideas && d.ideas.titles.length > 0
-    ? `<h2>Family titles that stand out near ${escapeHtml(d.ideas.city)}</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}. Qloo had local data for ${d.ideas.scored} of our ${d.ideas.poolSize} family titles here; these stand out against 40 ballpark markets. They come from Qloo's taste data for this area.</p>`
+    ? `<h2>Family movies ${escapeHtml(d.ideas.city)} likes more than most towns</h2><p>${d.ideas.titles.map(escapeHtml).join(", ")}. Try one for a family night.</p>`
     : "";
   const acts = d.acts && d.acts.names.length > 0
-    ? `<h2>Acts that stand out near ${escapeHtml(d.acts.city)}</h2><p>${d.acts.names.map(escapeHtml).join(", ")}. Qloo had local data for ${d.acts.scored} of our ${d.acts.poolSize} touring acts here; these stand out against 40 reference markets. They come from Qloo's taste data for this area.</p>`
+    ? `<h2>Acts ${escapeHtml(d.acts.city)} likes more than most cities</h2><p>${d.acts.names.map(escapeHtml).join(", ")}.</p>`
     : "";
   const angles = d.angles.map((a) => `<li>${escapeHtml(a)}</li>`).join("");
   const banner = d.synthetic ? `<p class="warn">SYNTHETIC DEMO DATA. These numbers are made up for testing, not from Qloo.</p>` : "";
-  const recorded = d.recordedLabel ? ` Scores were pulled from Qloo on ${escapeHtml(d.recordedLabel)}.` : "";
+  const recorded = d.recordedLabel ? ` Data checked ${escapeHtml(d.recordedLabel)}.` : "";
   return `<article class="memo">
 <h1>${C.memoTitle}: ${escapeHtml(d.club)}</h1>
 <p class="meta">Prepared ${escapeHtml(longDate(d.generatedOn))} with Homestand.${recorded}${venue && d.sample ? " This is a made-up calendar for a sample amphitheatre, not a real venue's schedule." : ""}</p>
 ${banner}
 <p>${escapeHtml(memoOpener(d))}</p>
 ${d.swaps.length ? `<h2>Approved swaps</h2>
-<div class="memo-scroll"><table><thead><tr><th>${C.night.replace(/^./, (c) => c.toUpperCase())}</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Local pull (was to now)</th></tr></thead><tbody>${rows}</tbody></table></div>
+<div class="memo-scroll"><table><thead><tr><th>${C.night.replace(/^./, (c) => c.toUpperCase())}</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Fit: before \u2192 after</th></tr></thead><tbody>${rows}</tbody></table></div>
 <h2>Why</h2><ul>${whys}</ul>` : `<p>No swaps were approved. The calendar is unchanged.</p>`}
 ${venue ? acts : ideas}
-${d.angles.length ? `<h2>${venue ? "Locked headliners: support-act ideas" : "Locked nights: sponsor-friendly angles"}</h2><ul>${angles}</ul>` : ""}
+${d.angles.length ? `<h2>${venue ? "Locked headliners: support-act ideas" : "Locked nights: sponsor ideas"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
-<p>${escapeHtml(methodWords(d.kind))}</p>
-<p>${d.nights} ${C.nights} were reviewed; ${d.classic} classic ${d.classic === 1 ? C.night : C.nights} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : "(fireworks, giveaways, heritage and similar)"} ${d.classic === 1 ? "was" : "were"} left as planned because they are not a ${venue ? "music" : "pop-culture"} taste. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
+<p>Strong, average and weak compare each theme with this ${C.place}'s other themes. They describe taste, not ticket sales.</p>
+<p>${d.nights} ${C.nights} were reviewed; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : "(fireworks, giveaways, heritage nights and similar)"} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded. Taste data comes from Qloo's Taste AI. Every swap keeps its date and sponsor.</p>
 </article>`;
 }
 
-export const MEMO_CSS = `body{font:15px/1.5 Geist,system-ui,sans-serif;color:#14233c;max-width:760px;margin:2rem auto;padding:0 1rem}h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:1.6rem}table{border-collapse:collapse;width:100%;font-size:.9rem}.memo-scroll{overflow-x:auto}th,td{border:1px solid #9aa4b2;padding:.35rem .5rem;text-align:left}.meta{color:#4a5568}.warn{border:2px solid #b3360b;padding:.5rem;font-weight:600}`;
+export const MEMO_CSS = `body{font:15px/1.5 Geist,system-ui,sans-serif;color:#14233c;max-width:760px;margin:2rem auto;padding:0 1rem}h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:1.6rem}table{border-collapse:collapse;width:100%;font-size:.9rem}.memo-scroll{overflow-x:auto}th,td{border:1px solid #9aa4b2;padding:.35rem .5rem;text-align:left}.meta{color:#4a5568}.warn{border:2px solid #b3360b;padding:.5rem;font-weight:600}@media (max-width:640px){body{font-size:16px}.memo-scroll{overflow:visible}table,thead,tbody,tr,th,td{display:block}thead{position:absolute;left:-9999px}tr{border:1px solid #9aa4b2;margin:0 0 .6rem;padding:.3rem .2rem}td{border:0;padding:.15rem .4rem}td::before{content:attr(data-label) ": ";font-weight:700}}`;
 
 export function memoDocument(d: MemoData): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${copyFor(d.kind).memoTitle}: ${escapeHtml(d.club)}</title><style>${MEMO_CSS}</style></head><body>${buildMemoHtml(d)}</body></html>`;

@@ -234,7 +234,7 @@ input[type=file]{font-size:13px;color:#2a1f10;max-width:100%}
 .send .h2 em{font-size:1em}
 .send .notice{max-width:520px}
 .memo-h{font-family:var(--slab);font-weight:400;font-size:clamp(18px,1.8vw,22px);color:#fff}
-.memo-sheet{position:relative;background:linear-gradient(#fbf3de,#f1e5c4);color:#2a1f10;padding:22px 24px 20px;border-radius:3px;transform:rotate(-.6deg);box-shadow:0 24px 50px rgba(0,0,0,.55);font-size:13.5px;line-height:1.55;max-width:600px;width:100%;overflow:hidden}
+.memo-sheet{position:relative;background:linear-gradient(#fbf3de,#f1e5c4);color:#2a1f10;padding:22px 24px 20px;border-radius:3px;box-shadow:0 24px 50px rgba(0,0,0,.55);font-size:13.5px;line-height:1.55;max-width:600px;width:100%;overflow:hidden}
 .memo-sheet::before{content:"";position:absolute;left:50%;top:-12px;width:90px;height:24px;transform:translateX(-50%) rotate(2deg);background:rgba(240,185,74,.55);box-shadow:0 2px 6px rgba(0,0,0,.25)}
 .memo-sheet h1{font-family:var(--slab);font-weight:400;font-size:17px;color:#16194a;letter-spacing:.03em;text-transform:uppercase;margin-bottom:8px;border-bottom:2px solid #a8382c;padding-bottom:6px;overflow-wrap:anywhere}
 .memo-sheet h2{font-family:var(--slab);font-weight:400;font-size:14px;color:#16194a;margin:14px 0 6px}
@@ -334,7 +334,7 @@ textarea::placeholder{color:#8a7a58;opacity:1}
 .acts:empty{display:none}
 .verdict{gap:14px}
 .stampv{margin:12px 12px 18px 4px;max-width:calc(100% - 20px);overflow-wrap:anywhere}
-.stamp-plain{font-size:17px;font-weight:700;color:#fff;max-width:60ch;margin:0}
+.stamp-plain{font-size:clamp(20px,2.2vw,28px);line-height:1.25;font-weight:700;color:#fff;max-width:34ch;margin:6px 0 0}
 .review .lead{margin:6px 0 14px}
 body.why-open .nav{visibility:hidden}
 .bk-h,.bk-r{grid-template-columns:1fr 16cqw}
@@ -451,3 +451,32 @@ body.why-open .nav{visibility:hidden}
 .ideas--lead h2{font-size:clamp(22px,2.4vw,30px)}
 .ideas--lead .idea{font-size:15.5px;padding:7px 14px}
 .ideas-lede{margin:0 0 12px;font-size:15px;color:#e2e5f6;max-width:62ch}
+@media (max-width:640px){.memo-sheet{font-size:14.5px}.memo-sheet .memo-scroll{overflow:visible}.memo-sheet table,.memo-sheet thead,.memo-sheet tbody,.memo-sheet tr,.memo-sheet th,.memo-sheet td{display:block;min-width:0}.memo-sheet thead{position:absolute;left:-9999px}.memo-sheet tr{border:1px solid rgba(26,42,106,.4);margin:0 0 8px;padding:4px 2px}.memo-sheet td{border:0;padding:2px 6px;font-size:14px}.memo-sheet td::before{content:attr(data-label) ": ";font-weight:700}}
+.exp{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.btn-main{font-size:18px;min-height:52px;padding-inline:26px}
+.exp-2{display:flex;gap:8px;flex-wrap:wrap}
+.honest-line{max-width:62ch;margin:0 0 22px}
+.tk-city{overflow-wrap:normal!important;word-break:keep-all}
+
+/* ---- round 10: one list for the ratings, readable type sizes ---- */
+.dl-top,.dl-rest{display:flex;flex-direction:column;gap:14px;min-width:0}
+.fitlist{list-style:none;margin:0;padding:12px 14px;display:grid;gap:10px;border-radius:14px;background:rgba(10,14,52,.7);border:1px solid rgba(255,255,255,.12)}
+.fitlist .fl{display:grid;grid-template-columns:26px 22px 1fr;gap:8px;align-items:start;font-size:13.5px;line-height:1.35;color:#d3d7ee}
+.fitlist .fl .gem,.fitlist .fl svg{width:24px;height:24px}
+.fitlist .fl-n{font-family:var(--slab);font-size:18px;line-height:1.1;color:#fff;text-align:right}
+.fitlist .fl-t b{color:#fff}
+.fitlist .fl.away .fl-t b{color:#ffb3bd}
+@media (max-width:1100px){.deck-l{display:contents}.dl-top{order:1}.deck-r{order:2}.dl-rest{order:3}}
+.card .fitword{font-size:max(11px,4.1cqw)!important;letter-spacing:.07em!important;max-width:94%;white-space:nowrap}
+.penn b{font-size:max(10px,5.4cqw)!important;letter-spacing:.06em!important}
+.nm-b{font-size:max(10px,5.8cqw)!important;letter-spacing:.1em!important}
+.disc-badge,.best-badge,.now-card .disc-badge,.now-card .best-badge{font-size:11px!important;letter-spacing:.06em!important;white-space:normal!important;text-align:center;line-height:1.2}
+.bk-idx .t b{font-size:max(13px,6cqw)}
+.bk-why{font-size:max(11.5px,4.2cqw)}
+.bk-ft{font-size:max(10px,3.2cqw)}
+@media (max-width:640px){
+  .small,.lg,.locks,.idx .pp,.ck li,.why,.dl,.dnote,.slot-note,.foot,.foot p+p,.fitlist .fl,.tag,.lb-info .src,.ms,.check-note,.help,.sample,.tk-main span,.next-step,.nofix-why,.dupes-note,.pack-hint,.ideas-lede,.ideas .small{font-size:13px!important}
+  .tk-city{font-size:clamp(17px,5.4vw,21px)!important}
+  .ticket{grid-template-columns:118px minmax(0,1fr)!important}
+  .ticket::before,.ticket::after{left:calc(118px - 9px)!important}
+}

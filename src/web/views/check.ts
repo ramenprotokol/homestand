@@ -1,5 +1,5 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { bridgeSentence, classicReason, comparisonSentence, fitWord, marketLevelSentence, methodWords, NEAR_TOP_NOTE, vsMarketsWords } from "../../app/score";
+import { bridgeSentence, classicReason, comparisonSentence, FIT_MEANING, fitWord, marketLevelSentence, methodWords, NEAR_TOP_NOTE, vsMarketsWords, type FitLabel } from "../../app/score";
 import { cityOfLabel } from "../../app/kind";
 import { themeById } from "../../app/themes/artists";
 import { checkResultLine, cleanTitle, fitSummary, lockedLine } from "../../app/text";
@@ -8,7 +8,6 @@ import { fitChip, syntheticBanner } from "../components";
 import { formatDate, formatDateTime, h, type Child } from "../dom";
 import { recheckTheme, navigate } from "../flow";
 import { bindTilt, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
-import { tally } from "../foil/tally";
 import { onCleanup, onMount, route, routeContext } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
 import { rand } from "../foil/rng";
@@ -19,13 +18,19 @@ import { step } from "../../app/trace";
 import { addTrace, copy, state, swapTitle, ui, viewOf, type NightView } from "../store";
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const legend = (): ReadonlyArray<readonly [CardFit, string, string]> => [
-  ["leans-in", "Leans in", `Fans here like it more than the average ${copy().night === "date" ? "act" : "theme"}.`],
-  ["average", "About average", `Liked about as much as the average ${copy().night === "date" ? "act" : "theme"}.`],
-  ["leans-away", "Leans away", `Fans here like it less than the average ${copy().night === "date" ? "act" : "theme"}.`],
-  ["classic", fitWord("classic", state.kind), copy().night === "date" ? "A proven staple, left alone." : "A proven promo, left alone."],
-  ["not-scored", "Not scored", copy().night === "date" ? "No act match, so no reading." : "No theme match, so no reading."],
-];
+/** The five (or six) ratings in one list: a colour chip, how many nights, the name and one plain line about what it means. */
+function fitList(views: NightView[]): HTMLElement {
+  const order: FitLabel[] = ["leans-in", "average", "leans-away", "classic", "not-scored", "found"];
+  return h(
+    "ul",
+    { class: "fitlist", "aria-label": "What the cards mean" },
+    order.flatMap((fit) => {
+      const n = views.filter((v) => v.fit === fit).length;
+      if (fit === "found" && n === 0) return [];
+      return [h("li", { class: `fl${fit === "leans-away" ? " away" : ""}`, "data-k": fit }, gemChip(fit), h("b", { class: "fl-n" }, String(n)), h("span", { class: "fl-t" }, h("b", null, fitWord(fit)), ` ${FIT_MEANING[fit]}`))];
+    }),
+  );
+}
 
 const city = (): string => cityOfLabel(state.analysis?.market.label ?? "");
 
@@ -77,18 +82,12 @@ export function checkView(): HTMLElement {
       ),
     );
   }
-  if (a.recordedAt) {
-    const when = formatDateTime(a.recordedAt);
-    notices.push(h("div", { class: "notice", role: "note", "data-testid": "recorded" }, icon("clock"), h("span", null, a.recordedOn ? `These scores were pulled from Qloo on ${when} and saved. "Re-check live" on any ${copy().night} asks Qloo again.` : `These scores were just pulled from Qloo (${when}). "Re-check live" on any ${copy().night} asks Qloo again.`)));
-  }
-
   const months = new Map<string, NightView[]>();
   for (const v of views) {
     const key = v.night.date.slice(0, 7);
     months.set(key, [...(months.get(key) ?? []), v]);
   }
 
-  const summary = fitSummary({ in: count("leans-in"), average: count("average"), away, notScored: count("not-scored"), classic: count("classic"), found: count("found") });
   const locked = views.filter((v) => v.night.locked);
   const result = checkResultLine(away, views.length, city(), copy().night, copy().nights);
 
@@ -96,8 +95,8 @@ export function checkView(): HTMLElement {
     h(
       "div",
       { class: "ask", role: "group", "aria-label": `Which theme is "${v.night.theme}"?`, "data-ask": v.night.index },
-      h("div", { class: "q" }, `${v.night.theme} (${formatDate(v.night.date)})`),
-      h("p", null, "That name fits more than one theme. Which one did you mean? We never guess."),
+      h("div", { class: "q" }, `Score ${formatDate(v.night.date)} as ${v.night.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}?`),
+      h("p", null, `"${v.night.theme}" fits more than one theme. We never guess.`),
       h(
         "div",
         { class: "ask-b" },
@@ -138,20 +137,26 @@ export function checkView(): HTMLElement {
   const deckL = h(
     "div",
     { class: "deck-l", id: "deckL" },
-    h("div", { class: "eyebrow" }, "Step 1 of 3 \u00b7 Check"),
-    h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
-    h("p", { class: "check-line", "data-testid": "check-result" }, result),
-    h("p", { class: "lede", "data-testid": "summary" }, summary),
-    asks,
-    notices,
-    tally(views),
-    h("div", { class: "legend", role: "list", "aria-label": "What the cards mean" }, legend().map(([fit, word, text]) => h("div", { class: `lg${fit === "leans-away" ? " away" : ""}`, role: "listitem" }, gemChip(fit), h("span", null, h("b", null, `${word}: `), text)))),
-    locked.length > 0
-      ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, lockedLine(locked.length, copy().night)), `: ${locked.map((v) => v.night.theme).join(", ")}.`))
-      : null,
-    h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
-    pendingViews.length > 0 ? h("p", { class: "small" }, `${pendingViews.length} ${pendingViews.length === 1 ? `${copy().night} needs` : `${copy().nights} need`} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} unscored.`) : null,
-    h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Scores describe what this market leans toward. ", h("a", { href: "#/study" }, state.kind === "venue" ? "See how we tested it on baseball" : "See how we tested it")),
+    h(
+      "div",
+      { class: "dl-top" },
+      h("div", { class: "eyebrow" }, "Step 1 of 3 \u00b7 Check"),
+      h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
+      h("p", { class: "check-line", "data-testid": "summary" }, result),
+      asks,
+      notices,
+    ),
+    h(
+      "div",
+      { class: "dl-rest" },
+      fitList(views),
+      locked.length > 0
+        ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, lockedLine(locked.length, copy().night)), `: ${locked.map((v) => v.night.theme).join(", ")}.`))
+        : null,
+      h("a", { class: "btn pri", href: "#/fix", "data-testid": "to-fix" }, away > 0 ? "See the fixes" : "Continue", icon("arrowRight")),
+      pendingViews.length > 0 ? h("p", { class: "small" }, `${pendingViews.length} ${pendingViews.length === 1 ? `${copy().night} needs` : `${copy().nights} need`} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} ungraded.`) : null,
+      h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Ratings describe taste, not ticket sales. ", h("a", { href: "#/study" }, state.kind === "venue" ? "See how we tested it on baseball" : "See how we tested it")),
+    ),
   );
 
   const section = h(
@@ -215,7 +220,7 @@ function loadingView(): HTMLElement {
     h(
       "div",
       { class: "wrap deck-in" },
-      h("div", { class: "deck-l" }, h("div", { class: "eyebrow" }, "Step 1 of 3 · Check"), h("h1", { class: "h2", tabindex: "-1" }, "Checking ", h("em", null, "your calendar")), h("p", { class: "lede", role: "status" }, "Matching theme names and asking Qloo what this market leans toward. A few seconds.")),
+      h("div", { class: "deck-l" }, h("div", { class: "eyebrow" }, "Step 1 of 3 · Check"), h("h1", { class: "h2", tabindex: "-1" }, "Checking ", h("em", null, "your calendar")), h("p", { class: "lede", role: "status" }, "Matching theme names and asking Qloo what people here like. A few seconds.")),
       h("div", { class: "deck-r" }, h("div", { class: "binder" }, h("div", { class: "grid" }, Array.from({ length: 10 }, () => h("div", { class: "skeleton" }))))),
     ),
   );
@@ -227,9 +232,9 @@ const rel = (z: number | null): string => (z === null ? "n/a" : `${z >= 0 ? "+" 
 
 function sourceLine(s: ThemeScoreOut, boardAt: string | null): string {
   if (s.source === "synthetic") return `Synthetic test data generated ${formatDateTime(s.fetchedAt)}. Not from Qloo.`;
-  // "Re-checked live" is said only after this director has asked for a re-check; until then it is when the score was pulled.
-  if (rechecked[s.themeId]) return `Re-checked live ${formatDateTime(s.fetchedAt)}${boardAt && s.fetchedAt !== boardAt ? ` (the board was pulled ${formatDateTime(boardAt)})` : ""}. "Re-check live" asks Qloo again.`;
-  return `Pulled from Qloo ${formatDateTime(s.fetchedAt)}. "Re-check live" asks Qloo again.`;
+  // "Checked again" is said only after this director has asked for fresh data; until then it is when the data was checked.
+  if (rechecked[s.themeId]) return `Checked again ${formatDateTime(s.fetchedAt)}${boardAt && s.fetchedAt !== boardAt ? ` (the rest was checked ${formatDateTime(boardAt)})` : ""}. "Get fresh data" asks Qloo again.`;
+  return `Checked ${formatDateTime(s.fetchedAt)}. "Get fresh data" asks Qloo again.`;
 }
 
 const rechecked: Record<string, string> = {};
@@ -237,13 +242,25 @@ let showNumbers = false;
 let recheckMessage = "";
 let recheckBusy = false;
 
+/** Why a night has no rating, in plain words. */
+function noDataReason(n: NightView["night"]): string {
+  return n.recognisedAs ? `${n.recognisedAs} is a theme we know, but we have no data for it yet, so it stays as planned.` : `We have no data for ${n.theme}, so it stays as planned.`;
+}
+
 function backOf(v: NightView): BackSpec {
   const n = v.night;
   const s = v.score;
   const scored = !!s && s.label !== "not-scored";
   const pool = n.pool && n.pool.z !== null ? n.pool : null;
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
-  const reason = v.discovered ? `${v.discovered.name} stands out near ${city()}: ${vsMarketsWords(v.discovered.z, state.kind)}. It is not scored against the library, so there is no local-pull rating.` : v.fit === "classic" ? classicReason(state.kind) : v.needsChoice ? `"${n.theme}" fits more than one theme. Pick one on the deck and it is scored.` : s?.reason ?? n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone.` : `"${n.theme}" is not one of the themes Qloo has local data for, so it is not scored. It stays as planned.`;
+  const reason = v.discovered
+    ? `People in ${city()} like ${v.discovered.name} more than people in most towns do.`
+    : v.fit === "classic"
+      ? classicReason(state.kind)
+      : v.needsChoice
+        ? `"${n.theme}" fits more than one theme. Pick one on the board and it gets a rating.`
+        : (s?.reason ?? noDataReason(n));
+  const checkedAt = s?.fetchedAt ?? state.analysis!.recordedAt;
   return {
     no: n.index + 1,
     total: state.analysis!.nights.length,
@@ -256,6 +273,7 @@ function backOf(v: NightView): BackSpec {
     themeName: pool ? pool.name : v.themeId ? (themeById(v.themeId)?.label ?? n.theme) : n.theme,
     fit,
     reason,
+    checked: checkedAt && (scored || pool) ? formatDateTime(checkedAt) : null,
   };
 }
 
@@ -296,38 +314,29 @@ function whyInfo(index: number): Child {
     return out;
   }
   if (v.discovered) {
-    out.push(h("p", { class: "panel-box" }, `${v.discovered.name} stands out near ${city()}: ${vsMarketsWords(v.discovered.z, state.kind)}. It is not scored against the library, so there is no local-pull rating: it was found, not measured.`));
+    out.push(h("p", { class: "panel-box" }, `People in ${city()} like ${v.discovered.name} more than people in most towns do. It isn't one of our themes, so it has no fit rating: Homestand found it by comparing ${city()} with 40 other towns.`));
     return out;
   }
   if (v.needsChoice) {
-    out.push(h("p", { class: "panel-box" }, `"${n.theme}" fits more than one theme (${n.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}). Close this panel and pick one on the deck.`));
+    out.push(h("p", { class: "panel-box" }, `"${n.theme}" fits more than one theme (${n.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}). Close this panel and pick one on the board.`));
     return out;
   }
   if (n.pool) {
-    out.push(h("p", { class: "panel-box" }, n.pool.z === null ? `${n.pool.name} is a family title we know, but Qloo had no local reading for it here, so it is not scored.` : `${n.pool.name} is scored from Qloo's local reading near ${city()} against its own spread over the 40 reference markets, centred on this market's own average over our family-title pool. It is not a library theme, so Homestand leaves it as planned and does not propose a swap for it.`));
+    out.push(h("p", { class: "panel-box" }, n.pool.z === null ? `${n.pool.name} is a family title we know, but Qloo had no data for it near ${city()}, so it has no rating.` : `${n.pool.name} is rated from how much people near ${city()} like it, compared with their other family titles. It isn't one of our themes, so Homestand leaves it as planned and doesn't propose a swap for it.`));
     if (n.pool.z !== null) out.push(h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, h("li", null, `${n.pool.name} (${n.pool.type.replace("_", " ")})`))));
     return out;
   }
   if (!v.themeId || !v.score) {
-    out.push(h("p", { class: "panel-box" }, n.recognisedAs ? `We recognise ${n.recognisedAs}, but we don't have Qloo scores for it yet, so it's left alone. It stays as planned.` : `"${n.theme}" is not one of the ${Object.keys(a.themes).length} themes we score with Qloo, so it is not scored. It stays as planned.`));
+    out.push(h("p", { class: "panel-box" }, noDataReason(n)));
     return out;
   }
   const s = v.score;
   const theme = themeById(v.themeId)!;
   if (s.label === "not-scored") {
-    out.push(h("p", { class: "panel-box" }, s.reason ?? "Not scored."));
+    out.push(h("p", { class: "panel-box" }, s.reason ?? "We have no data for this one."));
   } else {
-    // The card back holds the glanceable lines (local pull, versus other markets); this panel holds the detail, once.
-    out.push(
-      h(
-        "div",
-        { class: "panel-box" },
-        s.score !== null && s.score >= 0.9 && s.ref && s.ref.sd < 0.01 ? h("p", { class: "small" }, NEAR_TOP_NOTE) : null,
-        h("p", null, marketLevelSentence(s.marketMeanZ, state.kind)),
-        bridgeSentence(s.label, s.z, city()) ? h("p", { style: "font-weight:650" }, bridgeSentence(s.label, s.z, city())) : null,
-        h("p", { style: "font-weight:650" }, comparisonSentence(theme.label, s.label)),
-      ),
-    );
+    // The card back and this line say the one plain thing: how the town rates it against its own other themes. The comparison with other towns is under "Show the numbers".
+    out.push(h("div", { class: "panel-box" }, h("p", { style: "font-weight:650", "data-testid": "fit-line" }, comparisonSentence(theme.label, s.label, city()))));
   }
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${cleanTitle(e.name)} (${e.type.replace("_", " ")})`)))),
@@ -336,26 +345,30 @@ function whyInfo(index: number): Child {
   const toggle = h("button", { type: "button", class: "toggle", "aria-expanded": String(showNumbers), "data-keep": "numbers", onclick: () => { showNumbers = !showNumbers; refreshWhy(); } }, icon("caretDown"), showNumbers ? "Hide the numbers" : "Show the numbers");
   out.push(toggle);
   if (showNumbers) {
+    const vsOthers = s.z === null ? null : `${theme.label} here: ${vsMarketsWords(s.z, state.kind)}.`;
     out.push(
       h(
         "div",
         { class: "panel-box" },
         h("p", { class: "small" }, methodWords(state.kind)),
-        Math.abs(s.index ?? 0) > 4 || Math.abs(s.z ?? 0) > 4 ? h("p", { class: "small", "data-testid": "tiny-sd-note" }, "Differences between markets are tiny for this title, so the number looks bigger than it is.") : null,
+        vsOthers ? h("p", { "data-testid": "vs-others" }, vsOthers, bridgeSentence(s.label, s.z, city()) ? ` ${bridgeSentence(s.label, s.z, city())}` : "") : null,
+        h("p", { class: "small" }, marketLevelSentence(s.marketMeanZ, state.kind)),
+        s.score !== null && s.score >= 0.9 && s.ref && s.ref.sd < 0.01 ? h("p", { class: "small", "data-testid": "near-top-note" }, NEAR_TOP_NOTE) : null,
+        Math.abs(s.index ?? 0) > 4 || Math.abs(s.z ?? 0) > 4 ? h("p", { class: "small", "data-testid": "tiny-sd-note" }, "Differences between towns are tiny for this title, so the number looks bigger than it is.") : null,
         h("p", { class: "small" }, "Taste match here, item by item:"),
         h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, cleanTitle(e.name)), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(4))])),
         h(
           "dl",
           { class: "kv kv--sum" },
           h("dt", null, "This theme's score here"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
-          h("dt", null, `Typical ${copy().markets.replace(/s$/, "")} (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
-          h("dt", null, "Spread between markets (SD)"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
+          h("dt", null, `Typical ${copy().place} (mean of ${s.ref?.n ?? "n/a"})`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
+          h("dt", null, `Usual difference between ${copy().markets} (spread)`), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
           h("dt", null, "z = (score - typical) / spread"), h("dd", null, rel(s.z)),
-          h("dt", null, `This market's average z across ${s.scoredThemes} themes`), h("dd", null, rel(s.marketMeanZ)),
-          h("dt", null, "Local pull = z - market average"), h("dd", null, rel(s.index)),
-          h("dt", null, "Cut-offs for the index"), h("dd", null, "+0.50 / -0.50"),
+          h("dt", null, `This ${copy().place}'s average z across ${s.scoredThemes} themes`), h("dd", null, rel(s.marketMeanZ)),
+          h("dt", null, "Fit number = z - this town's average"), h("dd", null, rel(s.index)),
+          h("dt", null, "Cut-offs for a strong or weak fit"), h("dd", null, "+0.50 / -0.50"),
         ),
-        a.reference.synthetic ? h("p", { class: "small" }, "The typical-market numbers are a synthetic placeholder until the reference set is pulled.") : null,
+        a.reference.synthetic ? h("p", { class: "small" }, "The typical-town numbers are a synthetic placeholder until the comparison set is pulled.") : null,
       ),
     );
   }
@@ -374,14 +387,14 @@ function whyInfo(index: number): Child {
           type: "button", class: "btn gold sm", "data-testid": "recheck", "data-keep": "recheck", disabled: disabled ? "" : null,
           onclick: async () => {
             recheckBusy = true;
-            recheckMessage = "Asking Qloo now...";
+            recheckMessage = "Getting fresh data...";
             refreshWhy();
             try {
               const r = await recheckTheme(v.themeId!);
               rechecked[v.themeId!] = new Date().toISOString();
-              recheckMessage = r === "recent" ? "Checked with Qloo within the last day: same answer." : r === "changed" ? `Checked again: the answer changed to ${fitWord(state.analysis!.themes[v.themeId!]!.label, state.kind)}. Earlier proposals were cleared.` : "Checked again: same answer.";
+              recheckMessage = r === "recent" ? "Checked within the last day: same answer." : r === "changed" ? `Checked again: the rating changed to ${fitWord(state.analysis!.themes[v.themeId!]!.label)}. Earlier swaps were cleared.` : "Checked again: same answer.";
             } catch (err) {
-              recheckMessage = err instanceof ApiFailure ? err.message : "Re-check failed. Try again.";
+              recheckMessage = err instanceof ApiFailure ? err.message : "Getting fresh data failed. Try again.";
             }
             recheckBusy = false;
             refreshWhy();
@@ -390,9 +403,9 @@ function whyInfo(index: number): Child {
           },
         },
         icon("refresh"),
-        "Re-check live",
+        "Get fresh data",
       ),
-      caps.recheckDisabled ? h("p", { class: "small" }, "Live re-check is switched off for today because the daily allowance is used up. The recorded result above is still good.") : null,
+      caps.recheckDisabled ? h("p", { class: "small" }, "Fresh data is switched off for today because the daily allowance is used up. The saved result above is still good.") : null,
       recheckMessage ? h("p", { class: "small", role: "status", "data-testid": "recheck-message" }, recheckMessage) : null,
     ),
   );

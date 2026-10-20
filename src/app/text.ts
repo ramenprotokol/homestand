@@ -4,19 +4,16 @@ export const withArticle = (word: string): string => `${/^(?:[aeiou]|r&b)/i.test
 
 export const plural = (n: number, one: string, many = `${one}s`): string => (n === 1 ? one : many);
 
-/** "leans" for one, "lean" for the rest: "1 leans in", "7 lean in". */
-export const leanVerb = (n: number): string => (n === 1 ? "leans" : "lean");
-
-/** The Check screen's headline result, from the cards themselves. */
+/** The Check screen's headline result, from the cards themselves: how many nights are a weak fit for the town. */
 export function checkResultLine(away: number, total: number, city: string, night = "night", nights = "nights"): string {
-  if (total === 1) return away === 0 ? `This ${night} doesn't lean away from what ${city} likes.` : `This ${night} leans away from what ${city} likes.`;
-  if (away === 0) return `None of the ${total} ${nights} lean away from what ${city} likes.`;
-  return `${away} of ${total} ${nights} ${leanVerb(away)} away from what ${city} likes.`;
+  if (total === 1) return away === 0 ? `This ${night} isn't a weak fit for ${city}.` : `This ${night} is a weak fit for ${city}.`;
+  if (away === 0) return `None of the ${total} ${nights} is a weak fit for ${city}.`;
+  return `${away} of ${total} ${nights} ${away === 1 ? "is" : "are"} a weak fit for ${city}.`;
 }
 
 export function fitSummary(c: { in: number; average: number; away: number; notScored: number; classic: number; found?: number }): string {
-  const found = c.found ? `, ${c.found} found by Qloo` : "";
-  return `${c.in} ${leanVerb(c.in)} in, ${c.average} about average, ${c.away} ${leanVerb(c.away)} away, ${c.notScored} not scored, ${c.classic} classic${found}.`;
+  const found = c.found ? `, ${c.found} local favorite` : "";
+  return `${c.in} strong fit, ${c.average} average fit, ${c.away} weak fit, ${c.notScored} no data, ${c.classic} proven promo${found}.`;
 }
 
 export function lockedLine(n: number, night = "night"): string {
@@ -40,7 +37,7 @@ export function longDate(iso: string): string {
 export function personalLine(call: "Yes" | "No" | "Not sure", verdict: "CONFIRMED" | "CALL STANDS" | "OVERTURNED"): string {
   if (verdict === "CONFIRMED") return call === "Yes" ? "You said Yes. The data agrees." : call === "No" ? "You said No. The data showed an effect, so this one went against you." : "Fair: you weren't sure, and the data did find an effect.";
   if (verdict === "OVERTURNED") return call === "No" ? "You said No. The data agrees, and then some: it pointed the other way." : call === "Yes" ? "You said Yes. The data pointed the other way." : "Fair: you weren't sure, and the data pointed the other way.";
-  return call === "Yes" ? "You said Yes. The data didn't show it at this sample size." : call === "No" ? "You said No. That matches what we found." : "Fair: the data couldn't tell either.";
+  return call === "Yes" ? "You said Yes. The data didn't back that up." : call === "No" ? "You said No. That matches what we found." : "Fair: the data couldn't tell either.";
 }
 
 const NIGHT_SUFFIXES = ["Night", "Day", "Friday", "Giveaway", "Showdown"];

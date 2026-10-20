@@ -82,16 +82,16 @@ describe("memo", () => {
     swaps: [{ date: "2026-07-03", weekday: "Friday", from: "Elvis", to: "Grateful Dead", sponsor: "Tallmadge & Sons", fromZ: -1.24, toZ: 1.91, fromScore: 0.512, toScore: 0.731, why: "Closer to local taste." }],
     angles: ["Keep it."], nights: 24, suggested: 1, classic: 3, synthetic: true, recordedLabel: null,
   };
-  it("escapes everything and cites the local pull, not raw affinities or the bundle score", () => {
+  it("escapes everything and cites the fit, not raw affinities or the bundle score", () => {
     const html = buildMemoHtml(data);
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;b&gt;");
-    expect(html).toContain("well below to well above"); // words, never a raw index
+    expect(html).toContain("Weak fit \u2192 Strong fit"); // words, never a raw index
     expect(html).not.toMatch(/-1\.2|1\.9/);
     expect(html).not.toContain("0.51 to 0.73");
     expect(html).not.toContain("Bundle score");
     expect(html).toContain("SYNTHETIC DEMO DATA");
-    expect(html).toContain("does not say a theme will raise attendance");
+    expect(html).toContain("They describe taste, not ticket sales.");
   });
   it("opens with a fixed sentence built only from counts: what was suggested and what was approved", () => {
     const head = "Homestand checked 24 theme nights for Akron, OH sample club <b> against local taste data from Qloo.";
@@ -111,14 +111,12 @@ describe("memo", () => {
       ideas: { city: "Tulsa", titles: ["Fuller House", "Sing 2"], scored: 19, poolSize: 46 },
     };
     const html = buildMemoHtml(d);
-    expect(html).toContain("DC League of Super-Pets <em>(Discovered by Qloo)</em>");
-    expect(html).toContain("well below to found by Qloo");
+    expect(html).toContain("DC League of Super-Pets <em>(Local favorite)</em>");
+    expect(html).toContain("Weak fit \u2192 Local favorite");
     expect(html).not.toMatch(/-2\.1/);
-    expect(html).toContain("Family titles that stand out near Tulsa");
+    expect(html).toContain("Family movies Tulsa likes more than most towns");
     expect(html).toContain("Fuller House, Sing 2.");
-    expect(html).toContain("Qloo had local data for 19 of our 46 family titles here");
     expect(html).not.toContain("under-25");
-    expect(html).toContain("They come from Qloo's taste data for this area");
     expect(html).not.toContain("n/a");
   });
   it("carries a discovered title into the CSV and the calendar file", () => {

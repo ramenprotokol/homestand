@@ -5,18 +5,28 @@ import { copyFor, type Kind } from "../kind";
 export type FitLabel = "leans-in" | "average" | "leans-away" | "not-scored" | "classic" | "found";
 
 export const FIT_WORDS: Record<FitLabel, string> = {
-  "leans-in": "Leans in",
-  average: "About average",
-  "leans-away": "Leans away",
-  "not-scored": "Not scored",
-  classic: "Classic night",
-  found: "Found by Qloo",
+  "leans-in": "Strong fit",
+  average: "Average fit",
+  "leans-away": "Weak fit",
+  "not-scored": "No data",
+  classic: "Proven promo (not graded)",
+  found: "Local favorite",
 };
 
-/** The label as a person reads it. A venue calls a classic night a classic date; everything else is the same for both kinds. */
-export const fitWord = (fit: FitLabel, kind?: Kind): string => (fit === "classic" && kind === "venue" ? "Classic date" : FIT_WORDS[fit]);
+/** The label as a person reads it: the same words for a club and a venue. */
+export const fitWord = (fit: FitLabel): string => FIT_WORDS[fit];
 
-/** z at or beyond these cut-offs is "Leans in" / "Leans away". */
+/** What each rating means, in one plain line (the legend, and the first thing a newcomer reads). Always "compared with this town's other themes". */
+export const FIT_MEANING: Record<FitLabel, string> = {
+  "leans-in": "People here like it more than this town's other themes.",
+  average: "People here like it about as much as this town's other themes.",
+  "leans-away": "People here like it less than this town's other themes.",
+  "not-scored": "We have no data for this name, so it stays as planned.",
+  classic: "A tried-and-true promo. We leave it alone.",
+  found: "People in this town like it more than people in most towns do.",
+};
+
+/** z at or beyond these cut-offs is a Strong fit / a Weak fit. */
 export const Z_CUT = 0.5;
 
 export interface RefStat {
@@ -65,8 +75,8 @@ export function labelForZ(z: number): "leans-in" | "average" | "leans-away" {
 }
 
 export function fitFor(score: number | null, ref: RefStat | undefined, kind?: Kind): Fit {
-  if (score === null) return { label: "not-scored", z: null, reason: "Qloo had no reading for part of this theme in this market." };
-  if (!ref || ref.n < MIN_REF_N) return { label: "not-scored", z: null, reason: "There is no reference set for this theme yet." };
+  if (score === null) return { label: "not-scored", z: null, reason: "Qloo had no data for part of this theme in this town." };
+  if (!ref || ref.n < MIN_REF_N) return { label: "not-scored", z: null, reason: "There is no comparison data for this theme yet." };
   const z = zScore(score, ref);
   if (z === null) return { label: "not-scored", z: null, reason: `${copyFor(kind).markets.replace(/^./, (c) => c.toUpperCase())} barely differ on this theme, so there is nothing to compare.` };
   return { label: labelForZ(z), z };
@@ -95,61 +105,63 @@ export function centre(zs: ReadonlyArray<number | null>): Centred {
   return { mean, count: scored.length, indices: zs.map((z) => (z === null ? null : z - mean)) };
 }
 
-/** How the market compares with other ballpark markets overall, in plain words. */
+/** How this town compares with other towns overall, in plain words (shown only under "Show the numbers"). */
 export function marketLevelSentence(meanZ: number | null, kind?: Kind): string {
   if (meanZ === null) return "";
   const level = meanZ <= -0.25 ? "lower than usual" : meanZ >= 0.25 ? "higher than usual" : "about the same as usual";
-  return `Compared with other ${copyFor(kind).markets}, this market scores ${level} on most themes.`;
+  return `Compared with other ${copyFor(kind).markets}, this ${copyFor(kind).place} scores ${level} on most themes.`;
 }
 
-/** The theme against this market's own average, in plain words. */
-export function comparisonSentence(themeLabel: string, label: FitLabel): string {
+/** The one plain line that says what a rating means for this theme, always against the town's own other themes. */
+export function comparisonSentence(themeLabel: string, label: FitLabel, city = "This town"): string {
   switch (label) {
     case "leans-in":
-      return `Against its own average, ${themeLabel} stands out above.`;
+      return `${city} likes ${themeLabel} more than its other themes.`;
     case "leans-away":
-      return `Against its own average, ${themeLabel} stands out below.`;
+      return `${city} likes ${themeLabel} less than its other themes.`;
     case "average":
-      return `Against its own average, ${themeLabel} is about in line.`;
+      return `${city} likes ${themeLabel} about as much as its other themes.`;
     default:
       return "";
   }
 }
 
+/** The same line, from the size of the gap: "Biloxi likes Star Wars much less than its other themes." */
+export function fitLine(themeLabel: string, city: string, index: number | null): string {
+  const band = pullBand(index);
+  if (band === null) return "";
+  const how = band === "well below" ? "much less than" : band === "below" ? "less than" : band === "about" ? "about as much as" : band === "above" ? "more than" : "much more than";
+  return `${city} likes ${themeLabel} ${how} its other themes.`;
+}
+
+/** How the method works, in plain words. Shown only under "Show the numbers". */
 export const methodWords = (kind?: Kind): string =>
-  `We ask Qloo how strongly people near this ${copyFor(kind).place} lean toward each thing in a theme, and compare that with 40 other ${copyFor(kind).markets}. ` +
-  "Then we compare each theme with this market's own average lean, the same within-market comparison The Study uses. " +
-  "A theme clearly above its own average (by at least half the usual spread between markets) is \"Leans in\". Clearly below is \"Leans away\". In between is \"About average\". " +
+  `We ask Qloo how strongly people near this ${copyFor(kind).place} like each thing in a theme, and compare that with 40 other ${copyFor(kind).markets}. ` +
+  "Then we compare each theme with this town's own average. A theme clearly above that average (by at least half the usual gap between towns) is a Strong fit. Clearly below is a Weak fit. In between is an Average fit. " +
   "It describes local taste. It does not say a theme will raise attendance.";
 
 export const METHOD_WORDS = methodWords("club");
 
-/** "stands out above this market's average (+1.1)": the cited comparison, in plain words plus the number. */
-export function vsAverageWords(index: number | null): string {
+/** "a strong fit here": the plain reading of an index. */
+export function fitPhrase(index: number | null): string {
   const b = pullBand(index);
   if (b === null) return "not compared";
-  return b === "about" ? "is about in line with this market's average" : b === "above" || b === "well above" ? `stands out ${b === "well above" ? "well " : ""}above this market's average` : `sits ${b === "well below" ? "well " : ""}below this market's average`;
-}
-
-export function vsAverage(index: number | null): string {
-  if (index === null) return "not compared";
-  const words = index >= Z_CUT ? "stands out above this market's average" : index <= -Z_CUT ? "sits below this market's average" : "is about in line with this market's average";
-  return `${words} (${index >= 0 ? "+" : "-"}${Math.abs(index).toFixed(1)})`;
+  return b === "about" ? "an average fit here" : b === "above" || b === "well above" ? "a strong fit here" : "a weak fit here";
 }
 
 /**
- * When the market-centred label and the comparison with the other markets point opposite ways, say so in plain words, so "Leans in" never
- * sits beside "well below most markets" unexplained. Empty when they agree (or the theme is about average either way).
+ * When the label (against this town's other themes) and the comparison with other towns point opposite ways, say so in plain words, so a Strong fit
+ * never sits beside "well below most towns" unexplained. Empty when they agree (or the theme is average either way).
  */
 export function bridgeSentence(fit: FitLabel | "pick", z: number | null, city: string): string {
   if (z === null) return "";
-  if (fit === "leans-in" && z <= -Z_CUT) return `Below most markets, but strong for ${city}'s own usual taste.`;
-  if (fit === "leans-away" && z >= Z_CUT) return `Above most markets, but weak for ${city}'s own usual taste.`;
+  if (fit === "leans-in" && z <= -Z_CUT) return `Below most towns, but strong for ${city}'s usual taste.`;
+  if (fit === "leans-away" && z >= Z_CUT) return `Above most towns, but weak for ${city}'s usual taste.`;
   return "";
 }
 
-export const CLASSIC_REASON = "Classic promos aren't a pop-culture taste, so Qloo doesn't score them. They stay as planned.";
-export const classicReason = (kind?: Kind): string => (kind === "venue" ? "Classic dates (fireworks, symphony nights, local showcases) aren't a music taste, so Qloo doesn't score them. They stay as planned." : CLASSIC_REASON);
+export const CLASSIC_REASON = "Proven promos (fireworks, giveaways, heritage nights) aren't graded, because they aren't a pop-culture taste. They stay as planned.";
+export const classicReason = (kind?: Kind): string => (kind === "venue" ? "Proven promos (fireworks, symphony nights, local showcases) aren't graded, because they aren't a music taste. They stay as planned." : CLASSIC_REASON);
 
 /**
  * What the study found, in plain words. Shown on the landing page, the Why panel, The Study and the memo.
@@ -157,7 +169,7 @@ export const classicReason = (kind?: Kind): string => (kind === "venue" ? "Class
  */
 export const AUDIT_LINE = "It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.";
 
-/** How a score compares with the 40 reference markets, from its z, in plain words. */
+/** How a score compares with the 40 other towns, from its z, in plain words (only under "Show the numbers"). */
 export function vsMarketsWords(z: number | null, kind?: Kind): string {
   const m = copyFor(kind).markets;
   if (z === null) return "not compared";
@@ -168,10 +180,10 @@ export function vsMarketsWords(z: number | null, kind?: Kind): string {
   return `well above most ${m}`;
 }
 
-/** Why a theme everyone scores near the top can still sit below average: the small gaps between markets are what is compared. */
-export const NEAR_TOP_NOTE = "Nearly every market scores this near the top, so the small differences between markets are what matter.";
+/** Why a theme everyone scores near the top can still rate below average: the small gaps between towns are what is compared. Shown only when that gap is tiny. */
+export const NEAR_TOP_NOTE = "Nearly every town scores this near the top, so the small differences between towns are what matter.";
 
-/** "Local pull" in plain words from the sign and size of the index (z against the market's own average). */
+/** "Fit" in plain words from the sign and size of the index (z against the town's own average). */
 export function pullWords(index: number | null): string {
   const band = pullBand(index);
   return band === null ? "not compared" : band === "about" ? "about this town's usual" : `${band} this town's usual`;

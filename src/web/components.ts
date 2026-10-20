@@ -14,7 +14,7 @@ const FIT_ICON: Record<FitLabel, IconName> = {
 
 /** The fit in words, with an icon: colour is never the only signal. */
 export function fitChip(fit: FitLabel | "pick"): HTMLElement {
-  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWord(fit, state.kind));
+  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWord(fit));
 }
 
 export function syntheticBanner(): HTMLElement | null {

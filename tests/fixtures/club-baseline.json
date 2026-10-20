@@ -1,6 +1,6 @@
 {
  "biloxi": {
-  "hash": "8580642e7a3cfa08188ba9b2722db561525eb4927b620ac8a3a6645372d8f967",
+  "hash": "c1f28a57ec14e4ec46797e54781fe509eeaf7ad87999ab90d2650b1446022092",
   "summary": {
    "bands": [
     "2027-04-09 Margaritaville Night: leans-away",
@@ -35,18 +35,18 @@
     "2027-06-12 super-mario > back-to-the-future | alt toy-story"
    ],
    "angles": [
-    "Margaritaville on Fri Apr 9 is locked, so it stays exactly as planned. Fans of Margaritaville near Biloxi also lean toward Garth Brooks, so if Magnolia Mutual is open to it, a small Garth Brooks touch (walk-up songs, PA clips or a photo spot) fits the night."
+    "Margaritaville on Fri Apr 9 is locked, so it stays exactly as planned. Fans of Margaritaville near Biloxi also like Garth Brooks, so if Magnolia Mutual is open to it, a small Garth Brooks touch (walk-up songs, PA clips or a photo spot) fits the night."
    ],
    "unfixed": [
-    "2027-06-26 No theme that leans in passes the date, audience and no-repeat checks.",
-    "2027-07-31 No theme that leans in passes the date, audience and no-repeat checks.",
-    "2027-05-29 No theme that leans in passes the date, audience and no-repeat checks.",
-    "2027-07-02 No theme that leans in passes the date, audience and no-repeat checks."
+    "2027-06-26 No strong-fit theme passes the date, audience and no-repeat checks.",
+    "2027-07-31 No strong-fit theme passes the date, audience and no-repeat checks.",
+    "2027-05-29 No strong-fit theme passes the date, audience and no-repeat checks.",
+    "2027-07-02 No strong-fit theme passes the date, audience and no-repeat checks."
    ]
   }
  },
  "albuquerque": {
-  "hash": "c4f0288a792b69f8a75a5f77e9726df16b5ca6e860655697f7cb665c3669cb0d",
+  "hash": "75501bd293644c5c290a8c574157df7337c763ed4e3ce4be63ab294197eb7fc7",
   "summary": {
    "bands": [
     "2027-04-10 Taylor Swift Night: leans-in",
@@ -81,13 +81,13 @@
     "2027-08-21 harry-potter > pirates | alt back-to-the-future,ninja-turtles"
    ],
    "angles": [
-    "Garth Brooks on Sat Aug 14 is locked, so it stays exactly as planned. Fans of Garth Brooks near Albuquerque also lean toward Kenny Chesney, so if Red Mesa Tires is open to it, a small Kenny Chesney touch (walk-up songs, PA clips or a photo spot) fits the night."
+    "Garth Brooks on Sat Aug 14 is locked, so it stays exactly as planned. Fans of Garth Brooks near Albuquerque also like Kenny Chesney, so if Red Mesa Tires is open to it, a small Kenny Chesney touch (walk-up songs, PA clips or a photo spot) fits the night."
    ],
    "unfixed": []
   }
  },
  "akron": {
-  "hash": "addd611f6cc4526f5b6cf096d1f49344edc27aea9f5ec6661fbd0ee82d77ef03",
+  "hash": "c8f64e61d32c4e8b7fd90d877e7d8f1947b1e79ff8ddd0ab26b6f619a49f8e59",
   "summary": {
    "bands": [
     "2027-04-10 Bluey Day: leans-in",
@@ -129,7 +129,7 @@
   }
  },
  "portland-me": {
-  "hash": "e23314832c4d9a24e8e3b118d8937cc51da9410e97bcdb2ecf600d6529be42ad",
+  "hash": "9526468012c5d9415af467f477676b1c1cd022918dc998510cdd773e6f576abd",
   "summary": {
    "bands": [
     "2027-04-17 Bluey Day: leans-in",
@@ -168,7 +168,7 @@
   }
  },
  "example@biloxi": {
-  "hash": "e07b2b8e23d7a5cff55ef7e77e027fbb41960054fd394bcc16a331f5494ee76b",
+  "hash": "39fbce505dc12ef4095ef0a08ccc13feb6a8dddae15234a6f3df71ae2c30f5e1",
   "summary": {
    "bands": [
     "2027-04-09 Fireworks Friday: classic",
@@ -199,15 +199,15 @@
    ],
    "angles": [],
    "unfixed": [
-    "2027-05-01 No theme that leans in passes the date, audience and no-repeat checks.",
-    "2027-07-10 No theme that leans in passes the date, audience and no-repeat checks.",
-    "2027-06-04 No theme that leans in passes the date, audience and no-repeat checks.",
-    "2027-06-26 No theme that leans in passes the date, audience and no-repeat checks."
+    "2027-05-01 No strong-fit theme passes the date, audience and no-repeat checks.",
+    "2027-07-10 No strong-fit theme passes the date, audience and no-repeat checks.",
+    "2027-06-04 No strong-fit theme passes the date, audience and no-repeat checks.",
+    "2027-06-26 No strong-fit theme passes the date, audience and no-repeat checks."
    ]
   }
  },
  "example@akron": {
-  "hash": "49ee1e8c61ed567317df1f6f6049c441bb4d28c1d308ab07b7a9262539584bee",
+  "hash": "c605281bc62c078abd4ce0879b2bec6db4e3b65310893cb59621ff018d4b4621",
   "summary": {
    "bands": [
     "2027-04-09 Fireworks Friday: classic",

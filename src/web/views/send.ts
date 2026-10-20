@@ -15,7 +15,7 @@ import { download, formatDate, formatDateTime, h } from "../dom";
 import { navigate } from "../flow";
 import { cleanTitle, localDay } from "../../app/text";
 import { icon } from "../icons";
-import { approvedSwaps, shownAngles, state, swapTitle, viewOf } from "../store";
+import { approvedSwaps, copy, shownAngles, state, swapTitle, viewOf } from "../store";
 
 
 function exportRows(): ExportRow[] {
@@ -23,7 +23,7 @@ function exportRows(): ExportRow[] {
   return a.nights.map((n) => {
     const v = viewOf(n);
     // A venue's swapped date is a new hold: the old note ("offer out") belongs to the act that was dropped, so it is never inherited.
-    const note = !v.swappedFrom ? n.notes : state.kind === "venue" ? `New hold${v.discovered ? " (found by Qloo)" : ""}: withdraw the offer to ${n.theme}` : [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", discovered by Qloo" : ""})`].filter(Boolean).join(". ");
+    const note = !v.swappedFrom ? n.notes : state.kind === "venue" ? `New hold${v.discovered ? " (local favorite)" : ""}: withdraw the offer to ${n.theme}` : [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", local favorite" : ""})`].filter(Boolean).join(". ");
     return { date: n.date, theme: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: note };
   });
 }
@@ -49,7 +49,7 @@ function memoData(): MemoData {
     fromZ: p.from.z, toZ: p.to.z, fromEntities: (a.themes[p.fromThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), toEntities: p.discovered ? [p.discovered.name] : (a.themes[p.toThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
   }));
   return {
-    ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : {}), club: a.market.label, generatedOn: localDay(), swaps,
+    ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : {}), club: a.market.label, city: cityOfLabel(a.market.label), generatedOn: localDay(), swaps,
     angles: shownAngles().map((x) => x.text), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
     ...(state.kind === "venue" ? { acts: actsOf(a.market.label) } : {}),
@@ -69,7 +69,8 @@ export function sendView(): HTMLElement {
   const stem = state.kind === "venue" ? `${state.sampleId ?? "my-venue"}-summer-series` : (state.sampleId ?? "my-club") + "-season";
   const data = memoData();
 
-  const summary = swaps.length === 0 ? "No swaps approved, so the calendar is unchanged. You can still export it and the memo." : `${swaps.length} swap${swaps.length === 1 ? "" : "s"} approved. Each keeps its date and sponsor.`;
+  const weakLeft = views.filter((v) => v.fit === "leans-away").length;
+  const summary = swaps.length === 0 ? `No swaps made, so the calendar is unchanged. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left. You can still download the memo.` : `${swaps.length} swap${swaps.length === 1 ? "" : "s"} made. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left.`;
 
   // The fan: every approved swap, landed, in the glowing frame.
   const fan = h("div", { class: "fan" });
@@ -84,7 +85,7 @@ export function sendView(): HTMLElement {
     fan.append(w);
   });
   const counts = (f: string): number => views.filter((v) => v.fit === f).length;
-  const caption = swaps.length === 0 ? "The deck stands as planned" : `${counts("leans-in")} in \u00b7 ${counts("average")} average \u00b7 ${counts("leans-away")} away${counts("found") > 0 ? ` \u00b7 ${counts("found")} found` : ""}`;
+  const caption = swaps.length === 0 ? "The deck stands as planned" : `${counts("leans-in")} strong \u00b7 ${counts("average")} average \u00b7 ${counts("leans-away")} weak${counts("found") > 0 ? ` \u00b7 ${counts("found")} local favorite` : ""}`;
 
   const canvas = h("canvas", { id: "fx3", "aria-hidden": "true" });
   const final = h(
@@ -120,10 +121,14 @@ export function sendView(): HTMLElement {
           h(
             "div",
             { class: "exp" },
-            h("button", { type: "button", class: "btn gold", "data-testid": "dl-csv", onclick: () => download(`${stem}.csv`, "text/csv", exportCsv(rows, state.kind)) }, icon("download"), "Download CSV"),
-            h("button", { type: "button", class: "btn gold", "data-testid": "dl-ics", onclick: () => download(`${stem}.ics`, "text/calendar", exportIcs(rows, a.market.label, new Date().toISOString(), state.kind)) }, icon("download"), "Download calendar (.ics)"),
-            h("button", { type: "button", class: "btn ghost", "data-testid": "dl-memo", onclick: () => download(`${stem}-memo.html`, "text/html", memoDocument(memoData())) }, icon("download"), "Download memo (HTML)"),
-            h("button", { type: "button", class: "btn ghost", "data-testid": "print-memo", onclick: () => window.print() }, icon("printer"), "Print memo"),
+            h("button", { type: "button", class: "btn gold btn-main", "data-testid": "dl-memo", onclick: () => download(`${stem}-memo.html`, "text/html", memoDocument(memoData())) }, icon("download"), "Download the memo"),
+            h(
+              "div",
+              { class: "exp-2" },
+              h("button", { type: "button", class: "btn ghost sm", "data-testid": "dl-ics", onclick: () => download(`${stem}.ics`, "text/calendar", exportIcs(rows, a.market.label, new Date().toISOString(), state.kind)) }, icon("download"), "Add to calendar (.ics)"),
+              h("button", { type: "button", class: "btn ghost sm", "data-testid": "dl-csv", onclick: () => download(`${stem}.csv`, "text/csv", exportCsv(rows, state.kind)) }, icon("download"), "Spreadsheet (CSV)"),
+              h("button", { type: "button", class: "btn ghost sm", "data-testid": "print-memo", onclick: () => window.print() }, icon("printer"), "Print the memo"),
+            ),
           ),
           h("h2", { class: "memo-h" }, `Rationale memo, ${formatDate(data.generatedOn)}`),
           memoSheet(data),

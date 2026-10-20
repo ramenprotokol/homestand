@@ -1,42 +1,40 @@
 import { shortDate } from "../../app/dates";
 import { cleanTitle } from "../../app/text";
-import { pullBand, pullWords, vsAverageWords, vsMarketsWords } from "../../app/score";
+import { fitWord, pullBand, type FitLabel } from "../../app/score";
 import { themeById } from "../../app/themes/artists";
 import { openDrawer, syntheticBanner } from "../components";
-import { formatDateTime, h, localizeDates, type Child } from "../dom";
+import { h, localizeDates, type Child } from "../dom";
 import { ensureProposals, navigate } from "../flow";
 import { makeCard, setFlip, specForSwap, specOf, flipper, type CardSpec } from "../foil/cards";
 import { onCleanup, onMount, onResize, routeContext } from "../foil/lifecycle";
 import { gsap, reduced, sleep } from "../foil/motion";
 import { packEl } from "../foil/pack";
-import { setTally, tally } from "../foil/tally";
 import { icon } from "../icons";
 import type { ActsOut, ProposeResponse } from "../../app/api-types";
-import { ACTS_REFERENCE, worthABooking } from "../../app/acts";
+import { worthABooking } from "../../app/acts";
 import { GENRE_WORDS } from "../../app/themes/library";
 import { cityOfLabel } from "../../app/kind";
-import { DISCOVERY_REFERENCE, worthAnIdea } from "../../app/discovery";
+import { worthAnIdea } from "../../app/discovery";
 import type { Discovered } from "../../app/propose/propose";
 import { approvedSwaps, copy, effective, invalidateProposals, pack, saveWork, shownAngles, state, swapTitle, ui, viewOf, type ShownProposal } from "../store";
 
 const rerender = (): void => void window.dispatchEvent(new HashChangeEvent("hashchange"));
 const label = (id: string): string => themeById(id)?.label ?? id;
-/** What the swap puts on the night: a library theme, or a title Qloo found. */
-const foundWordsOf = (f: { z?: number | null }): string => `${vsMarketsWords(f.z ?? null, state.kind)}.`.replace(/^./, (c) => c.toUpperCase());
-/** The badge on a best-option swap. The "about this town's usual" detail lives in the reason. */
-const bestLabel = (p: ShownProposal): string => `Best ${themeById(p.fromThemeId)?.audience === "kids" ? "kids" : "family"} option`;
-/** Colour of a local-pull reading by its band: red below the town's usual, silver about usual, gold above. */
+/** The badge on a best-option swap: the honest fallback when nothing in the night's audience is a strong fit. */
+const bestLabel = (p: ShownProposal): string => `Best ${themeById(p.fromThemeId)?.audience === "kids" ? "kids" : "family"} option here`;
+/** Colour of a fit reading by its band: red below the town's usual, silver about usual, gold above. */
 const bandClass = (z: number | null): "neg" | "mid" | "pos" => {
   const b = pullBand(z);
   return b === "below" || b === "well below" ? "neg" : b === "above" || b === "well above" ? "pos" : "mid";
 };
 const toLabel = (p: ShownProposal): string => p.discovered?.name ?? label(p.toThemeId);
-/** "Well below": the local pull in words, for the big meter. The numbers stay small beside it. */
-const bandWord = (z: number | null): string => {
+/** The rating of a theme from its fit number: "Strong fit", "Average fit" or "Weak fit". */
+const ratingWord = (z: number | null): string => {
   const b = pullBand(z);
-  const w = b === null ? "n/a" : b === "about" ? "about usual" : b;
-  return w.charAt(0).toUpperCase() + w.slice(1);
+  return b === null ? "No data" : b === "about" ? "Average fit" : b === "above" || b === "well above" ? "Strong fit" : "Weak fit";
 };
+/** The rating of the swap's new theme: "Local favorite" for a title Qloo found. */
+const toRating = (p: ShownProposal): string => (p.discovered ? fitWord("found") : fitWord(p.to.label as FitLabel));
 const TYPE_WORDS: Record<string, string> = { tv_show: "TV show", movie: "movie", artist: "artist", book: "book", brand: "brand" };
 
 /** Where the carousel is, kept across redraws so a re-render never tears the pack again. */
@@ -74,7 +72,6 @@ export function fixView(): HTMLElement {
   if (stage.forPropose !== p) Object.assign(stage, { forPropose: p, opened: pack.opened, cur: Math.min(pack.cur, Math.max(0, p.proposals.length - 1)) });
   const swaps = p.proposals;
   const synth = syntheticBanner();
-  const headTally = tally(a.nights.map(viewOf), true);
 
   const doneMsg = h("p", { role: "status", "data-testid": "fix-status" });
   const doneBar = h("div", { class: "fix-done" }, doneMsg, h("a", { class: "btn pri", href: "#/send", "data-testid": "to-send" }, "Send the revised calendar", icon("arrowRight")));
@@ -88,13 +85,14 @@ export function fixView(): HTMLElement {
   const stageEl = h("div", { class: "stage2", id: "stage2" });
   const agent = h("aside", { class: "agent", id: "agent", "aria-live": "polite" }, h("div", { class: "ag-h" }, h("i"), "How Homestand decided"), h("div", { class: "ag-b", id: "steps" }));
 
-  const advanced = h(
+  const settings = h(
     "details",
     { class: "advanced", "data-testid": "advanced", open: state.allowDuplicates || ui.dupesNote ? "" : null },
-    h("summary", null, icon("caretDown"), state.kind === "venue" ? "Repeat options: let an act repeat" : "Repeat options: let a theme repeat"),
+    h("summary", null, icon("caretDown"), "Settings and details"),
     h(
       "div",
       { class: "advanced-body" },
+      h("button", { type: "button", class: "btn ghost sm", "data-testid": "open-trace", onclick: openTrace }, icon("list"), "Every step"),
       h(
         "label",
         { class: "check-l" },
@@ -110,40 +108,39 @@ export function fixView(): HTMLElement {
             rerender();
           },
         }),
-        `Allow a theme to repeat in the ${copy().season}`,
+        state.kind === "venue" ? `Let an act repeat in the ${copy().season}` : `Let a theme repeat in the ${copy().season}`,
       ),
       h("span", { class: "check-note" }, `Off by default: each theme is used once, so two weak ${copy().nights} never get the same replacement.`),
       ui.dupesNote ? h("p", { class: "dupes-note", role: "status", "data-testid": "dupes-note" }, ui.dupesNote) : null,
     ),
   );
-  const tools = h("div", { class: "fix-tools" }, h("button", { type: "button", class: "btn ghost sm", "data-testid": "open-trace", onclick: openTrace }, icon("list"), "Full step log"), advanced);
 
-  const lead = swaps.length > 0 && state.kind === "venue" ? `${swaps.length} open date${swaps.length === 1 ? "" : "s"}: here is who to send an offer to instead of the hold that leans away. Nothing changes until you approve it. Locked dates are never touched, and every date keeps its sponsor.` : swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
+  const lead = swaps.length > 0 && state.kind === "venue" ? `${swaps.length} open date${swaps.length === 1 ? "" : "s"}: here is who to send an offer to instead of each weak-fit hold. Nothing changes until you approve it. Locked dates are never touched, and every date keeps its sponsor.` : swaps.length > 0 ? `${swaps.length} swap${swaps.length === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.` : "Nothing needs swapping.";
   const section = h(
     "section",
     { class: "fix", id: "fix" },
     h(
       "div",
       { class: "wrap" },
-      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, state.kind === "venue" ? "who to send an offer to" : `${copy().nights} that lean away`)), h("p", { class: "lede" }, lead)), headTally),
+      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `the weak ${copy().nights}`)), h("p", { class: "lede" }, lead))),
       synth,
       state.kind === "venue" ? actsPanel(p.acts, a.market.label) : null,
-      tools,
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
+      settings,
       state.kind === "venue" ? null : ideasPanel(p.discovery, a.market.label),
       shownAngles().length > 0 ? anglesSection() : null,
       p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
     ),
   );
 
-  if (swaps.length > 0) onMount(() => new FixStage(stageEl, agent, swaps, headTally, paintDone).mount());
+  if (swaps.length > 0) onMount(() => new FixStage(stageEl, agent, swaps, paintDone).mount());
   return h("div", { class: "page" }, section);
 }
 
 /** The locked-night ideas. Redrawn when the director switches a swap, so an act or theme that has become a swap is never also offered as an add-on. */
 function anglesSection(): HTMLElement {
-  return h("section", { class: "sect side", id: "angles" }, h("h2", null, state.kind === "venue" ? "Locked headliners: keep them, add a support act" : `Locked ${copy().nights}: keep them, add an angle`), h("div", { class: "side-list" }, shownAngles().map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))));
+  return h("section", { class: "sect side", id: "angles" }, h("h2", null, state.kind === "venue" ? "Locked headliners: keep them, add a support act" : `Locked ${copy().nights}: keep them, add a sponsor idea`), h("div", { class: "side-list" }, shownAngles().map((x) => sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), `${shortDate(x.date)}: ${label(x.themeId)}`), h("p", null, x.text))))));
 }
 
 function repaintAngles(): void {
@@ -151,7 +148,7 @@ function repaintAngles(): void {
   if (el) el.replaceWith(anglesSection());
 }
 
-/** The family titles that stand out most near this ballpark, best first, up to six. Only titles that clear the "Leans in" bar. */
+/** The family titles that stand out most in this town, best first, up to three. Only big names that clear the Strong fit bar. */
 export function ideaTitles(d: { movies: Discovered[]; shows: Discovered[] }, max = 3): string[] {
   return [...d.movies, ...d.shows].filter((x) => x.major === true && worthAnIdea(x)).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max).map((x) => x.name);
 }
@@ -163,14 +160,13 @@ function ideasPanel(d: ProposeResponse["discovery"], marketLabel: string): HTMLE
   const city = cityOfLabel(marketLabel);
   return h(
     "section",
-    { class: "ideas", "data-testid": "ideas", "aria-label": `Family titles that stand out near ${city}` },
-    h("h2", null, `Family titles that stand out near ${city}`),
+    { class: "ideas", "data-testid": "ideas", "aria-label": `Family movies ${city} likes more than most towns` },
+    h("h2", null, `Family movies ${city} likes more than most towns. Try one for a family night.`),
     h("ul", { class: "idea-chips" }, titles.map((t) => h("li", { class: "idea" }, t))),
-    h("p", { class: "small", "data-testid": "ideas-note" }, `Qloo had local data for ${d.scored} of our ${d.poolSize} family titles near ${city}. These stand out against ${DISCOVERY_REFERENCE.markets} ballpark markets, and they come from Qloo's taste data for this area.${d.fetchedAt ? ` Pulled from Qloo ${formatDateTime(d.fetchedAt)}.` : ""}`),
   );
 }
 
-/** Venue runs: the acts that stand out most near this venue, best first, up to six. Only acts that clear the "Leans in" bar and are nationally well known. */
+/** Venue runs: the acts that stand out most in this city, best first, up to six. Only acts that clear the Strong fit bar and are nationally well known. */
 export function actIdeas(d: ActsOut, max = 6): Discovered[] {
   return d.acts.filter(worthABooking).sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.name.localeCompare(b.name)).slice(0, max);
 }
@@ -180,29 +176,30 @@ function actsPanel(d: ActsOut | null | undefined, marketLabel: string): HTMLElem
   const city = cityOfLabel(marketLabel);
   const acts = actIdeas(d);
   if (acts.length === 0) {
-    return h("section", { class: "ideas ideas--lead", "data-testid": "ideas", "aria-label": `Touring acts near ${city}` }, h("h2", null, `Touring acts near ${city}`), h("p", { class: "small", "data-testid": "ideas-note" }, `No act in our pool of ${d.poolSize} stands out near ${city} right now: none is clearly above its own usual here. That happens, and we say so rather than pad the list.`));
+    return h("section", { class: "ideas ideas--lead", "data-testid": "ideas", "aria-label": `Touring acts in ${city}` }, h("h2", null, `Touring acts in ${city}`), h("p", { class: "ideas-lede", "data-testid": "ideas-note" }, `None of the ${d.poolSize} acts we checked stands out in ${city} right now. That happens, and we say so rather than pad the list.`));
   }
   return h(
     "section",
-    { class: "ideas ideas--lead", "data-testid": "ideas", "aria-label": `Acts that stand out near ${city}` },
-    h("h2", null, `Acts that stand out near ${city}`),
-    h("p", { class: "ideas-lede" }, "A talent buyer's shortlist: acts this market likes more than its usual, well known nationally. Offer one of them an open date."),
+    { class: "ideas ideas--lead", "data-testid": "ideas", "aria-label": `Acts ${city} likes more than most cities` },
+    h("h2", null, `Acts ${city} likes more than most cities`),
+    h("p", { class: "ideas-lede" }, "A talent buyer's shortlist: well-known acts this city likes more than most cities do. Offer one of them an open date."),
     h("ul", { class: "idea-chips" }, acts.map((x) => h("li", { class: "idea" }, x.name, x.genre ? h("small", null, ` · ${GENRE_WORDS[x.genre]}`) : null))),
-    h("p", { class: "small", "data-testid": "ideas-note" }, `Qloo had local data for ${d.scored} of our ${d.poolSize} touring acts near ${city}. These stand out against ${ACTS_REFERENCE.markets} reference markets and are nationally well known. They come from Qloo's taste data for this area.${d.fetchedAt ? ` Pulled from Qloo ${formatDateTime(d.fetchedAt)}.` : ""}`),
   );
 }
 
-/** One compact block for every night that could not be fixed, with one shared explanation instead of a card each. */
+/** One compact block for every night that could not be fixed, with one shared explanation (worded for the case) instead of a card each. */
 function unfixedBlock(list: ProposeResponse["unfixed"]): HTMLElement {
   const young = list.filter((u) => u.reason.startsWith("No family theme")).length;
+  const city = cityOfLabel(state.analysis!.market.label);
+  const these = `these ${list.length === 1 ? copy().night : `${list.length} ${copy().nights}`}`;
   const why =
     state.kind === "venue"
-      ? "No act in the same genre, or a related one, leans in here for these dates, so they stay as planned."
+      ? `No act in the same or a related genre is a strong fit in ${city} for ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`
       : young === list.length
-      ? "Nothing in these nights' audience leans in here, and no theme close to this town's usual beats the planned night by enough. A kids' night stays a kids' night, so these stay as planned."
-      : young === 0
-        ? `No theme passes the date, audience and no-repeat checks for these ${copy().nights}, so they stay as planned.`
-        : "No replacement passes the checks and clearly beats the planned night, so these stay as planned.";
+        ? `No better kids' theme fits ${city} on ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`
+        : young === 0
+          ? `No better theme fits ${city} on ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`
+          : `No better theme fits ${city} on ${these}, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`;
   return h(
     "section",
     { class: "sect nofix", "data-testid": "unfixed-block" },
@@ -232,7 +229,7 @@ function sideRow(index: number, kind: "lock" | "nofix", body: HTMLElement): HTML
 function sealed(): HTMLElement {
   const lock = document.createElement("template");
   lock.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="#3a2504" stroke-width="1.8"/><rect x="3" y="7" width="10" height="8" rx="1.8" fill="#3a2504"/></svg>';
-  return h("div", { class: "seal" }, h("span", null, lock.content.firstElementChild, "Sealed"));
+  return h("div", { class: "seal" }, h("span", null, lock.content.firstElementChild, "Locked"));
 }
 
 interface Slide {
@@ -262,7 +259,6 @@ class FixStage {
     private readonly root: HTMLElement,
     private readonly agent: HTMLElement,
     private readonly swaps: ShownProposal[],
-    private readonly headTally: HTMLElement,
     private readonly paintDone: () => void,
   ) {}
 
@@ -464,13 +460,11 @@ class FixStage {
     const night = state.analysis!.nights[p.index]!;
     const d = state.decisions[p.id];
     const found = p.discovered;
-    const cited = found
-      ? `Found by Qloo: ${foundWordsOf(found)} It is not scored against the library, so there is no local-pull rating. ${label(p.fromThemeId)}: ${vsAverageWords(p.from.z)}.`
-      : `${label(p.toThemeId)}: ${vsAverageWords(p.to.z)}. ${label(p.fromThemeId)}: ${vsAverageWords(p.from.z)}.`;
+    const city = cityOfLabel(state.analysis!.market.label);
+    const fromRating = ratingWord(p.from.z);
+    const cited = [found ? `People in ${city} like ${found.name} more than people in most towns do.` : "", p.whySource === "model" ? "Wording drafted by an AI from the checked facts." : ""].filter(Boolean).join(" ");
     const shown = d === "approved" ? p.to.z : p.from.z;
-    const foundWords = found ? vsMarketsWords(found.z ?? null, state.kind) : "";
-    const was = bandWord(p.from.z).toLowerCase();
-    const sub = d === "approved" && found ? `Approved. ${foundWords.replace(/^./, (c) => c.toUpperCase())}.` : d === "approved" ? `Approved. Was ${was}.` : d === "rejected" ? "Rejected. Kept as planned." : found ? `now ${was} → found by Qloo, ${foundWords}` : `now ${was} → proposed ${bandWord(p.to.z).toLowerCase()}`;
+    const sub = d === "approved" ? "Approved." : d === "rejected" ? "Rejected. Kept as planned." : `${fromRating} → ${toRating(p)}`;
 
     const takenElsewhere = new Set(this.swaps.filter((o) => o.id !== p.id).map((o) => effective(o).toThemeId));
     const pool = [top.toThemeId, ...top.alternates.map((a) => a.toThemeId)].filter((id) => id !== p.toThemeId);
@@ -505,19 +499,19 @@ class FixStage {
         "div",
         { class: "meta" },
         h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDate(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Date and sponsor stay")),
-        h("div", { class: "idx" }, h("span", { class: "k" }, "Local pull"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, found && d === "approved" ? "Found by Qloo" : bandWord(shown)), h("div", { class: "pp" }, sub)),
+        h("div", { class: "idx" }, h("span", { class: "k" }, "Fit"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, found && d === "approved" ? toRating(p) : ratingWord(shown)), h("div", { class: "pp" }, sub)),
       ),
       h(
         "div",
         { class: "swap-card", "data-proposal": p.id, "data-decision": d ?? "open", "data-testid": "proposal" },
         // The new night, shown before approval: the big card above is the night as planned.
-        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : state.kind === "venue" ? "Send an offer to" : "Would be"), p.kind === "best-option" ? h("span", { class: "best-badge", "data-testid": "best-badge" }, bestLabel(p)) : null, found ? h("span", { class: "disc-badge", "data-testid": "disc-badge" }, "Discovered by Qloo") : null, nowCard),
+        h("div", { class: "now-card", "data-testid": "now-card" }, h("span", { class: "now-k" }, d === "approved" ? "Now" : state.kind === "venue" ? "Send an offer to" : "Swap to"), p.kind === "best-option" ? h("span", { class: "best-badge", "data-testid": "best-badge" }, bestLabel(p)) : null, found ? h("span", { class: "disc-badge", "data-testid": "disc-badge" }, fitWord("found")) : null, nowCard),
         h(
           "div",
           { class: "swap-body" },
-          h("p", { class: "swap-line", "data-testid": "swap-line" }, label(p.fromThemeId), icon("swap"), toLabel(p)),
+          h("p", { class: "swap-line", "data-testid": "swap-line" }, `${label(p.fromThemeId)}: ${fromRating}`, icon("swap"), `${toLabel(p)}: ${toRating(p)}`),
           h("p", { class: "swap-why" }, p.why),
-          h("p", { class: "small", "data-testid": "cited" }, cited, p.whySource === "model" ? " Wording drafted by an AI from the checked facts." : ""),
+          cited ? h("p", { class: "small", "data-testid": "cited" }, cited) : null,
           chips,
         ),
       ),
@@ -543,7 +537,6 @@ class FixStage {
   }
 
   private repaintTally(): void {
-    setTally(this.headTally, state.analysis!.nights.map(viewOf));
     this.paintDone();
   }
 
@@ -581,7 +574,7 @@ class FixStage {
         .add(() => {
           const v = this.console.querySelector<HTMLElement>("#idxV");
           if (v) {
-            v.textContent = p.discovered ? "Found by Qloo" : bandWord(p.to.z);
+            v.textContent = toRating(p);
             v.className = `v v--word ${p.discovered ? "pos" : bandClass(p.to.z)}`;
           }
         }, 0.5)
@@ -635,13 +628,13 @@ class FixStage {
     const th = state.analysis?.themes[themeId];
     const items: Child[] = (th?.entities ?? []).flatMap((e, i) => [i > 0 ? " · " : null, h("b", null, cleanTitle(e.name)), ` (${TYPE_WORDS[e.type] ?? e.type.replace("_", " ")})`, e.affinity === null ? h("i", null, " no reading") : null]);
     const index = th?.index ?? null;
-    return this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, kicker), h("div", { class: "m" }, items, index === null ? null : h("span", { class: `ix ${bandClass(index)}` }, `→ local pull: ${pullWords(index)}`)))], instant);
+    return this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, kicker), h("div", { class: "m" }, items, index === null ? null : h("span", { class: `ix ${bandClass(index)}` }, `→ fit: ${ratingWord(index)}`)))], instant);
   }
 
   private idleAgent(): void {
     const a = state.analysis!, p = state.propose!;
     this.steps.replaceChildren();
-    this.add([h("div", { class: "ic" }, "A"), h("div", null, h("div", { class: "k" }, "Ready"), h("div", { class: "m" }, `Homestand compared all ${a.nights.length} ${copy().nights} with this market's own taste level and found `, h("b", null, `${p.proposals.length} swap${p.proposals.length === 1 ? "" : "s"}`), `, ${p.angles.length} ${state.kind === "venue" ? "support-act" : "sponsor"} idea${p.angles.length === 1 ? "" : "s"} and ${p.unfixed.length} ${p.unfixed.length === 1 ? copy().night : copy().nights} it could not fix.`))], true);
+    this.add([h("div", { class: "ic" }, "A"), h("div", null, h("div", { class: "k" }, "Ready"), h("div", { class: "m" }, `Homestand rated all ${a.nights.length} ${copy().nights} against ${cityOfLabel(a.market.label)}'s own taste and found `, h("b", null, `${p.proposals.length} swap${p.proposals.length === 1 ? "" : "s"}`), `, ${p.angles.length} ${state.kind === "venue" ? "support-act" : "sponsor"} idea${p.angles.length === 1 ? "" : "s"} and ${p.unfixed.length} ${p.unfixed.length === 1 ? copy().night : copy().nights} it could not fix.`))], true);
     this.add([h("div", { class: "ic" }, "★"), h("div", null, h("div", { class: "k" }, "Next"), h("div", { class: "m" }, "Open the pack. Each swap keeps its ", h("b", null, "date and sponsor"), ". You decide, one at a time."))], true);
   }
 
@@ -675,7 +668,7 @@ class FixStage {
     this.qloo(p.fromThemeId, `Taste lookup · the weak ${copy().night}`, quick);
     await wait(520);
     if (!live()) return;
-    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, "Discovered by Qloo"), h("div", { class: "m" }, h("b", null, p.discovered.name), ` stands out near ${cityOfLabel(state.analysis!.market.label)}: ${vsMarketsWords(p.discovered.z ?? null, state.kind)}. ${state.kind === "venue" ? "No library theme that close in genre leaned in for this date." : "No library theme leaned in for this night."} It has no local-pull number: it was found, not scored.`))], quick);
+    if (p.discovered) this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, fitWord("found")), h("div", { class: "m" }, h("b", null, p.discovered.name), ` People in ${cityOfLabel(state.analysis!.market.label)} like it more than people in most towns do. ${state.kind === "venue" ? "No theme of ours that close in genre was a strong fit for this date." : "No theme of ours was a strong fit for this night."} It has no fit rating of its own: it was found, not graded.`))], quick);
     else this.qloo(p.toThemeId, "Taste lookup · the better fit", quick);
     await wait(520);
     if (!live()) return;

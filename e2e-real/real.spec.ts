@@ -4,7 +4,8 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
   await page.screenshot({ path: `test-results/screens-real/${info.project.name}-${name}.png`, fullPage: true });
 }
 // The live site limits each client to 12 checks a minute. The live run (not the local one, which has roomy limits) therefore paces itself.
-test.afterEach(async (_fixtures, info) => {
+test.afterEach(async ({ page }, info) => {
+  void page;
   if (info.project.name.startsWith("live")) await new Promise((r) => setTimeout(r, 6000));
 });
 
@@ -29,7 +30,7 @@ for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) {
     await noSideScroll(page);
     await shot(page, info, `check-${id}`);
     const summary = await page.getByTestId("summary").innerText();
-    await expect(page.getByTestId("check-result")).toHaveText(/^(None of the \d+ nights lean|\d+ of \d+ nights? leans?) away from what .+ likes\.$/);
+    await expect(page.getByTestId("summary")).toHaveText(/^(None of the \d+ nights is|\d+ of \d+ nights? (is|are)) a weak fit for .+\.$/);
     await page.getByTestId("to-fix").click();
     await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible({ timeout: 30_000 }); // the live agent can take a while to propose
     const skip = page.getByTestId("skip-pack");
@@ -50,19 +51,19 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await page.getByTestId("market-albuquerque").click();
   await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
   // Why panel on a scored magnet.
-  const scored = page.locator(".card[role=button]").filter({ has: page.locator(".fitword", { hasText: /Leans in|Leans away|About average/ }) }).first();
+  const scored = page.locator(".card[role=button]").filter({ has: page.locator(".fitword", { hasText: /Strong fit|Weak fit|Average fit/ }) }).first();
   await scored.click();
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Local pull = z - market average/)).toBeVisible();
-  await expect(why).toContainText(/Compared with other ballpark markets, this market scores/);
+  await expect(why.getByText(/Fit number = z - this town's average/)).toBeVisible();
+  await expect(why).toContainText(/Compared with other towns, this town scores/);
   await expect(why.getByTestId("why-footer")).toContainText("See how we tested this");
   await expect(why).not.toContainText("coin flip");
-  await expect(why.getByTestId("source-line")).toContainText(/Pulled from Qloo|Re-checked live/);
+  await expect(why.getByTestId("source-line")).toContainText(/Checked /);
   await shot(page, info, "why");
   await why.getByTestId("recheck").click();
-  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked with Qloo within the last day: same answer/);
+  await expect(why.getByTestId("recheck-message")).toContainText(/Checked again|Checked within the last day: same answer/);
   await expect(why.getByTestId("recheck-message")).toBeInViewport();
   await page.screenshot({ path: `test-results/screens-real/${info.project.name}-why-viewport.png` });
   await page.keyboard.press("Escape");
@@ -76,7 +77,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
     await pack.focus();
     await page.keyboard.press("Enter");
     await expect(page.locator("#carousel")).toBeVisible();
-    await expect(page.getByTestId("proposal").getByTestId("cited")).toContainText("average");
+    await expect(page.getByTestId("proposal").getByTestId("swap-line")).toContainText("fit");
     await shot(page, info, "carousel");
     await page.getByTestId("approve").click();
     await expect(page.locator(".decision")).toContainText("Approved");
@@ -95,18 +96,18 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await shot(page, info, "study-call");
   await page.getByTestId("call-not-sure").click();
   await expect(page.getByTestId("verdict")).toContainText("CALL STANDS");
-  await expect(page.getByTestId("audit-line")).toContainText("It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.");
+  await expect(page.getByTestId("stamp-plain")).toContainText("Local taste did not pick the bigger crowd: 49 times in 100, about a coin flip.");
   await expect(page.getByTestId("h1-text")).toContainText("49.1%");
   await expect(page.getByTestId("h1-text")).toContainText("521 pairs");
   await expect(page.getByTestId("results-pending")).toHaveCount(0);
-  await expect(page.getByTestId("stamp-plain")).toHaveText("Not enough evidence to overturn: taste didn't predict bigger crowds.");
+  await expect(page.getByTestId("stamp-plain")).toHaveText("Local taste did not pick the bigger crowd: 49 times in 100, about a coin flip.");
   await noSideScroll(page);
   await shot(page, info, "study-result");
 });
 
 test("real data: the own path finds a city through the local worker (live geocoding)", async ({ page }) => {
   await page.goto("/#/own");
-  await page.getByLabel("1. Your ballpark's city").fill("Tulsa");
+  await page.getByLabel("1. Your home city").fill("Tulsa");
   await page.getByRole("button", { name: "Search" }).click();
   await expect(page.getByRole("button", { name: "Tulsa, OK" })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText("Something upstream failed")).toHaveCount(0);
@@ -117,13 +118,13 @@ test("real data: the own path finds a city through the local worker (live geocod
 
 test("real data: a non-sample city with the example calendar gets swaps to look at", async ({ page }, info) => {
   await page.goto("/#/own");
-  await page.getByLabel("1. Your ballpark's city").fill("Fresno");
+  await page.getByLabel("1. Your home city").fill("Fresno");
   await page.getByRole("button", { name: "Search" }).click();
   await page.getByRole("button", { name: "Fresno, CA" }).click();
   await page.getByTestId("load-example").click();
   await page.getByTestId("check-mine").click();
   await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByTestId("check-result")).toContainText("Fresno");
+  await expect(page.getByTestId("summary")).toContainText("Fresno");
   await page.getByTestId("to-fix").click();
   const pack = page.getByRole("button", { name: /Open the pack/ });
   await expect(pack).toBeVisible({ timeout: 40_000 });
@@ -135,7 +136,7 @@ test("real data: a non-sample city with the example calendar gets swaps to look 
 
 test("real data: Boise with the example calendar gets discovered family-title swaps", async ({ page }, info) => {
   await page.goto("/#/own");
-  await page.getByLabel("1. Your ballpark's city").fill("Boise");
+  await page.getByLabel("1. Your home city").fill("Boise");
   await page.getByRole("button", { name: "Search" }).click();
   await page.getByRole("button", { name: "Boise, ID" }).click();
   await page.getByTestId("load-example").click();
@@ -144,9 +145,8 @@ test("real data: Boise with the example calendar gets discovered family-title sw
   await page.getByTestId("to-fix").click();
   const pack = page.getByRole("button", { name: /Open the pack/ });
   await expect(pack).toBeVisible({ timeout: 40_000 });
-  await expect(page.getByTestId("ideas")).toContainText("Family titles that stand out near Boise");
+  await expect(page.getByTestId("ideas")).toContainText("Family movies Boise likes more than most towns");
   await expect(page.getByTestId("ideas")).not.toContainText("under-25");
-  await expect(page.getByTestId("ideas-note")).toContainText(/Qloo had local data for \d+ of our \d+ family titles near Boise/);
   await pack.focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("proposal")).toBeVisible();
@@ -156,16 +156,17 @@ test("real data: Boise with the example calendar gets discovered family-title sw
     await page.keyboard.press("Enter");
     await page.waitForTimeout(600);
   }
-  await expect(page.getByTestId("disc-badge")).toHaveText("Discovered by Qloo");
-  await expect(page.locator(".swap-why")).toContainText(/stands out near Boise: fans here like it more than at most of the 40 ballpark markets we compare against\.|Nothing in this audience leans in near Boise, so .+ is offered as a well-known family title/);
+  await expect(page.getByTestId("disc-badge")).toHaveText("Local favorite");
+  await expect(page.locator(".swap-why")).toContainText(/People in Boise like .+ more than people in most towns do\.|Nothing on our list is a strong fit for this night in Boise, so .+ is offered/);
   await shot(page, info, "boise-discovered");
+  await page.getByTestId("advanced").evaluate((el) => { (el as HTMLDetailsElement).open = true; });
   await page.getByTestId("open-trace").click();
-  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo about \d+ family-friendly animated movies near Boise|Used the recorded family-title scores near Boise/);
+  await expect(page.getByRole("dialog")).toContainText(/Asked Qloo about \d+ family-friendly animated movies near Boise|Used the saved family-title scores near Boise/);
 });
 
 test("real data: a recognised theme with no Qloo scores is not called unknown", async ({ page }) => {
   await page.goto("/#/own");
-  await page.getByLabel("1. Your ballpark's city").fill("Fresno");
+  await page.getByLabel("1. Your home city").fill("Fresno");
   await page.getByRole("button", { name: "Search" }).click();
   await page.getByRole("button", { name: "Fresno, CA" }).click();
   await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\n2027-05-01,PAW Patrol Day,,no,\n2027-05-08,Rubber Duck Regatta,,no,\n2027-05-15,Star Wars Night,,no,\n");
@@ -173,11 +174,11 @@ test("real data: a recognised theme with no Qloo scores is not called unknown", 
   await expect(page.getByTestId("summary")).toBeVisible({ timeout: 60_000 });
   await page.getByRole("button", { name: /PAW Patrol Day/ }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog")).toContainText("We recognise PAW Patrol, but we don't have Qloo scores for it yet, so it's left alone.");
+  await expect(page.getByRole("dialog")).toContainText("PAW Patrol is a theme we know, but we have no data for it yet, so it stays as planned.");
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /Rubber Duck Regatta/ }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("dialog")).toContainText(/Rubber Duck Regatta" is not one of the \d+ themes we score with Qloo/);
+  await expect(page.getByRole("dialog")).toContainText(/We have no data for Rubber Duck Regatta, so it stays as planned\./);
   await expect(page.getByRole("dialog")).not.toContainText("We recognise");
 });
 
@@ -191,14 +192,15 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await expect(page.getByTestId("summary")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText("Synthetic demo data")).toHaveCount(0);
   await expect(page.getByTestId("venue-note")).toContainText("made-up");
-  await expect(page.getByTestId("check-result")).toHaveText(/^(None of the 18 dates lean|\d+ of 18 dates? leans?) away from what Raleigh likes\.$/);
+  await expect(page.getByTestId("summary")).toHaveText(/^(None of the 18 dates is|\d+ of 18 dates? (is|are)) a weak fit for Raleigh\.$/);
   await noSideScroll(page);
   await snap("1-check");
   // A flipped card.
   await page.getByRole("button", { name: /Stevie Nicks/ }).click();
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
-  await expect(why).toContainText(/Compared with other reference markets, this market scores/);
+  await why.getByRole("button", { name: "Show the numbers" }).click();
+  await expect(why).toContainText(/Compared with other cities, this city scores/);
   await expect(why).not.toContainText(/ballpark/i);
   await snap("2-why");
   await page.keyboard.press("Escape");
@@ -213,10 +215,10 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await page.screenshot({ path: `${dir}/${info.project.name}-venue-3b-viewport.png` });
   expect(await page.locator(".slide").count()).toBeGreaterThanOrEqual(1);
   expect(await page.getByTestId("angle").count()).toBe(5);
-  await expect(page.getByTestId("angle").first()).toContainText(/(Support act idea: fans of .+ near Raleigh also lean toward|Fans of .+ near Raleigh also lean toward .+ promo tie-in)/);
+  await expect(page.getByTestId("angle").first()).toContainText(/(Support act idea: fans of .+ near Raleigh also like|Fans of .+ near Raleigh also like .+ promo tie-in)/);
   // On real data every Raleigh headliner gets a real support-act line, not the generic sponsor angle.
-  for (const t of await page.getByTestId("angle").allInnerTexts()) expect(t).toMatch(/Support act idea: fans of .+ near Raleigh also lean toward .+, so an act like .+ could fit the opening slot\./);
-  await expect(page.getByTestId("ideas")).toContainText(/Acts that stand out near Raleigh/);
+  for (const t of await page.getByTestId("angle").allInnerTexts()) expect(t).toMatch(/Support act idea: fans of .+ near Raleigh also like .+, so an act like .+ could fit the opening slot\./);
+  await expect(page.getByTestId("ideas")).toContainText(/Acts Raleigh likes more than most cities/);
   await expect(page.getByTestId("disc-badge").first()).toBeVisible(); // at least one swap is an act Qloo found
   if ((page.viewportSize()?.width ?? 0) >= 900) {
     const bar = (await page.locator(".acts").boundingBox())!;

@@ -253,7 +253,7 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
       return fail(503, "counters", "Live lookups are paused because the usage counters are unavailable. Recorded results still work; try again shortly.", headers);
     }
     if (err instanceof CappedError) {
-      return fail(429, "capped", "Today's live Qloo allowance is used up, and this market has no recorded result yet. The four sample clubs still work.", headers);
+      return fail(429, "capped", "Today's live Qloo allowance is used up, and this town has no saved result yet. The four sample clubs still work.", headers);
     }
     // Qloo or upstream trouble: say so without leaking details.
     console.error("upstream failure", err instanceof Error ? err.message : String(err));

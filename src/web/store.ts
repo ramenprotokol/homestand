@@ -4,7 +4,7 @@ import type { Kind } from "../app/kind";
 import type { FitLabel } from "../app/score";
 import type { TraceStep } from "../app/trace";
 import { pickAngles, templateWhy, type Proposal, type SponsorAngle } from "../app/propose/propose";
-import { copyFor, type Copy } from "../app/kind";
+import { cityOfLabel, copyFor, type Copy } from "../app/kind";
 import type { Genre } from "../app/themes/library";
 import { swapName } from "../app/text";
 import { themeById } from "../app/themes/artists";
@@ -163,7 +163,7 @@ export function effective(p: ShownProposal): ShownProposal {
   const from = themeById(p.fromThemeId)!;
   const to = themeById(pick.toThemeId)!;
   // Switching changes the theme but keeps the date and sponsor; the reason falls back to the template for the new theme.
-  return { ...p, toThemeId: pick.toThemeId, to: pick.to, why: templateWhy(from, to, p.sponsor), whySource: "template" };
+  return { ...p, toThemeId: pick.toThemeId, to: pick.to, why: templateWhy(from, to, p.sponsor, state.market ? cityOfLabel(state.market.label) : undefined), whySource: "template" };
 }
 
 /** The locked-night ideas as they read now: one that is already a proposed or chosen swap is never also offered as an add-on. */

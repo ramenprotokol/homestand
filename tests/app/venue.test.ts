@@ -128,7 +128,7 @@ describe("genre-aware ranking", () => {
     const r = propose({ nights, library: [themes[0]!, themes[1]!, bundle, retired, themes[3]!], fits, allowDuplicates: false, now: "t", venue: true });
     expect(r.proposals).toEqual([]);
     expect(r.unfixed).toHaveLength(1);
-    expect(r.unfixed[0]!.reason).toBe("No rock act, or act in a related genre, leans in here that fits this date.");
+    expect(r.unfixed[0]!.reason).toBe("No rock act, or act in a related genre, is a strong fit here for this date.");
   });
 
   it("lets a tribute night fill a tribute date only", () => {
@@ -180,7 +180,7 @@ describe("a venue run end to end on the synthetic data", () => {
     expect(p.acts!.poolSize).toBe(d.actsRef!.pool.length);
     expect(p.angles).toHaveLength(5);
     for (const x of p.angles) {
-      expect(x.text).toMatch(/^.+ on .+ is locked, so it stays exactly as planned\. Support act idea: fans of .+ near Raleigh also lean toward .+, so an act like .+ could fit the opening slot\.$/);
+      expect(x.text).toMatch(/^.+ on .+ is locked, so it stays exactly as planned\. Support act idea: fans of .+ near Raleigh also like .+, so an act like .+ could fit the opening slot\.$/);
       expect(x.act?.name).toBeTruthy();
     }
     expect(p.trace.map((t) => t.text).join(" ")).toMatch(/taste graph/);
@@ -246,8 +246,8 @@ describe("the act pool", () => {
 
 describe("wording", () => {
   it("says venue, reference markets, summer series and date for a venue; club wording is unchanged", () => {
-    expect(copyFor("venue")).toMatchObject({ place: "venue", season: "summer series", themeNight: "date", night: "date", sample: "sample venue" });
-    expect(copyFor("club")).toMatchObject({ place: "ballpark", season: "season", themeNight: "theme night", night: "night", sample: "sample club" });
+    expect(copyFor("venue")).toMatchObject({ place: "city", season: "summer series", themeNight: "date", night: "date", sample: "sample venue" });
+    expect(copyFor("club")).toMatchObject({ place: "town", season: "season", themeNight: "theme night", night: "night", sample: "sample club" });
     expect(copyFor(undefined)).toBe(copyFor("club"));
     expect(cityOfLabel("Raleigh, NC sample amphitheatre")).toBe("Raleigh");
     expect(cityOfLabel("Biloxi, MS sample club")).toBe("Biloxi");

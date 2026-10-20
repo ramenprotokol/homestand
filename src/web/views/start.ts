@@ -50,8 +50,8 @@ function teaseSection(): HTMLElement {
   const cards = demoCards();
   const burst = h("canvas", { class: "tease-fx", "aria-hidden": "true" });
   const beats = [
-    { n: "1", name: "Check", text: "See which nights your market leans toward or away from.", art: h("div", { class: "fan3", "aria-hidden": "true" }, cards) },
-    { n: "2", name: "Fix", text: "Approve or reject swaps for the nights that lean away.", art: h("div", { class: "pack-art", "aria-hidden": "true" }, packEl("div", "", "swaps · sealed")) },
+    { n: "1", name: "Check", text: "See which nights your town is likely to like, and which it won't.", art: h("div", { class: "fan3", "aria-hidden": "true" }, cards) },
+    { n: "2", name: "Fix", text: "Approve or reject swaps for the weak nights.", art: h("div", { class: "pack-art", "aria-hidden": "true" }, packEl("div", "", "swaps · sealed")) },
     { n: "3", name: "Send", text: "Export the new calendar and a one-page memo.", art: h("div", { class: "fw-art", "aria-hidden": "true" }, h("div", { class: "fw-box" }, burst)) },
   ];
   const section = h(
@@ -62,6 +62,7 @@ function teaseSection(): HTMLElement {
       { class: "wrap" },
       h("div", { class: "eyebrow" }, "How it plays"),
       h("h2", { class: "h2" }, "Three moves, ", h("em", null, "one season")),
+      h("p", { class: "honest honest-line", "data-testid": "hero-honest" }, "It reads what your town likes. It doesn't forecast ticket sales, and we tested that: ", h("a", { href: "#/study" }, "see The Study"), "."),
       h("ol", { class: "how", "aria-label": "How it works" }, beats.map((b) => h("li", { class: "beat" }, h("div", { class: "beat-art" }, b.art), h("div", { class: "beat-copy" }, h("span", { class: "n" }, b.n), h("h3", null, b.name), h("p", null, b.text))))),
       teaser(),
       h("div", { class: "page-end" }, h("a", { class: "btn pri", href: "#/sample", "data-testid": "end-try-sample" }, "Try a sample club", icon("arrowRight"))),
@@ -102,16 +103,14 @@ function mountTease(section: HTMLElement, cards: HTMLElement[], canvas: HTMLCanv
 
 export function startView(): HTMLElement {
   const copy = [
-    h("h1", { class: "sub", id: "sub", tabindex: "-1" }, "Your market, not the national chart."),
-    h("p", { class: "hero-lede", "data-testid": "hero-intro" }, "Planning next season's theme nights? Homestand checks each one against what fans in your town like, and suggests swaps for the weak ones. Your dates and sponsors stay put. Every swap comes with a cited reason you can show a sponsor."),
+    h("h1", { class: "sub", id: "sub", tabindex: "-1" }, "Theme nights your town will actually like."),
+    h("p", { class: "hero-lede", "data-testid": "hero-intro" }, "Planning next season's theme nights? Homestand rates each one against what people in your town like, and suggests swaps for the weak ones. Your dates and sponsors stay put, and every swap comes with a reason you can show a sponsor."),
     h(
       "div",
       { class: "hero-actions", id: "cta" },
       h("a", { class: "btn pri", href: "#/sample", "data-testid": "try-sample" }, "Try a sample club", icon("arrowRight")),
       h("a", { class: "btn ghost", href: "#/own", "data-testid": "use-own" }, "Use your own"),
     ),
-    h("p", { class: "tag honest", id: "tag", "data-testid": "hero-honest" }, "It reads what your town likes. It doesn't forecast ticket sales, and we tested that: ", h("a", { href: "#/study" }, "see The Study"), "."),
-    h("p", { class: "tag", id: "venue-tag", "data-testid": "hero-venue" }, "Also works for concert venues: ", h("a", { href: "#/check/raleigh", "data-testid": "try-venue" }, "try the amphitheatre sample"), "."),
   ];
   return h("div", { class: "landing" }, heroShell(copy), ridge(), teaseSection());
 }
@@ -124,6 +123,7 @@ function sceneHead(eyebrow: string, title: string, accent: string, lede: string)
 
 function ticketFor(m: (typeof SAMPLE_MARKETS)[number]): HTMLElement {
   const venue = m.kind === "venue";
+  const count = parseCalendar(sampleCsv(m.id)).rows.length;
   return h(
     "button",
     {
@@ -139,8 +139,8 @@ function ticketFor(m: (typeof SAMPLE_MARKETS)[number]): HTMLElement {
     h(
       "span",
       { class: "tk-main" },
-      h("b", null, m.label),
-      h("span", null, venue ? `${m.region}. A made-up summer concert calendar for a sample amphitheatre. It is not a real venue.` : `${m.region}. Starts with their next season's calendar.`),
+      h("b", null, `${m.region} \u00b7 ${count} ${venue ? "dates" : "nights"} \u00b7 Open`),
+      venue ? h("span", null, "A made-up summer concert calendar for a sample amphitheatre. It is not a real venue.") : null,
       h("span", { class: "tk-go" }, venue ? "Open this venue" : "Open this club", icon("arrowRight")),
     ),
   );
@@ -153,7 +153,7 @@ export function pickView(): HTMLElement {
     h(
       "div",
       { class: "wrap" },
-      sceneHead("Get started · Pick a club", "Pick a", "sample club", "Each is a real ballpark market with a season calendar we wrote. Sponsors are made up."),
+      sceneHead("Get started · Pick a club", "Pick a", "sample club", "Real towns. Made-up schedules and sponsors."),
       h("div", { class: "tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "club").map(ticketFor)),
       h("div", { class: "eyebrow venue-eyebrow" }, "Also works for concert venues"),
       h("p", { class: "lede venue-lede" }, "Same Check, Fix and Send on a touring-act calendar. This one is a made-up summer calendar for a sample amphitheatre."),
@@ -184,7 +184,7 @@ export function ownView(): HTMLElement {
     status.textContent = "Searching...";
     try {
       const { results: hits } = await api.geocode(text);
-      status.textContent = hits.length ? "Choose the city that is your ballpark's market." : "No match. Try the city name only.";
+      status.textContent = hits.length ? "Choose your home city." : "No match. Try the city name only.";
       for (const hit of hits) {
         const b = h(
           "button",
@@ -241,11 +241,11 @@ export function ownView(): HTMLElement {
     h(
       "div",
       { class: "wrap" },
-      sceneHead("Get started · Bring your own", "Use your own", "calendar", "Two things: where your ballpark is (any US or Canadian city), and your theme nights."),
+      sceneHead("Get started · Bring your own", "Use your own", "calendar", "Two things: your home city (any US or Canadian city), and your theme nights."),
       h(
         "div",
         { class: "paper" },
-        h("div", { class: "field" }, h("label", { for: "city" }, "1. Your ballpark's city"), h("div", { class: "actions" }, q, h("button", { type: "button", class: "btn gold", onclick: () => void search() }, icon("search"), "Search")), status, results),
+        h("div", { class: "field" }, h("label", { for: "city" }, "1. Your home city"), h("div", { class: "actions" }, q, h("button", { type: "button", class: "btn gold", onclick: () => void search() }, icon("search"), "Search")), status, results),
         h(
           "div",
           { class: "field" },
@@ -260,7 +260,7 @@ export function ownView(): HTMLElement {
             h("dt", null, "locked"), h("dd", null, "yes if the night can't change (a signed deal), otherwise no."),
             h("dt", null, "notes"), h("dd", null, "Optional. Anything you want to remember."),
           ),
-          h("p", { class: "help" }, "Themes we don't recognise are left alone. They stay on your calendar as planned, marked \"Not scored\"."),
+          h("p", { class: "help" }, "Themes we don't recognise are left alone. They stay on your calendar as planned, marked \"No data\"."),
           h(
             "div",
             { class: "actions" },

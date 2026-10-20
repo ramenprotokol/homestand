@@ -67,7 +67,7 @@ export interface Proposal {
   why: string;
   /** Set when the replacement is a title Qloo found, not a library theme. `to` then has label "found" and no number. */
   discovered?: Discovered;
-  /** "best-option": nothing in this night's audience leans in here, so this is the strongest of its audience, about the town's usual. */
+  /** "best-option": nothing in this night's audience is a strong fit here, so this is the strongest of its audience, an average fit. */
   kind?: "best-option";
 }
 
@@ -191,17 +191,18 @@ export const venueEligible = (original: Pick<Theme, "tribute" | "tier">, cand: P
 
 export function venueAngleText(night: Pick<PlanNight, "date" | "sponsor">, from: Theme): string {
   const who = night.sponsor || "the sponsor";
-  return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor-friendly angle: give ${who} a featured moment on the night (a stage-side read, a pre-show video or a giveaway tied to ${from.label}).`;
+  return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor idea: give ${who} a featured moment on the night (a stage-side read, a pre-show video or a giveaway tied to ${from.label}).`;
 }
 
-export function templateWhy(from: Theme, to: Theme, sponsor: string): string {
-  return `${to.label} fits this market better than ${from.label}: measured against this market's own average, ${to.label} stands out above it and ${from.label} stands out below it. ${sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`;
+/** The plain reason for a swap between two of our themes. `town` is the city ("Biloxi"); without it the sentence says "this town". */
+export function templateWhy(from: Theme, to: Theme, sponsor: string, town = "this town"): string {
+  return `People in ${town} like ${to.label} more than ${from.label}, compared with their other themes. ${sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`;
 }
 
 export function angleText(night: PlanNight, from: Theme, to: Theme | null): string {
   const who = night.sponsor || "the sponsor";
-  if (!to) return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor-friendly angle: give ${who} a featured moment on the night (a PA read, the first pitch or a giveaway tied to ${from.label}).`;
-  return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. If ${who} is open to it, a small ${to.label} touch (walk-up songs, PA clips or a photo spot) would sit closer to what this market leans toward.`;
+  if (!to) return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor idea: give ${who} a featured moment on the night (a PA read, the first pitch or a giveaway tied to ${from.label}).`;
+  return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. If ${who} is open to it, a small ${to.label} touch (walk-up songs, PA clips or a photo spot) would be a better fit for this town.`;
 }
 
 /** Minimum-cost assignment (Hungarian method) for a matrix with at least as many columns as rows: the column chosen for each row. */
@@ -274,12 +275,12 @@ export function propose(input: ProposeInput): ProposeResult {
   const actPool: Discovered[] = venue ? [...(input.acts ?? [])].sort((x, y) => (y.z ?? 0) - (x.z ?? 0) || x.name.localeCompare(y.name)) : [];
 
   const away = nights.filter((n) => n.themeId && fits[n.themeId]?.label === "leans-away");
-  trace.push(step(now, "propose", `${away.length} ${away.length === 1 ? W.night : W.nights} lean${away.length === 1 ? "s" : ""} away from this market's taste.`));
+  trace.push(step(now, "propose", `${away.length} ${away.length === 1 ? `${W.night} is` : `${W.nights} are`} a weak fit for this ${W.place}.`));
   const used = new Set(nights.map((n) => n.themeId).filter((x): x is string => x !== null));
   const leaning = library
     .filter((t) => fits[t.id]?.label === "leans-in")
     .sort((a, b) => (fits[b.id]!.z ?? 0) - (fits[a.id]!.z ?? 0) || a.id.localeCompare(b.id));
-  trace.push(step(now, "propose", `${leaning.length} library theme${leaning.length === 1 ? "" : "s"} lean in here and can be offered.`));
+  trace.push(step(now, "propose", `${leaning.length} theme${leaning.length === 1 ? "" : "s"} from our list ${leaning.length === 1 ? "is" : "are"} a strong fit here and can be offered.`));
 
   // Worst first, so the weakest nights are handled first (the order the trace and the pack read in).
   const ordered = [...away].sort((a, b) => (fits[a.themeId!]!.z ?? 0) - (fits[b.themeId!]!.z ?? 0) || a.index - b.index);
@@ -375,7 +376,7 @@ export function propose(input: ProposeInput): ProposeResult {
     if (mine?.kind === "act") {
       const found = actPool[mine.idx]!;
       const actTier = mine.tier;
-      trace.push(step(now, "constraint", `${night.date} ${original.label}: ${g.passing.length === 0 ? "no library theme passed" : "no library theme that close in genre was as good a fit"}, so an act of ${actTier === 0 ? "the same genre" : "a related genre"} that stands out near ${city} is offered: ${found.name}.`, `Found by Qloo, not scored against the library.${rejected ? ` Library themes ruled out: ${rejected}.` : ""}`));
+      trace.push(step(now, "constraint", `${night.date} ${original.label}: ${g.passing.length === 0 ? "no theme from our list passed" : "no theme from our list that close in genre was as good a fit"}, so an act of ${actTier === 0 ? "the same genre" : "a related genre"} that people in ${city} like more than most towns do is offered: ${found.name}.`, `Local favorite: not graded against our theme list.${rejected ? ` Themes ruled out: ${rejected}.` : ""}`));
       proposals.push({
         id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor,
         fromThemeId: original.id, toThemeId: discoveredId(found), alternates: [], from: fits[original.id]!, to: { label: "found", z: null, score: null },
@@ -385,7 +386,7 @@ export function propose(input: ProposeInput): ProposeResult {
           "Not used anywhere else in the summer series.",
           night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
         ],
-        why: `${found.name} stands out near ${city}: fans here like them more than at most of the 40 reference markets we compare against. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
+        why: `People in ${city} like ${found.name} more than people in most towns do. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
         discovered: found,
       });
       continue;
@@ -396,7 +397,7 @@ export function propose(input: ProposeInput): ProposeResult {
     if (!chosen && isYoung(original.audience) && standing >= 0) {
       const found = pool.splice(standing, 1)[0]!;
       const toId = discoveredId(found);
-      trace.push(step(now, "constraint", `${night.date} ${original.label}: no library theme passed, so a family ${found.type === "movie" ? "movie" : "show"} that stands out near the ballpark is offered: ${found.name}.`, `Found by Qloo, not scored against the library.${rejected ? ` Library themes ruled out: ${rejected}.` : ""}`));
+      trace.push(step(now, "constraint", `${night.date} ${original.label}: no theme from our list passed, so a family ${found.type === "movie" ? "movie" : "show"} that people in ${city} like more than most towns do is offered: ${found.name}.`, `Local favorite: not graded against our theme list.${rejected ? ` Themes ruled out: ${rejected}.` : ""}`));
       proposals.push({
         id: `${night.date}-${night.index}`, index: night.index, date: night.date, weekday: weekdayName(night.date), sponsor: night.sponsor,
         fromThemeId: original.id, toThemeId: toId, alternates: [], from: fits[original.id]!, to: { label: "found", z: null, score: null },
@@ -406,7 +407,7 @@ export function propose(input: ProposeInput): ProposeResult {
           "Not used anywhere else in the season.",
           night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
         ],
-        why: `${found.name} stands out near ${city}: fans here like it more than at most of the 40 ballpark markets we compare against.`,
+        why: `People in ${city} like ${found.name} more than people in most towns do.`,
         discovered: found,
       });
       continue;
@@ -430,35 +431,35 @@ export function propose(input: ProposeInput): ProposeResult {
       ];
       if (best) {
         if (!allowDuplicates) used.add(best.id);
-        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience leans in here, so the best option for it is offered: ${best.label}.`, `About this town's usual, and ahead of ${original.label} by at least ${BEST_OPTION_GAIN.toFixed(1)}.`));
+        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience is a strong fit here, so the best option for it is offered: ${best.label}.`, `An average fit, and ahead of ${original.label} by at least ${BEST_OPTION_GAIN.toFixed(1)}.`));
         proposals.push({
           ...common, toThemeId: best.id, to: fits[best.id]!, checks,
-          why: `${best.label} is the strongest ${kind} choice here: about this town's usual, where ${original.label} sits well below it. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
+          why: `${best.label} is an average fit here, ${original.label} is weak. A small step up. ${night.sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`,
         });
         continue;
       }
       const decentIdx = originalZ <= -1 ? pool.findIndex((x) => (x.z ?? -9) >= 0) : -1;
       if (decentIdx >= 0) {
         const found = pool.splice(decentIdx, 1)[0]!;
-        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience leans in here, so a well-known family ${found.type === "movie" ? "movie" : "show"} that holds up near the ballpark is offered as its best option: ${found.name}.`, "Found by Qloo, not scored against the library."));
+        trace.push(step(now, "constraint", `${night.date} ${original.label}: nothing in this audience is a strong fit here, so a well-known family ${found.type === "movie" ? "movie" : "show"} that holds up in ${city} is offered as its best option: ${found.name}.`, "Local favorite: not graded against our theme list."));
         proposals.push({
           ...common, toThemeId: discoveredId(found), to: { label: "found", z: null, score: null }, discovered: found,
           checks: checks.map((c) => (c.startsWith("Same audience") ? "A well-known family title, so it suits a kids or family night." : c)),
-          why: `Nothing in this audience leans in near ${city}, so ${found.name} is offered as a well-known family title that is at least typical here.`,
+          why: `Nothing on our list is a strong fit for this night in ${city}, so ${found.name} is offered: a well-known family title that holds up there.`,
         });
         continue;
       }
     }
     if (!chosen) {
       const young = isYoung(original.audience);
-      unfixed.push({ index: night.index, date: night.date, reason: venue ? `No ${original.genre ? `${GENRE_WORDS[original.genre]} ` : ""}act, or act in a related genre, leans in here that fits this date.` : young ? "No family theme leans in here that fits this date." : "No theme that leans in passes the date, audience and no-repeat checks." });
+      unfixed.push({ index: night.index, date: night.date, reason: venue ? `No ${original.genre ? `${GENRE_WORDS[original.genre]} ` : ""}act, or act in a related genre, is a strong fit here for this date.` : young ? "No family theme is a strong fit here for this date." : "No strong-fit theme passes the date, audience and no-repeat checks." });
       trace.push(step(now, "constraint", `${night.date} ${original.label}: no candidate passed (${rejected || "none left"}).`));
       continue;
     }
     const tier = venue
       ? TIER_WORDS[genreTier(original.genre, chosen.genre)]
       : ["same kind of theme", "same audience", "another theme that fits the night"][likeness(original, chosen)]!;
-    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by ${venue ? "same genre, then a related genre" : "same kind of theme"} first, then same audience, then local lean (this one: ${tier}).${rejected ? ` Other themes ruled out: ${rejected}.` : ""}`));
+    trace.push(step(now, "constraint", `${night.date} ${original.label} to ${chosen.label}: ${chosenDetail}`, `Ranked by ${venue ? "same genre, then a related genre" : "same kind of theme"} first, then same audience, then how strong a fit (this one: ${tier}).${rejected ? ` Other themes ruled out: ${rejected}.` : ""}`));
     ranked.set(`${night.date}-${night.index}`, passing.slice(1).map((x) => x.theme.id));
     if (!allowDuplicates) used.add(chosen.id);
     proposals.push({
@@ -479,7 +480,7 @@ export function propose(input: ProposeInput): ProposeResult {
         "Audience suits this kind of night.",
         night.sponsor ? `Sponsor (${night.sponsor}) and date stay.` : "Date stays.",
       ],
-      why: templateWhy(original, chosen, night.sponsor),
+      why: templateWhy(original, chosen, night.sponsor, city),
     });
   }
   if (venue) {
