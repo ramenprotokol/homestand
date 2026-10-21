@@ -47,6 +47,12 @@ function mountHero(hero: HTMLElement): void {
       fx.stop();
     },
   );
+  // The first measure can run before layout settles (WebKit gave a sliver-wide hero on phones and zoomed the painting in), so refit whenever the hero's own size changes too.
+  if (typeof ResizeObserver !== "undefined") {
+    const ro = new ResizeObserver(() => fitWorld(hero));
+    ro.observe(hero);
+    onCleanup(() => ro.disconnect());
+  }
   onResize(() => {
     fitWorld(hero);
     fx.resize();

@@ -46,7 +46,7 @@ function topbar(route: string): HTMLElement {
     h(
       "div",
       { class: "nav-r" },
-      state.market ? h("a", { class: "club", href: "#/sample", "data-testid": "change-club", "aria-label": `${shortLabel(state.market.label)}. Change ${copy().team}` }, h("i"), shortLabel(state.market.label), h("span", { class: "club-change" }, `Change ${copy().team}`), h("span", { class: "club-compact" }, "Change")) : null,
+      state.market ? h("a", { class: "club", href: "#/sample", "data-testid": "change-club" }, h("i"), shortLabel(state.market.label), h("span", { class: "club-change" }, `Change ${copy().team}`), h("span", { class: "club-compact" }, "Change")) : null,
       h("a", { class: "study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
     ),
   );

@@ -81,6 +81,12 @@ a{color:inherit}
   .wordmark{font-size:clamp(60px,21vw,104px);line-height:.92;letter-spacing:.04em}
   .wordmark span{display:block}
   .mark{top:34%;width:112%}
+}
+/* Phones: the name stays on one line ("HOMESTAND"), sized to the screen, never split into HOME / STAND */
+@media (max-width:560px){
+  .wordmark{font-size:clamp(34px,11.3vw,64px);letter-spacing:.03em;white-space:nowrap}
+  .wordmark span{display:inline}
+  .mark{top:30%}
   .sub{font-size:clamp(18px,5.4vw,26px);margin-top:6px;white-space:nowrap}
   .copy .btn{margin-top:16px;padding:13px 24px}
   .tag{font-size:11px;margin-top:12px;max-width:34ch}
@@ -95,6 +101,8 @@ a{color:inherit}
 .flipper{position:absolute;inset:0;transform-style:preserve-3d}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;container-type:inline-size}
 .face.back,.face.alt{transform:rotateY(180deg)}
+/* the face pointing away is also hidden outright (see syncSide in cards.ts); backface-visibility alone leaked mirrored text in WebKit */
+.flipper[data-side="back"]>.front,.flipper[data-side="front"]>.back,.flipper[data-side="front"]>.alt{visibility:hidden}
 .sheet{position:absolute;inset:0;border-radius:4.6cqw;background:linear-gradient(145deg,#fffaea,#f3e6c4 55%,#e6d3a6);box-shadow:0 1.4cqw 3.6cqw rgba(0,0,0,.55),0 0 0 .35cqw rgba(0,0,0,.35),inset 0 .5cqw 0 rgba(255,255,255,.8),inset 0 -.6cqw 1cqw rgba(120,80,20,.22);transition:box-shadow .3s}
 .card:hover .sheet,.card:focus-visible .sheet{box-shadow:0 2.4cqw 5cqw rgba(0,0,0,.6),0 0 0 .35cqw rgba(0,0,0,.35),0 0 7cqw var(--glow,rgba(255,217,122,.45)),inset 0 .5cqw 0 rgba(255,255,255,.8)}
 .panel{position:absolute;left:5.2cqw;right:5.2cqw;top:5.2cqw;bottom:21cqw;border-radius:2.4cqw;background:var(--pn);box-shadow:0 0 0 .7cqw var(--rim,#c79a3c),0 0 0 1.3cqw rgba(60,30,0,.35),inset 0 0 6cqw rgba(0,0,0,.45),inset 0 .6cqw 0 rgba(255,255,255,.22);overflow:hidden}
@@ -106,6 +114,7 @@ a{color:inherit}
 .emb .la,.emb .lb,.emb .lc{stroke-linecap:round;stroke-linejoin:round}
 .plate{position:absolute;left:4.5cqw;right:4.5cqw;bottom:3.2cqw;height:20cqw;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:0}
 .nm-s{font-family:var(--accent);font-style:italic;font-weight:700;font-size:var(--fs,10cqw);line-height:1;color:#7c1d2e;white-space:nowrap;text-shadow:0 .3cqw 0 rgba(255,255,255,.6)}
+.nm-s.long{white-space:normal;line-height:1.04;max-width:100%;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;text-overflow:ellipsis;padding-bottom:.4cqw}
 .nm-b{font-family:var(--slab);font-size:5.8cqw;letter-spacing:.16em;color:#16194a;margin-top:.8cqw;line-height:1}
 .spons{font-family:var(--cond);font-size:3.2cqw;letter-spacing:.2em;text-transform:uppercase;color:#6b5a3a;margin-top:1cqw;line-height:1}
 @container (max-width:230px){.spons{display:none}.plate{height:19cqw}}
@@ -115,11 +124,17 @@ a{color:inherit}
 .penn .lk{position:absolute;bottom:5cqw;left:50%;transform:translateX(-50%);width:5.4cqw;height:5.4cqw}
 .penn::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,.22),transparent 40%,rgba(0,0,0,.2))}
 .gem{position:absolute;right:3cqw;top:3cqw;width:12cqw;height:12cqw;z-index:3;filter:drop-shadow(0 .8cqw 1cqw rgba(0,0,0,.5)) drop-shadow(0 0 var(--gb,0cqw) var(--gl,transparent))}
-.foil{position:absolute;inset:0;border-radius:4.6cqw;pointer-events:none;mix-blend-mode:color-dodge;opacity:0;transition:opacity .3s;
+.foil{position:absolute;inset:0;border-radius:4.6cqw;pointer-events:none;mix-blend-mode:soft-light;opacity:0;transition:opacity .3s;
   background:radial-gradient(circle at var(--mx,50%) var(--my,30%),rgba(255,255,255,.95),transparent 38%),linear-gradient(115deg,#ff5ea8 8%,#ffd45e 28%,#5effc4 48%,#5eb7ff 68%,#c25eff 88%);background-size:auto,260% 260%;background-position:0 0,var(--bx,50%) var(--by,50%);z-index:4}
-.card:hover .foil,.card.tilting .foil{opacity:.4}
-.lab-leans-in .foil{opacity:.3;background:radial-gradient(circle at var(--mx,50%) var(--my,30%),rgba(255,255,255,.95),transparent 40%),linear-gradient(115deg,#a8731c 5%,#ffe28a 30%,#fff6c8 45%,#e0a52c 60%,#ffe28a 80%,#a8731c 95%);background-size:auto,260% 260%;background-position:0 0,var(--bx,50%) var(--by,50%)}
-.lab-leans-in:hover .foil,.lab-leans-in.tilting .foil{opacity:.55}
+/* soft-light, not color-dodge: dodge washes the whole card to white in WebKit, soft-light reads the same shimmer in all three engines */
+.card:hover .foil,.card.tilting .foil{opacity:.85}
+.lab-leans-in .foil{opacity:.7;background:radial-gradient(circle at var(--mx,50%) var(--my,30%),rgba(255,255,255,.95),transparent 40%),linear-gradient(115deg,#a8731c 5%,#ffe28a 30%,#fff6c8 45%,#e0a52c 60%,#ffe28a 80%,#a8731c 95%);background-size:auto,260% 260%;background-position:0 0,var(--bx,50%) var(--by,50%)}
+.lab-leans-in:hover .foil,.lab-leans-in.tilting .foil{opacity:1}
+/* A card that flips (Why back, swap alt) gets a plain translucent foil: Firefox flattens a preserve-3d card that holds any blend-mode child, which mirrors the flipped face. */
+.card.flips .foil{mix-blend-mode:normal}
+.card.flips:hover .foil,.card.flips.tilting .foil{opacity:.2}
+.card.flips.lab-leans-in .foil{opacity:.14}
+.card.flips.lab-leans-in:hover .foil,.card.flips.lab-leans-in.tilting .foil{opacity:.3}
 .fine{position:absolute;left:5.2cqw;right:5.2cqw;top:5.2cqw;bottom:21cqw;border-radius:2.4cqw;pointer-events:none;box-shadow:inset 0 0 0 .4cqw rgba(255,255,255,.18);z-index:2}
 
 /* label colours (gem + panel) */
