@@ -1,5 +1,5 @@
 import { weekdayName } from "../calendar/csv";
-import { copyFor } from "../kind";
+import { copyFor, type Sport } from "../kind";
 import { withArticle } from "../text";
 import { shortDate } from "../dates";
 import { labelForZ, type FitLabel } from "../score";
@@ -162,6 +162,8 @@ export interface ProposeInput {
   city?: string;
   /** A concert venue run: swaps stay in the same genre first, every locked headliner gets a support-act idea, and discovered acts can fill a date. */
   venue?: boolean;
+  /** A club run's sport, for the wording of sponsor ideas. Left out means baseball. */
+  sport?: Sport;
   /** Venue runs: acts that stand out near the venue and are nationally well known, best first. */
   acts?: readonly Discovered[];
 }
@@ -200,10 +202,11 @@ export function templateWhy(from: Theme, to: Theme, sponsor: string, town = "thi
   return `People in ${town} like ${to.label} more than ${from.label}, compared with their other themes. ${sponsor ? "The date and the sponsor stay the same." : "The date stays the same."}`;
 }
 
-export function angleText(night: PlanNight, from: Theme, to: Theme | null): string {
+export function angleText(night: PlanNight, from: Theme, to: Theme | null, sport: Sport = "baseball"): string {
   const who = night.sponsor || "the sponsor";
-  if (!to) return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor idea: give ${who} a featured moment on the night (a PA read, the first pitch or a giveaway tied to ${from.label}).`;
-  return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. If ${who} is open to it, a small ${to.label} touch (walk-up songs, PA clips or a photo spot) would be a better fit for this town.`;
+  const W = copyFor("club", sport);
+  if (!to) return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. A sponsor idea: give ${who} a featured moment on the night (a PA read, ${W.firstMoment} or a giveaway tied to ${from.label}).`;
+  return `${from.label} on ${shortDate(night.date)} is locked, so it stays exactly as planned. If ${who} is open to it, a small ${to.label} touch (${W.touches}) would be a better fit for this town.`;
 }
 
 /** Minimum-cost assignment (Hungarian method) for a matrix with at least as many columns as rows: the column chosen for each row. */
@@ -373,7 +376,7 @@ export function propose(input: ProposeInput): ProposeResult {
       if (venue) continue; // a venue run gives every locked headliner a support-act idea, below
       // A cross-theme touch only when it is the same kind of theme (music with music, film with film) and fits the night; otherwise a generic angle.
       const alt = leaning.find((t) => inWindow(night.date, t.window) && audienceFit(original, t, slot) && t.id !== original.id && categoryGroup(t.category) === categoryGroup(original.category) && audienceBand(t.audience) === audienceBand(original.audience));
-      angles.push({ index: night.index, date: night.date, themeId: original.id, sponsor: night.sponsor, toThemeId: alt?.id ?? original.id, text: angleText(night, original, alt ?? null) });
+      angles.push({ index: night.index, date: night.date, themeId: original.id, sponsor: night.sponsor, toThemeId: alt?.id ?? original.id, text: angleText(night, original, alt ?? null, input.sport) });
       continue;
     }
     const g = gathered.get(night.index)!;

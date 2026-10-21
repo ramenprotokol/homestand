@@ -17,6 +17,9 @@ import { icon } from "../icons";
 import { step } from "../../app/trace";
 import { addTrace, copy, state, swapTitle, ui, viewOf, type NightView } from "../store";
 
+/** The link to The Study. The Study is real baseball data, so a venue or another sport says so instead of "how we tested it". */
+const studyLinkText = (baseball: string): string => (state.kind === "venue" ? "We tested this on baseball, not concerts." : state.sport !== "baseball" ? `We tested this on baseball, not ${copy().sport}.` : baseball);
+
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 /** The five (or six) ratings in one list: a colour chip, how many nights, the name and one plain line about what it means. */
 function fitList(views: NightView[]): HTMLElement {
@@ -82,6 +85,7 @@ export function checkView(): HTMLElement {
   const notices: HTMLElement[] = [];
   const synth = syntheticBanner();
   if (synth) notices.push(synth);
+  if (state.kind === "club" && state.sport !== "baseball" && state.sampleId) notices.push(h("div", { class: "notice", role: "note", "data-testid": "sport-note" }, icon("info"), h("span", null, h("strong", null, "A made-up sample. "), `This ${copy().sport} calendar is one we wrote for a sample team. The dates, theme nights and sponsors are invented, and it is not any real team's schedule.`)));
   if (state.kind === "venue") notices.push(h("div", { class: "notice", role: "note", "data-testid": "venue-note" }, icon("info"), h("span", null, h("strong", null, "A made-up sample. "), "This summer concert calendar is one we wrote for a sample amphitheatre. The acts, dates and sponsors are invented, and it is not any real venue's schedule.")));
   if (state.parseErrors.length > 0) {
     notices.push(
@@ -166,7 +170,7 @@ export function checkView(): HTMLElement {
       locked.length > 0
         ? h("div", { class: "locks" }, icon("lock"), h("span", null, h("b", null, lockedLine(locked.length, copy().night)), `: ${locked.map((v) => v.night.theme).join(", ")}.`))
         : null,
-      h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Ratings describe taste, not ticket sales. ", h("a", { href: "#/study" }, state.kind === "venue" ? "We tested this on baseball, not concerts." : "See how we tested it")),
+      h("p", { class: "small" }, "Taste data from Qloo, a company that measures what people like. Ratings describe taste, not ticket sales. ", h("a", { href: "#/study" }, studyLinkText("See how we tested it"))),
     ),
   );
 
@@ -267,7 +271,7 @@ function backOf(v: NightView): BackSpec {
   const reason = v.discovered
     ? `People in ${city()} like ${v.discovered.name} more than people in most towns do.`
     : v.fit === "classic"
-      ? classicReason(state.kind)
+      ? classicReason(state.kind, state.sport)
       : v.needsChoice
         ? `"${n.theme}" fits more than one theme. Pick one above and it gets a rating.`
         : (s?.reason ?? noDataReason(n));
@@ -321,7 +325,7 @@ function whyInfo(index: number): Child {
   if (v.swappedFrom) out.push(h("p", { class: "panel-box" }, `Swapped from ${v.swappedFrom}.`));
 
   if (v.fit === "classic") {
-    out.push(h("p", { class: "panel-box" }, classicReason(state.kind)));
+    out.push(h("p", { class: "panel-box" }, classicReason(state.kind, state.sport)));
     return out;
   }
   if (v.discovered) {
@@ -385,7 +389,7 @@ function whyInfo(index: number): Child {
     );
   }
 
-  out.push(h("p", { class: "small", "data-testid": "why-footer" }, h("a", { href: "#/study" }, state.kind === "venue" ? "We tested this on baseball, not concerts." : "See how we tested this")));
+  out.push(h("p", { class: "small", "data-testid": "why-footer" }, h("a", { href: "#/study" }, studyLinkText("See how we tested this"))));
   const caps = a.caps;
   const disabled = caps.recheckDisabled || recheckBusy;
   out.push(

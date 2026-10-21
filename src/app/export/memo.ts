@@ -1,4 +1,4 @@
-import { copyFor, type Kind } from "../kind";
+import { copyFor, type Kind, type Sport } from "../kind";
 import { FIT_WORDS, pullBand } from "../score";
 import { longDate } from "../text";
 
@@ -25,6 +25,8 @@ export interface MemoSwap {
 export interface MemoData {
   /** "venue" for the concert-venue sample; left out for a club, whose memo reads exactly as before. */
   kind?: Kind;
+  /** A club run's sport; left out for baseball, whose memo reads exactly as before. */
+  sport?: Sport;
   club: string;
   /** The city alone ("Biloxi"), for plain sentences. */
   city?: string;
@@ -61,10 +63,10 @@ const ratingText = (z: number | null): string => {
 const lower = (t: string): string => t.charAt(0).toLowerCase() + t.slice(1);
 
 /** The memo's first sentence: fixed wording, filled only with counts the app knows. No model writes it. */
-export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "suggested" | "kind">): string {
+export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "suggested" | "kind" | "sport">): string {
   const approved = d.swaps.length;
   const suggested = Math.max(d.suggested, approved);
-  const head = `Homestand checked ${d.nights} ${copyFor(d.kind).themeNights} for ${d.club} against local taste data from Qloo.`;
+  const head = `Homestand checked ${d.nights} ${copyFor(d.kind, d.sport).themeNights} for ${d.club} against local taste data from Qloo.`;
   if (suggested === 0) return `${head} It suggested no swaps, so the calendar is unchanged.`;
   const noun = d.kind === "venue" ? "offer" : "swap";
   const said = `It suggested ${suggested} ${noun}${suggested === 1 ? "" : "s"}; ${approved === 0 ? "none is" : approved === 1 ? "1 is" : `${approved} are`} in the revised calendar.`;
@@ -73,7 +75,7 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "sugg
 
 /** One printable page. Cites the local pull (index) behind each swap; never the per-entity Qloo values. */
 export function buildMemoHtml(d: MemoData): string {
-  const C = copyFor(d.kind);
+  const C = copyFor(d.kind, d.sport);
   const venue = d.kind === "venue";
   const rows = d.swaps
     .map(
@@ -104,7 +106,7 @@ export function buildMemoHtml(d: MemoData): string {
   const recorded = d.recordedLabel ? ` Data checked ${escapeHtml(d.recordedLabel)}.` : "";
   return `<article class="memo">
 <h1>${C.memoTitle}: ${escapeHtml(d.club)}</h1>
-<p class="meta">Prepared ${escapeHtml(longDate(d.generatedOn))} with Homestand.${recorded}${venue && d.sample ? " This is a made-up calendar for a sample amphitheatre, not a real venue's schedule." : ""}</p>
+<p class="meta">Prepared ${escapeHtml(longDate(d.generatedOn))} with Homestand.${recorded}${venue && d.sample ? " This is a made-up calendar for a sample amphitheatre, not a real venue's schedule." : !venue && d.sample && d.sport && d.sport !== "baseball" ? ` This is a made-up calendar for a sample ${C.sport} team, not a real team's schedule.` : ""}</p>
 ${banner}
 <p>${escapeHtml(memoOpener(d))}</p>
 ${d.swaps.length ? `<h2>Approved ${venue ? "offers" : "swaps"}</h2>
@@ -116,7 +118,7 @@ ${venue ? acts : ideas}
 ${d.angles.length ? `<h2>${venue ? "Locked headliners: an opener idea" : "Locked nights: an idea for the sponsor"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
 <p>Strong, average and weak compare each ${venue ? "act" : "theme"} with this ${C.place}'s other ${venue ? "acts" : "themes"}. They describe taste, not ticket sales.</p>
-<p>${d.nights} ${C.nights} were reviewed; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : "(fireworks, giveaways, heritage nights and similar)"} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded. Taste data comes from Qloo. Every ${venue ? "offer" : "swap"} keeps its date and sponsor.</p>
+<p>${d.nights} ${C.nights} were reviewed; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : `(${C.provenExamples} and similar)`} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded. Taste data comes from Qloo. Every ${venue ? "offer" : "swap"} keeps its date and sponsor.</p>
 </article>`;
 }
 

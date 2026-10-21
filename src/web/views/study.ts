@@ -135,6 +135,7 @@ export function studyView(): HTMLElement {
     h("div", { class: "eyebrow" }, "We tested it"),
     h("h1", { class: "h2", tabindex: "-1" }, "The Study ", h("em", null, "does local taste sell tickets?")),
     h("p", { class: "lede wide" }, "Ratings say what a town likes. They do not say a theme will raise attendance. So we tested it on real 2025 theme nights, with the method and the bar we set written down before we looked at any result."),
+    h("p", { class: "lede wide study-scope", "data-testid": "study-baseball-only" }, h("strong", null, "The Study is baseball only. "), "It uses real 2025 Minor League Baseball data. We have not tested basketball, hockey or soccer."),
   );
 
   const calls = h(

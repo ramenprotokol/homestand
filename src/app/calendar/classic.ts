@@ -1,3 +1,5 @@
+import type { Sport } from "../kind";
+
 // Staples that are not a pop-culture taste. Matched on whole words in the lower-cased, punctuation-free text.
 const CLASSIC_PHRASES: readonly string[] = [
   "fireworks", "firework", "dollar dog", "dollar dogs", "dollar hot dog", "dollar hot dogs", "bark in the park", "bark at the park", "bark park",
@@ -5,6 +7,17 @@ const CLASSIC_PHRASES: readonly string[] = [
   "faith", "family faith", "christian", "heritage", "hispanic heritage", "black heritage", "irish heritage", "military", "veterans", "veteran", "armed forces", "first responder",
   "first responders", "salute", "opening day", "fan appreciation", "senior day", "dollar night", "dollar days", "thirsty thursday", "two for tuesday", "family value",
 ];
+
+/**
+ * Proven promos that belong to one sport, matched like the staples above but only for a run of that sport (the worker adds them as extra classic
+ * phrases). Baseball adds nothing: the baseball list above is the whole list. A pop-culture match still wins over any of these.
+ */
+export const SPORT_CLASSIC_PHRASES: Record<Sport, readonly string[]> = {
+  baseball: [],
+  basketball: ["t shirt night", "t shirt tuesday", "rally towel", "white out", "whiteout", "stripe out", "half court shot", "student night", "college night", "poster night"],
+  hockey: ["teddy bear toss", "teddy bear", "stuffed animal toss", "chuck a puck", "puck toss", "scarf night", "toque", "white out", "whiteout", "t shirt night", "hat trick", "jersey auction", "student night", "college night"],
+  soccer: ["scarf night", "scarf", "supporters night", "supporters", "kit night", "kit giveaway", "t shirt night", "student night", "college night"],
+};
 
 export function normalizeText(s: string): string {
   return s

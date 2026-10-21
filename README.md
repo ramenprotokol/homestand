@@ -54,6 +54,10 @@ A promotions director plans dozens of theme nights a season, and most of them ar
 
 ## Venue mode (concert venues)
 
+## Any sport
+
+The engine does not know what sport it is. Homestand also runs for minor league **basketball, hockey and soccer** teams (no football: too few home games to plan theme nights around). "Use your own" asks for the sport first; baseball is the default and reads exactly as before. The sport changes only the words (team or club, arena, ballpark or stadium, the season's months, proven promos such as teddy bear toss, T-shirt nights and scarf giveaways, and the sponsor's ceremonial moment). Scoring, caches and the theme library are the same for every sport. The one extra sample is **Boise, ID sample team**: a made-up basketball team with a November 2027 to April 2028 calendar of 22 nights and fictional sponsors. The Study stays baseball-only, because it is real 2025 baseball data.
+
 The same Check, Fix and Send engine also runs on a touring-act calendar. The one sample is **Raleigh, NC sample amphitheatre**: a made-up summer calendar (May to September 2027, 18 dates, fictional sponsors) for a sample amphitheatre, not any real venue. Open it from the home page line or the picker, or at `#/check/raleigh`. Club runs keep their wording and their library. A snapshot test (`tests/app/club-regression.test.ts`) pins every band, swap, alternate, angle and step-log line of the four baseball samples and "Load an example"; it was regenerated only after reviewing the changes the shared engine work caused (joint swap assignment, genre families for music nights, add-ons that never repeat a swap, centred discovery).
 
 - **The calendar.** Five signed headliners (locked, "Contract signed"), nine tentative holds, two tribute nights (Yacht Rock, Emo Night, each a small declared bundle of artists) and two classic dates (Fireworks & Symphony, Local Battle of the Bands). Every act is one that plays amphitheatres and still tours; none is a stadium act.
@@ -88,7 +92,7 @@ npm install
 npm run worker:dev                                  # Worker with synthetic Qloo answers and template text (no keys, no network)
 VITE_API_BASE=http://127.0.0.1:8788 npm run dev     # front end
 npm test && npm run typecheck && npm run lint && npm run build
-npm run e2e                                         # Playwright against the local Worker
+npm run e2e                                         # Playwright against the local Worker (66 checks: 33 at desktop width, 33 at phone width)
 ```
 
 Local runs show a "Synthetic demo data" banner. To use real Qloo data, put your own `QLOO_API_KEY`, `QLOO_API_URL` and a random `MARKET_SIGNING_KEY` (16+ characters; it signs the cities the search returns, and the API only accepts searched cities and the sample clubs) in `.dev.vars` (gitignored) and run the `qloo:*` scripts. Re-running the Study needs the 2025 schedules fetched locally (`npm run study:fetch`, see [`DATA_RIGHTS.md`](DATA_RIGHTS.md)).

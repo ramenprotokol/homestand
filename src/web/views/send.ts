@@ -55,8 +55,8 @@ function memoData(): MemoData {
   const rejected = (state.propose?.proposals ?? []).filter((p) => state.decisions[p.id] === "rejected").map((p) => `${a.nights[p.index]!.theme} \u2192 ${p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId} (${shortDate(p.date)})`);
   return {
     stillWeak, rejected,
-    ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : {}), club: a.market.label, city: cityOfLabel(a.market.label), generatedOn: localDay(), swaps,
-    angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : (([h1, b1, e1]) => [`${h1}.`, b1, e1].filter(Boolean).join(" "))(clubAngleParts(x, cityOfLabel(a.market.label)))), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
+    ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : state.sport !== "baseball" ? { sport: state.sport, sample: state.sampleId !== null } : {}), club: a.market.label, city: cityOfLabel(a.market.label), generatedOn: localDay(), swaps,
+    angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : (([h1, b1, e1]) => [`${h1}.`, b1, e1].filter(Boolean).join(" "))(clubAngleParts(x, cityOfLabel(a.market.label), state.sport))), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
     ...(state.kind === "venue" ? { acts: actsOf(a.market.label) } : {}),
     synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedLabel: a.recordedAt ? formatDateTime(a.recordedAt) : null,
@@ -72,7 +72,7 @@ export function sendView(): HTMLElement {
   const swaps = approvedSwaps();
   const views = a.nights.map(viewOf);
   const rows = exportRows();
-  const stem = state.kind === "venue" ? `${state.sampleId ?? "my-venue"}-summer-series` : (state.sampleId ?? "my-club") + "-season";
+  const stem = state.kind === "venue" ? `${state.sampleId ?? "my-venue"}-summer-series` : (state.sampleId ?? `my-${copy().team}`) + "-season";
   const data = memoData();
 
   const weakLeft = views.filter((v) => v.fit === "leans-away").length;
@@ -138,7 +138,7 @@ export function sendView(): HTMLElement {
           ),
           h("h2", { class: "memo-h" }, `Rationale memo, ${formatDate(data.generatedOn)}`),
           memoSheet(data),
-          h("a", { class: "btn pri", href: "#/study", "data-testid": "to-study" }, state.kind === "venue" ? "Did local taste predict crowds? The Study tested Minor League baseball only" : "Did local taste really predict crowds? See The Study", icon("arrowRight")),
+          h("a", { class: "btn pri", href: "#/study", "data-testid": "to-study" }, state.kind === "venue" || state.sport !== "baseball" ? "Did local taste predict crowds? The Study tested Minor League baseball only" : "Did local taste really predict crowds? See The Study", icon("arrowRight")),
         ),
         h("div", { class: "send-r" }, h("div", { class: "frame", id: "frame" }, h("i", { class: "c1" }), h("i", { class: "c2" }), h("i", { class: "c3" }), h("i", { class: "c4" }), fan, h("div", { class: "fcap" }, caption))),
       ),

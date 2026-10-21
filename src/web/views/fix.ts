@@ -14,7 +14,7 @@ import { icon } from "../icons";
 import type { ActsOut, ProposeResponse } from "../../app/api-types";
 import { worthABooking } from "../../app/acts";
 import { GENRE_WORDS } from "../../app/themes/library";
-import { cityOfLabel } from "../../app/kind";
+import { cityOfLabel, copyFor, type Sport } from "../../app/kind";
 import { worthAnIdea } from "../../app/discovery";
 import { noSwapLine, type Discovered } from "../../app/propose/propose";
 import { approvedSwaps, copy, effective, invalidateProposals, logYou, pack, saveWork, shownAngles, state, swapTitle, ui, viewOf, type ShownProposal } from "../store";
@@ -150,7 +150,7 @@ function anglesSection(): HTMLElement {
     );
   }
   return h("section", { class: "sect side", id: "angles" }, h("h2", null, "Locked nights: an idea for the sponsor"), h("div", { class: "side-list" }, shownAngles().map((x) => {
-    const [head, body, extra] = clubAngleParts(x, city);
+    const [head, body, extra] = clubAngleParts(x, city, state.sport);
     return sideRow(x.index, "lock", h("div", { class: "panel-box", "data-testid": "angle" }, h("p", { class: "swap-line" }, icon("lock"), head), h("p", null, body), extra ? h("p", { class: "small" }, extra) : null));
   })));
 }
@@ -161,10 +161,10 @@ export function openerLine(x: { themeId: string; toThemeId: string; date: string
 }
 
 /** One locked night's sponsor idea in three plain pieces: the date and theme, the idea, and what fans also like. */
-export function clubAngleParts(x: { themeId: string; toThemeId: string; date: string; sponsor: string }, city: string): [string, string, string] {
+export function clubAngleParts(x: { themeId: string; toThemeId: string; date: string; sponsor: string }, city: string, sport: Sport = "baseball"): [string, string, string] {
   const theme = label(x.themeId);
   const also = x.toThemeId !== x.themeId ? label(x.toThemeId) : "";
-  return [`${shortDate(x.date)}: ${theme}`, `Give ${x.sponsor || "the sponsor"} a moment: a PA read, the first pitch, or a ${theme} giveaway.`, also ? `Fans of ${theme} near ${city} also like ${also}, so a small ${also} touch fits too.` : ""];
+  return [`${shortDate(x.date)}: ${theme}`, `Give ${x.sponsor || "the sponsor"} a moment: a PA read, ${copyFor("club", sport).firstMoment}, or a ${theme} giveaway.`, also ? `Fans of ${theme} near ${city} also like ${also}, so a small ${also} touch fits too.` : ""];
 }
 
 function repaintAngles(): void {

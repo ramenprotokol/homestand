@@ -7,7 +7,7 @@ import { closeWhy } from "./foil/why";
 import { shortLabel } from "../app/kind";
 import { openSample, resumeClub, navigate } from "./flow";
 import { route as routeState, runMounts, teardown } from "./foil/lifecycle";
-import { state, ui } from "./store";
+import { copy, state, ui } from "./store";
 import { checkView } from "./views/check";
 import { fixView } from "./views/fix";
 import { sendView } from "./views/send";
@@ -46,7 +46,7 @@ function topbar(route: string): HTMLElement {
     h(
       "div",
       { class: "nav-r" },
-      state.market ? h("a", { class: "club", href: "#/sample", "data-testid": "change-club", "aria-label": `${shortLabel(state.market.label)}. Change ${state.kind === "venue" ? "venue" : "club"}` }, h("i"), shortLabel(state.market.label), h("span", { class: "club-change" }, state.kind === "venue" ? "Change venue" : "Change club"), h("span", { class: "club-compact" }, "Change")) : null,
+      state.market ? h("a", { class: "club", href: "#/sample", "data-testid": "change-club", "aria-label": `${shortLabel(state.market.label)}. Change ${copy().team}` }, h("i"), shortLabel(state.market.label), h("span", { class: "club-change" }, `Change ${copy().team}`), h("span", { class: "club-compact" }, "Change")) : null,
       h("a", { class: "study-link", href: "#/study", "aria-current": route === "/study" ? "page" : null, "data-testid": "study-link" }, "The Study"),
     ),
   );

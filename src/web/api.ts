@@ -1,6 +1,6 @@
 import type { AnalyzeResponse, ApiError, GeoHit, MarketIn, ProposeNightIn, ProposeResponse, RecheckResponse } from "../app/api-types";
 import type { CalendarRow } from "../app/calendar/csv";
-import type { Kind } from "../app/kind";
+import type { Kind, Sport } from "../app/kind";
 
 const BASE = (import.meta.env.VITE_API_BASE ?? "").replace(/\/$/, "");
 
@@ -27,10 +27,12 @@ async function call<T>(path: string, init?: RequestInit): Promise<T> {
 
 const post = <T>(path: string, body: unknown): Promise<T> => call<T>(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 
+/** A club run sends no `kind`, exactly as before venue mode; only a venue run says so. Likewise only a sport other than baseball is sent, so a baseball request is byte for byte what it always was. */
+const runFields = (kind: Kind, sport: Sport): { kind?: Kind; sport?: Sport } => (kind === "venue" ? { kind } : sport !== "baseball" ? { sport } : {});
+
 export const api = {
-  // A club run sends no `kind`, exactly as before venue mode; only a venue run says so.
-  analyze: (market: MarketIn, rows: CalendarRow[], kind: Kind = "club") => post<AnalyzeResponse>("/api/analyze", { market, rows, ...(kind === "venue" ? { kind } : {}) }),
-  propose: (market: MarketIn, nights: ProposeNightIn[], allowDuplicates: boolean, kind: Kind = "club") => post<ProposeResponse>("/api/propose", { market, nights, allowDuplicates, ...(kind === "venue" ? { kind } : {}) }),
-  recheck: (market: MarketIn, themeId: string, kind: Kind = "club") => post<RecheckResponse>("/api/recheck", { market, themeId, ...(kind === "venue" ? { kind } : {}) }),
+  analyze: (market: MarketIn, rows: CalendarRow[], kind: Kind = "club", sport: Sport = "baseball") => post<AnalyzeResponse>("/api/analyze", { market, rows, ...runFields(kind, sport) }),
+  propose: (market: MarketIn, nights: ProposeNightIn[], allowDuplicates: boolean, kind: Kind = "club", sport: Sport = "baseball") => post<ProposeResponse>("/api/propose", { market, nights, allowDuplicates, ...runFields(kind, sport) }),
+  recheck: (market: MarketIn, themeId: string, kind: Kind = "club", sport: Sport = "baseball") => post<RecheckResponse>("/api/recheck", { market, themeId, ...runFields(kind, sport) }),
   geocode: (q: string) => call<{ results: GeoHit[] }>(`/api/geocode?q=${encodeURIComponent(q)}`),
 };

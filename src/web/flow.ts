@@ -1,7 +1,7 @@
 import type { MarketIn } from "../app/api-types";
 import type { CalendarRow, RowError } from "../app/calendar/csv";
 import { parseCalendar, sortRowsByDate } from "../app/calendar/csv";
-import type { Kind } from "../app/kind";
+import { sportOf, type Kind, type Sport } from "../app/kind";
 import { sampleById } from "../app/markets";
 import { sampleCsv } from "../app/samples";
 import { api, ApiFailure } from "./api";
@@ -20,6 +20,7 @@ interface SavedClub {
   parseErrors: RowError[];
   sampleId: string | null;
   kind?: Kind;
+  sport?: Sport;
 }
 
 /** The chosen club survives a reload for this tab. Storage can be missing or throw (private windows), so the app never relies on it. */
@@ -44,7 +45,7 @@ function savedClub(): SavedClub | null {
 
 async function analyzeClub(c: SavedClub): Promise<void> {
   try {
-    const a = await api.analyze(c.market, c.rows, c.kind ?? "club");
+    const a = await api.analyze(c.market, c.rows, c.kind ?? "club", sportOf(c.sport));
     state.analysis = a;
     addTrace("Check: match names, rate, flag weak nights", a.trace);
   } catch (err) {
@@ -59,7 +60,7 @@ export function resumeClub(): void {
   const c = savedClub();
   if (!c || state.analysis || ui.loading) return;
   reset();
-  Object.assign(state, c);
+  Object.assign(state, c, { sport: sportOf(c.sport) });
   loadWork();
   ui.loading = true;
   ui.error = null;
@@ -67,18 +68,18 @@ export function resumeClub(): void {
 }
 
 /** Step 1 of 3, Check: parse is done by the caller; this asks the Worker to resolve, score and flag. */
-export async function startCheck(market: MarketIn, rowsIn: CalendarRow[], parseErrors: RowError[], sampleId: string | null, go = true, kind: Kind = "club"): Promise<void> {
+export async function startCheck(market: MarketIn, rowsIn: CalendarRow[], parseErrors: RowError[], sampleId: string | null, go = true, kind: Kind = "club", sport: Sport = "baseball"): Promise<void> {
   const rows = sortRowsByDate(rowsIn);
   reset();
-  Object.assign(state, { market, rows, parseErrors, sampleId, kind });
-  saveClub({ market, rows, parseErrors, sampleId, kind });
+  Object.assign(state, { market, rows, parseErrors, sampleId, kind, sport });
+  saveClub({ market, rows, parseErrors, sampleId, kind, sport });
   ui.loading = true;
   ui.error = null;
   ui.dupesNote = null;
   ui.dupesBefore = null;
   // A sample club has a link of its own: #/check/biloxi opens it from a cold start.
   if (go) navigate(sampleId ? `#/check/${sampleId}` : "#/check");
-  await analyzeClub({ market, rows, parseErrors, sampleId, kind });
+  await analyzeClub({ market, rows, parseErrors, sampleId, kind, sport });
 }
 
 /** A deep link such as #/check/biloxi: load that sample club unless it is already loaded. False for an unknown club. */
@@ -87,7 +88,7 @@ export function openSample(id: string): boolean {
   if (!m) return false;
   if (state.sampleId === id && (state.analysis || ui.loading || ui.error)) return true;
   const { rows, errors } = parseCalendar(sampleCsv(id));
-  void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, id, false, m.kind);
+  void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, id, false, m.kind, sportOf(m.sport));
   loadWork();
   return true;
 }
@@ -101,7 +102,7 @@ export async function ensureProposals(): Promise<void> {
       const v = viewOf(n);
       return { index: n.index, date: n.date, themeId: n.resolution.kind === "classic" || v.needsChoice ? null : v.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes };
     });
-    const res = await api.propose(state.market, nights, state.allowDuplicates, state.kind);
+    const res = await api.propose(state.market, nights, state.allowDuplicates, state.kind, state.sport);
     state.propose = res;
     // Allowing repeats re-runs the proposals. Say so when that changed nothing.
     if (ui.dupesBefore !== null) {
@@ -120,7 +121,7 @@ export async function ensureProposals(): Promise<void> {
 export async function recheckTheme(themeId: string): Promise<"same" | "changed" | "recent"> {
   if (!state.analysis || !state.market) return "same";
   const before = state.analysis.themes[themeId];
-  const res = await api.recheck(state.market, themeId, state.kind);
+  const res = await api.recheck(state.market, themeId, state.kind, state.sport);
   state.analysis.themes = { ...res.themes, [themeId]: res.theme };
   state.analysis.caps = res.caps;
   invalidateProposals();

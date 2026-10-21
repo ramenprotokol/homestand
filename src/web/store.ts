@@ -1,6 +1,6 @@
 import type { AnalyzeResponse, MarketIn, NightOut, ProposeResponse, ThemeScoreOut } from "../app/api-types";
 import type { CalendarRow, RowError } from "../app/calendar/csv";
-import type { Kind } from "../app/kind";
+import type { Kind, Sport } from "../app/kind";
 import type { FitLabel } from "../app/score";
 import type { TraceStep } from "../app/trace";
 import { pickAngles, templateWhy, type Proposal, type SponsorAngle } from "../app/propose/propose";
@@ -20,6 +20,8 @@ export interface TraceGroup {
 export interface State {
   /** "venue" for the concert-venue sample, else "club": decides wording and which library the Worker scores. */
   kind: Kind;
+  /** The sport of a club run: wording only. Baseball unless the director (or a sample) chose another. */
+  sport: Sport;
   market: MarketIn | null;
   sampleId: string | null;
   rows: CalendarRow[];
@@ -38,13 +40,13 @@ export interface State {
 export const state: State = blank();
 
 /** The wording for the run on screen: club wording unless the concert-venue sample is loaded. */
-export const copy = (): Copy => copyFor(state.kind);
+export const copy = (): Copy => copyFor(state.kind, state.sport);
 
 /** A swapped date's name: a club keeps the original's ending ("Bluey Day"), a venue date is just the act. */
 export const swapTitle = (original: string, newLabel: string): string => swapName(original, newLabel, state.kind);
 
 function blank(): State {
-  return { kind: "club", market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: watched({}), propose: null, decisions: watched({}), altChoice: watched({}), allowDuplicates: false, traceGroups: [] };
+  return { kind: "club", sport: "baseball", market: null, sampleId: null, rows: [], parseErrors: [], analysis: null, choices: watched({}), propose: null, decisions: watched({}), altChoice: watched({}), allowDuplicates: false, traceGroups: [] };
 }
 
 // ----- the director's work survives a reload (this tab only; storage can be missing or throw, so nothing depends on it) -----
@@ -52,7 +54,7 @@ const WORK_KEY = "homestand.work";
 /** Where the swap carousel was: opened, and which swap. Kept by the Fix screen. */
 export const pack = { opened: false, cur: 0 };
 
-const workKey = (): string | null => (state.market ? `${state.market.label}|${state.rows.length}|${state.kind}` : null);
+const workKey = (): string | null => (state.market ? `${state.market.label}|${state.rows.length}|${state.kind}${state.sport === "baseball" ? "" : `|${state.sport}`}` : null);
 
 export function saveWork(): void {
   const key = workKey();

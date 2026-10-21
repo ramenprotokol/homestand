@@ -1,6 +1,6 @@
 import statsFile from "../data/reference-stats.json";
 import syntheticFile from "../data/reference-stats.synthetic.json";
-import { copyFor, type Kind } from "../kind";
+import { copyFor, type Kind, type Sport } from "../kind";
 
 export type FitLabel = "leans-in" | "average" | "leans-away" | "not-scored" | "classic" | "found";
 
@@ -166,7 +166,10 @@ export function bridgeSentence(fit: FitLabel | "pick", z: number | null, city: s
 }
 
 export const CLASSIC_REASON = "Proven promos (fireworks, giveaways, heritage nights) aren't graded, because they aren't a pop-culture taste. They stay as planned.";
-export const classicReason = (kind?: Kind): string => (kind === "venue" ? "Proven promos (fireworks, symphony nights, local showcases) aren't graded, because they aren't a music taste. They stay as planned." : CLASSIC_REASON);
+export const classicReason = (kind?: Kind, sport?: Sport): string =>
+  kind === "venue" ? "Proven promos (fireworks, symphony nights, local showcases) aren't graded, because they aren't a music taste. They stay as planned."
+  : sport && sport !== "baseball" ? `Proven promos (${copyFor("club", sport).provenExamples}) aren't graded, because they aren't a pop-culture taste. They stay as planned.`
+  : CLASSIC_REASON;
 
 /**
  * What the study found, in plain words. Shown on the landing page, the Why panel, The Study and the memo.

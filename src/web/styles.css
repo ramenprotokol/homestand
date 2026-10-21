@@ -592,3 +592,16 @@ body.why-open .nav{visibility:hidden}
 }
 .kv--sum{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}
 .kv--sum dd{font-family:inherit;font-weight:600;font-size:13.5px}
+
+/* ---------- any sport: the home line, the sport chips, the study scope line ---------- */
+.hero-sports{position:relative;z-index:1;margin:10px auto 0;max-width:52ch;font-family:var(--cond);font-size:13px;letter-spacing:.14em;text-transform:uppercase;line-height:1.6;color:var(--gold2);text-shadow:0 1px 10px rgba(0,0,0,.85)}
+.hero-sports b{font-weight:700;color:#fff}
+.field-label{font-family:var(--slab);font-size:18px;color:#16194a}
+.sport-chips{display:flex;flex-wrap:wrap;gap:8px}
+.sport-chip{min-height:46px;padding:8px 18px;border-radius:99px;border:2px solid #b7a47a;background:#fff;color:#14183e;font-weight:600;font-size:15px;cursor:pointer}
+.sport-chip:hover{background:#fff6dc}
+.sport-chip[aria-checked="true"]{background:#ffe39a;border-color:#a8382c;box-shadow:0 0 0 2px rgba(168,56,44,.18)}
+.sport-chip:focus-visible{outline:3px solid #16194a;outline-offset:2px}
+.study-scope{margin-top:10px}
+.study-scope strong{color:var(--gold2)}
+@media (max-width:760px){.sport-chips{display:grid;grid-template-columns:1fr 1fr}.hero-sports{font-size:12px;letter-spacing:.1em}}

@@ -1,7 +1,7 @@
 import type { ApiError, GeoHit, MarketIn, ProposeNightIn } from "../app/api-types";
 import { parseDate, type CalendarRow } from "../app/calendar/csv";
 import { analyze, capsOf, CappedError, forKind, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
-import { kindOf } from "../app/kind";
+import { isSport, kindOf } from "../app/kind";
 import { placeLabel } from "../app/geo";
 import { DAILY_QUOTA, type Limiter, type QuotaKind } from "./limits";
 import { isSampleMarket, marketAllowed, signMarket } from "./sign";
@@ -226,7 +226,10 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
       if (!deps.signingKey && !isSampleMarket(m)) console.error("MARKET_SIGNING_KEY is not set: only the sample clubs are accepted");
       return fail(400, "bad-market", "Search for your city and pick it from the list, or use a sample club.", headers);
     }
-    const agent: Deps = { ...forKind(deps.agent, kindOf(body.kind)), gate: gateFor(deps, req, m) };
+    // `sport` is optional (baseball when absent) and must be one of the four names when present. It is wording only: never part of a cache key.
+    if (body.sport !== undefined && !isSport(body.sport)) return fail(400, "bad-request", "The sport must be baseball, basketball, hockey or soccer.", headers);
+    const kind = kindOf(body.kind);
+    const agent: Deps = { ...forKind(deps.agent, kind), ...(kind === "club" && body.sport !== undefined ? { sport: body.sport } : {}), gate: gateFor(deps, req, m) };
 
     if (route === "analyze") {
       const rows = rowsOf(body.rows);

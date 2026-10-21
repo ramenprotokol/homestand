@@ -1,7 +1,8 @@
 import type { GeoHit } from "../../app/api-types";
-import { CSV_HEADER, CSV_TEMPLATE, csvField, parseCalendar, parseDate, parseLocked, splitRecords } from "../../app/calendar/csv";
+import { CSV_HEADER, csvField, parseCalendar, parseDate, parseLocked, splitRecords } from "../../app/calendar/csv";
+import { copyFor, SPORT_WORDS, SPORTS, sportOf, type Sport } from "../../app/kind";
 import { SAMPLE_MARKETS } from "../../app/markets";
-import { exampleCsv, sampleCsv } from "../../app/samples";
+import { csvTemplate, exampleCsv, sampleCsv } from "../../app/samples";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
 import { heroShell } from "../foil/hero";
@@ -101,6 +102,7 @@ export function startView(): HTMLElement {
   const copy = [
     h("h1", { class: "sub", id: "sub", tabindex: "-1" }, "Theme nights your town will actually like."),
     h("p", { class: "hero-lede", "data-testid": "hero-intro" }, "Planning next season's theme nights? Homestand rates each one against what people in your town like, and suggests swaps for the weak ones. Your dates and sponsors stay put, and every swap comes with a reason you can show a sponsor."),
+    h("p", { class: "hero-sports", "data-testid": "hero-sports" }, "Built for minor league teams: ", h("b", null, "baseball"), ", ", h("b", null, "basketball"), ", ", h("b", null, "hockey"), " and ", h("b", null, "soccer"), "."),
     h(
       "div",
       { class: "hero-actions", id: "cta" },
@@ -119,6 +121,8 @@ function sceneHead(eyebrow: string, title: string, accent: string, lede: string)
 
 function ticketFor(m: (typeof SAMPLE_MARKETS)[number]): HTMLElement {
   const venue = m.kind === "venue";
+  const W = copyFor(m.kind, sportOf(m.sport));
+  const other = !venue && W.sport !== "baseball";
   const count = parseCalendar(sampleCsv(m.id)).rows.length;
   return h(
     "button",
@@ -128,16 +132,17 @@ function ticketFor(m: (typeof SAMPLE_MARKETS)[number]): HTMLElement {
       "data-testid": `market-${m.id}`,
       onclick: () => {
         const { rows, errors } = parseCalendar(sampleCsv(m.id));
-        void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, m.id, true, m.kind);
+        void startCheck({ label: m.label, lon: m.lon, lat: m.lat }, rows, errors, m.id, true, m.kind, sportOf(m.sport));
       },
     },
-    h("span", { class: "tk-stub" }, h("span", { class: "tk-k" }, venue ? "Sample venue" : "Sample club"), h("span", { class: "tk-city" }, m.city)),
+    h("span", { class: "tk-stub" }, h("span", { class: "tk-k" }, venue ? "Sample venue" : other ? `Sample ${W.team}` : "Sample club"), h("span", { class: "tk-city" }, m.city)),
     h(
       "span",
       { class: "tk-main" },
       h("b", null, `${m.region} \u00b7 ${count} ${venue ? "dates" : "nights"}`),
       venue ? h("span", null, "A made-up summer concert calendar for a sample amphitheatre. It is not a real venue.") : null,
-      h("span", { class: "tk-go" }, venue ? "Open this venue" : "Open this club", icon("arrowRight")),
+      other ? h("span", null, `A made-up ${W.sport} team and a ${W.months} calendar. It is not a real team.`) : null,
+      h("span", { class: "tk-go" }, venue ? "Open this venue" : other ? `Open this ${W.team}` : "Open this club", icon("arrowRight")),
     ),
   );
 }
@@ -151,7 +156,10 @@ export function pickView(): HTMLElement {
       { class: "wrap" },
       sceneHead("Get started · Pick a club", "Pick a", "sample club", "Real towns. Made-up schedules and sponsors."),
       ui.pickNote ? h("p", { class: "notice pick-note", role: "status", "data-testid": "pick-note" }, "Pick a club first.") : null,
-      h("div", { class: "tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "club").map(ticketFor)),
+      h("div", { class: "tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "club" && sportOf(m.sport) === "baseball").map(ticketFor)),
+      h("div", { class: "eyebrow venue-eyebrow" }, "Also works for basketball, hockey and soccer"),
+      h("p", { class: "lede venue-lede" }, "Same Check, Fix and Send for any team that runs theme nights. This one is a made-up basketball team."),
+      h("div", { class: "tickets", "data-testid": "sport-tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "club" && sportOf(m.sport) !== "baseball").map(ticketFor)),
       h("div", { class: "eyebrow venue-eyebrow" }, "Also works for concert venues"),
       h("p", { class: "lede venue-lede" }, "Same Check, Fix and Send on a touring-act calendar. This one is a made-up summer calendar for a sample amphitheatre."),
       h("div", { class: "tickets" }, SAMPLE_MARKETS.filter((m) => m.kind === "venue").map(ticketFor)),
@@ -172,13 +180,54 @@ function nextWeek(rows: Array<{ date: string }>): string {
 let lastText = "";
 let lastChosen: GeoHit | null = null;
 
+const SPORT_KEY = "homestand.sport";
+/** The sport picked on this page. It survives a reload of this tab (storage can be missing or throw, so nothing depends on it). */
+let lastSport: Sport = (() => {
+  try {
+    return sportOf(sessionStorage.getItem(SPORT_KEY));
+  } catch {
+    return "baseball";
+  }
+})();
+const rememberSport = (s: Sport): void => {
+  lastSport = s;
+  try {
+    sessionStorage.setItem(SPORT_KEY, s);
+  } catch {
+    /* no storage: the sport is simply not remembered */
+  }
+};
+/** "2027-11-12" as "11/12/2027". */
+const usDate = (iso: string): string => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}/${iso.slice(0, 4)}`;
+
 export function ownView(): HTMLElement {
   let chosen: GeoHit | null = lastChosen;
   const status = h("p", { class: "help", role: "status" });
   const results = h("ul", { class: "results" });
   const q = h("input", { id: "city", type: "search", autocomplete: "off", placeholder: "For example, Tulsa" });
   const file = h("input", { id: "csvfile", type: "file", accept: ".csv,text/csv,.txt", "aria-label": "Upload a CSV file" });
-  const paste = h("textarea", { id: "csvtext", "aria-describedby": "csvhelp", spellcheck: "false", placeholder: CSV_TEMPLATE });
+  const paste = h("textarea", { id: "csvtext", "aria-describedby": "csvhelp", spellcheck: "false", placeholder: csvTemplate(lastSport) });
+  let sport: Sport = lastSport;
+  const dateHelp = h("dd", null);
+  const themeHelp = h("dd", null);
+  const sportHint = h("p", { class: "help", "data-testid": "sport-hint", role: "status" });
+  /** Pressing a chip: the words on this page follow the sport (the date example, the template, the example calendar). */
+  const sportButtons = SPORTS.map((s) =>
+    h("button", { type: "button", class: "sport-chip", role: "radio", "aria-checked": String(s === sport), "data-testid": `sport-${s}`, onclick: () => pickSport(s) }, SPORT_WORDS[s].name.replace(/^./, (c) => c.toUpperCase())),
+  );
+  function pickSport(s: Sport): void {
+    sport = s;
+    rememberSport(s);
+    paintSport();
+  }
+  function paintSport(): void {
+    const w = SPORT_WORDS[sport];
+    sportButtons.forEach((b, i) => b.setAttribute("aria-checked", String(SPORTS[i] === sport)));
+    sportHint.textContent = `${w.name.replace(/^./, (c) => c.toUpperCase())} seasons usually run ${w.months}. Next, the city your ${w.venue} is in.`;
+    themeHelp.textContent = `The theme night's name, like Bluey Night or ${w.promo}.`;
+    dateHelp.textContent = `The game date, like ${w.dateExample} or ${usDate(w.dateExample)}.`;
+    paste.setAttribute("placeholder", csvTemplate(sport));
+  }
   const errors = h("div", { role: "alert", class: "error" });
   const check = h("div", { class: "rowcheck", "data-testid": "rowcheck", "aria-live": "polite" });
   const table = h("div", { class: "rowtable", "data-testid": "rowtable" });
@@ -301,9 +350,10 @@ export function ownView(): HTMLElement {
       errors.replaceChildren(...rowErrors.map((e) => h("p", null, `Line ${e.line}: ${e.message}`)));
       return;
     }
-    void startCheck({ label: chosen.label, lon: chosen.lon, lat: chosen.lat, sig: chosen.sig }, rows, rowErrors, null);
+    void startCheck({ label: chosen.label, lon: chosen.lon, lat: chosen.lat, sig: chosen.sig }, rows, rowErrors, null, true, "club", sport);
   });
 
+  paintSport();
   if (lastText) { paste.value = lastText; refresh(); }
   if (lastChosen) status.textContent = `Home city: ${lastChosen.label}.`;
   return h(
@@ -312,10 +362,11 @@ export function ownView(): HTMLElement {
     h(
       "div",
       { class: "wrap" },
-      sceneHead("Get started · Bring your own", "Use your own", "calendar", "Two things: your home city (any US or Canadian city), and your theme nights."),
+      sceneHead("Get started · Bring your own", "Use your own", "calendar", "Three things: your sport, your home city (any US or Canadian city), and your theme nights."),
       h(
         "div",
         { class: "paper" },
+        h("div", { class: "field", role: "radiogroup", "aria-labelledby": "sport-label" }, h("span", { id: "sport-label", class: "field-label" }, "Your sport"), h("div", { class: "sport-chips" }, sportButtons), sportHint),
         h("div", { class: "field" }, h("label", { for: "city" }, "1. Your home city"), h("div", { class: "actions" }, q, h("button", { type: "button", class: "btn gold", onclick: () => void search() }, icon("search"), "Search")), status, results),
         h(
           "div",
@@ -325,8 +376,8 @@ export function ownView(): HTMLElement {
           h(
             "dl",
             { class: "cols" },
-            h("dt", null, "date"), h("dd", null, "The game date, like 2026-04-10 or 4/10/2026."),
-            h("dt", null, "theme"), h("dd", null, "The theme night's name, like Bluey Night or Fireworks Friday."),
+            h("dt", null, "date"), dateHelp,
+            h("dt", null, "theme"), themeHelp,
             h("dt", null, "sponsor"), h("dd", null, "Optional. Who presents the night. It stays on the date."),
             h("dt", null, "locked"), h("dd", null, "yes if the night can't change (a signed deal), otherwise no."),
             h("dt", null, "notes"), h("dd", null, "Optional. Anything you want to remember."),
@@ -335,8 +386,8 @@ export function ownView(): HTMLElement {
           h(
             "div",
             { class: "actions" },
-            h("button", { type: "button", class: "btn gold sm", "data-testid": "load-example", onclick: () => { paste.value = exampleCsv(); errors.replaceChildren(); refresh(); } }, "Load an example"),
-            h("button", { type: "button", class: "btn ghost sm dark", onclick: () => download("homestand-template.csv", "text/csv", CSV_TEMPLATE) }, icon("download"), "Download the template"),
+            h("button", { type: "button", class: "btn gold sm", "data-testid": "load-example", onclick: () => { paste.value = exampleCsv(sport); errors.replaceChildren(); refresh(); } }, "Load an example"),
+            h("button", { type: "button", class: "btn ghost sm dark", onclick: () => download("homestand-template.csv", "text/csv", csvTemplate(sport)) }, icon("download"), "Download the template"),
             file,
           ),
           h("p", { class: "help" }, "Paste from a spreadsheet, or edit the rows in the table below."),

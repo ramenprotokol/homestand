@@ -1,5 +1,6 @@
 import type { ActsOut, AnalyzeResponse, Caps, DiscoveryOut, MarketIn, NightOut, ProposeNightIn, ProposeResponse, RecheckResponse, ThemeScoreOut } from "../app/api-types";
 import { weekdayName, type CalendarRow } from "../app/calendar/csv";
+import { SPORT_CLASSIC_PHRASES } from "../app/calendar/classic";
 import { resolveTheme, type Resolution } from "../app/calendar/resolve";
 import { matchPoolTitle } from "../app/calendar/pooltitle";
 import { claimsOutcome, numbersAreGrounded } from "../app/guard";
@@ -14,7 +15,7 @@ import { idsOfType, type LiveTheme } from "../app/themes/ids";
 import { THEME_LIBRARY } from "../app/themes/library";
 import { VENUE_CLASSIC_PHRASES, VENUE_LIBRARY } from "../app/themes/artists";
 import { ACT_POPULARITY, ACTS_REFERENCE, actBatches, rankActs, worthABooking, type ActsReference } from "../app/acts";
-import { cityOfLabel, copyFor, type Kind } from "../app/kind";
+import { cityOfLabel, copyFor, type Kind, type Sport } from "../app/kind";
 import { TIER_RANK, type Genre, type Tier } from "../app/themes/library";
 import { DISCOVERY_REFERENCE, IDEA_POPULARITY, poolOffset, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
 import { step, type TraceStep } from "../app/trace";
@@ -43,6 +44,8 @@ export interface Deps {
   countersDown?: boolean;
   /** "venue" for a concert venue run (see forKind). Anything else is a club run, exactly as before venue mode existed. */
   kind?: Kind;
+  /** A club run's sport. Only its wording and its sport-specific proven promos differ; scoring, caches and the library are the same for every sport. Left out means baseball. */
+  sport?: Sport;
   /** The library a venue run scores: the music themes plus the artist themes. */
   venueLibrary?: LiveTheme[];
   /** The touring-act pool and its reference spread. Defaults to the committed one; synthetic mode and tests pass their own. */
@@ -338,7 +341,7 @@ async function tasteRanked(d: Deps, m: MarketIn, run: TasteRun, trace: TraceStep
  */
 async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights: PlanNight[], trace: TraceStep[]): Promise<SponsorAngle[]> {
   if (angles.length === 0) return angles;
-  const city = m.label.split(",")[0]!.replace(/ (sample )?club$/, "");
+  const city = m.label.split(",")[0]!.replace(/ (sample )?(club|team)$/, "");
   const used = new Set(nights.map((n) => n.themeId).filter((x): x is string => x !== null));
   const sig = signature(d.library);
   const run: TasteRun = { live: 0, memo: new Map() };
@@ -373,12 +376,12 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
     });
     const sameKind = ranked.filter((t) => categoryGroup(t.category) === categoryGroup(original.category));
     const who = angle.sponsor || "the sponsor";
-    const options: AngleOption[] = (sameKind.length > 0 ? sameKind : ranked).slice(0, 10).map((t) => ({ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also like ${t.label}, so if ${who} is open to it, a small ${t.label} touch (walk-up songs, PA clips or a photo spot) fits the night.` }));
+    const options: AngleOption[] = (sameKind.length > 0 ? sameKind : ranked).slice(0, 10).map((t) => ({ toThemeId: t.id, text: `${original.label} on ${shortDate(angle.date)} is locked, so it stays exactly as planned. Fans of ${original.label} near ${city} also like ${t.label}, so if ${who} is open to it, a small ${t.label} touch (${copyFor("club", d.sport).touches}) fits the night.` }));
     if (options.length === 0) {
       out.push(angle);
       continue;
     }
-    out.push({ ...angle, toThemeId: options[0]!.toThemeId, text: options[0]!.text, options, generic: angleText(night, original, null) });
+    out.push({ ...angle, toThemeId: options[0]!.toThemeId, text: options[0]!.text, options, generic: angleText(night, original, null, d.sport) });
   }
   return out;
 }
@@ -407,7 +410,7 @@ const discoveryKey = (d: Deps, m: MarketIn): string => {
  * discovery is unavailable: swaps then use library themes only.
  */
 export async function discover(d: Deps, m: MarketIn, trace: TraceStep[]): Promise<DiscoveryOut | null> {
-  const city = m.label.split(",")[0]!.replace(/ (sample )?club$/, "");
+  const city = m.label.split(",")[0]!.replace(/ (sample )?(club|team)$/, "");
   const ref = d.discoveryRef ?? DISCOVERY_REFERENCE;
   if (ref.pool.length === 0) {
     trace.push(step(iso(d), "qloo", `Skipped the family titles near ${city}: no title pool is loaded.`));
@@ -698,11 +701,11 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
   const trace: TraceStep[] = [];
   const at = iso(d);
   const venue = d.kind === "venue";
-  const W = copyFor(venue ? "venue" : "club");
+  const W = copyFor(venue ? "venue" : "club", d.sport);
   trace.push(step(at, "note", `Read ${input.rows.length} ${W.nights} for ${input.market.label}.`));
   const activeIds = new Set(d.library.map((t) => t.id));
   const known = venue ? VENUE_LIBRARY : THEME_LIBRARY;
-  const extraClassic = venue ? VENUE_CLASSIC_PHRASES : [];
+  const extraClassic = venue ? VENUE_CLASSIC_PHRASES : SPORT_CLASSIC_PHRASES[d.sport ?? "baseball"];
 
   // 1. Resolve: alias table first, then (only for text the table cannot place) one batched model call.
   const resolutions: Resolution[] = input.rows.map((r) => resolveTheme(r.theme, d.library, extraClassic));
@@ -735,7 +738,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
         d,
         venue
           ? "You match concert venue date names to a fixed list of touring artists and music nights. Answer with JSON only: an object mapping each number to an array of theme ids. Use an empty array unless the text clearly names that artist or music night. Never guess. Never invent ids."
-          : "You match minor league baseball promotion names to a fixed list of pop-culture themes. Answer with JSON only: an object mapping each number to an array of theme ids. Use an empty array unless the text clearly names that franchise, show, film, game, brand or artist. Never guess. Never invent ids.",
+          : "You match sports-team promotion names to a fixed list of pop-culture themes. Answer with JSON only: an object mapping each number to an array of theme ids. Use an empty array unless the text clearly names that franchise, show, film, game, brand or artist. Never guess. Never invent ids.",
         `Themes:\n${list}\n\nTexts:\n${texts.map((t, n) => `${n}: ${t}`).join("\n")}`,
         trace,
         "Matching unrecognised theme names",
@@ -832,7 +835,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   const actsOut = venue ? await discoverActs(d, input.market, trace) : undefined;
   const city = cityOfLabel(input.market.label);
   const nights: PlanNight[] = input.nights.map((n) => ({ ...n, themeId: n.themeId && Object.hasOwn(themes, n.themeId) ? n.themeId : null }));
-  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter((x) => x.major === true && (x.popularity ?? 0) >= SWAP_POPULARITY && (x.z ?? -9) >= 0) : [], city, ...(venue ? { venue: true, acts: actsOut ? actsOut.acts.filter(worthABooking) : [] } : {}) });
+  const res = propose({ nights, library: d.library, fits: fitsOf(themes), allowDuplicates: input.allowDuplicates, now: iso(d), discovered: discovery ? [...discovery.movies, ...discovery.shows].filter((x) => x.major === true && (x.popularity ?? 0) >= SWAP_POPULARITY && (x.z ?? -9) >= 0) : [], city, ...(d.sport && d.sport !== "baseball" ? { sport: d.sport } : {}), ...(venue ? { venue: true, acts: actsOut ? actsOut.acts.filter(worthABooking) : [] } : {}) });
   trace.push(...res.trace);
 
   const whys = new Map<string, string>();

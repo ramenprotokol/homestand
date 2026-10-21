@@ -1,4 +1,5 @@
-import { CSV_HEADER, csvField } from "./calendar/csv";
+import { CSV_HEADER, CSV_TEMPLATE, csvField } from "./calendar/csv";
+import { SPORT_WORDS, type Sport } from "./kind";
 
 // Four calendars we wrote for the demo: fictional sponsors, no MLB data. April to September 2027 (each date moved forward 52 weeks, so every night keeps its weekday).
 // Each has a few locked nights, 3 to 4 classic nights, one ambiguous theme (a name that fits two themes) and one unknown.
@@ -134,10 +135,39 @@ const VENUE_CALENDARS: Record<string, N[]> = {
   ],
 };
 
+// A made-up basketball calendar for a sample team in Boise (any-sport mode): November 2027 to April 2028, fictional sponsors, no real team.
+// The nights come from the same theme library the baseball samples use. Three locked nights, five proven promos, one ambiguous name and one unknown.
+const SPORT_CALENDARS: Record<string, N[]> = {
+  boise: [
+    ["2027-11-12", "T-Shirt Night", "Sawtooth Savings"],
+    ["2027-11-13", "Bluey Day", "Gem State Dental", false, "Matinee"],
+    ["2027-11-20", "Harry Potter Night", "Foothills Brewing"],
+    ["2027-11-27", "Military Appreciation Night", "Capitol Credit Union"],
+    ["2027-12-03", "The Grinch Night", "Gem State Dental"],
+    ["2027-12-11", "Princess Day", "Snake River Auto", false, "Matinee"],
+    ["2027-12-18", "Marvel Super Heroes Night", "Sawtooth Savings", true, "Sponsor contract signed"],
+    ["2028-01-07", "Star Wars Night", "Capitol Credit Union"],
+    ["2028-01-14", "Stranger Things Night", "Foothills Brewing"],
+    ["2028-01-15", "Taylor Swift Night", "Snake River Auto"],
+    ["2028-01-21", "Rally Towel Giveaway", "Sawtooth Savings"],
+    ["2028-01-22", "Dinosaur Day", "", false, "Matinee"],
+    ["2028-01-29", "Country Music Night", "Foothills Brewing", true, "Post-game concert booked"],
+    ["2028-02-04", "Marvel and Batman Night", "Gem State Dental"],
+    ["2028-02-12", "Black Heritage Night", "Capitol Credit Union"],
+    ["2028-02-18", "Bad Bunny Night"],
+    ["2028-02-26", "Pro Wrestling Night", "Snake River Auto"],
+    ["2028-03-03", "Famous Potato Night", "Sawtooth Savings"],
+    ["2028-03-10", "Barbie Night", "Gem State Dental"],
+    ["2028-03-18", "Yellowstone Night", "Foothills Brewing", true, "Sponsor contract signed"],
+    ["2028-03-25", "Super Mario Day", "", false, "Matinee"],
+    ["2028-04-07", "Fan Appreciation Night", "Capitol Credit Union"],
+  ],
+};
+
 export const VENUE_CALENDAR_IDS = Object.keys(VENUE_CALENDARS);
 
 export function sampleCsv(marketId: string): string {
-  const rows = CALENDARS[marketId] ?? VENUE_CALENDARS[marketId];
+  const rows = CALENDARS[marketId] ?? SPORT_CALENDARS[marketId] ?? VENUE_CALENDARS[marketId];
   if (!rows) throw new Error(`No sample calendar for ${marketId}`);
   const lines = rows.map(([d, t, s = "", l = false, n = ""]) => [d, t, s, l ? "yes" : "no", n].map(csvField).join(","));
   return `${CSV_HEADER}\n${lines.join("\n")}\n`;
@@ -171,7 +201,22 @@ const EXAMPLE: N[] = [
   ["2027-08-07", "Pro Wrestling Night"],
 ];
 
-export function exampleCsv(): string {
-  const lines = EXAMPLE.map(([d, t, s = "", l = false, n = ""]) => [d, t, s, l ? "yes" : "no", n].map(csvField).join(","));
+const addDays = (iso: string, days: number): string => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+/** Days the example moves forward so each night keeps its weekday and lands in the sport's season. Baseball is not moved. */
+const EXAMPLE_SHIFT: Record<Sport, number> = { baseball: 0, basketball: 217, hockey: 203, soccer: 0 };
+
+/** The example calendar. Baseball is the original; another sport moves the dates into its season and uses its own promo and game-time notes. */
+export function exampleCsv(sport: Sport = "baseball"): string {
+  const w = SPORT_WORDS[sport];
+  const rows: N[] = sport === "baseball" ? EXAMPLE : EXAMPLE.map(([d, t, sp, l, n]) => [addDays(d, EXAMPLE_SHIFT[sport]), t === "Fireworks Friday" ? w.promo : t, sp, l, n === "Day game" ? w.dayNote : n]);
+  const lines = rows.map(([d, t, s = "", l = false, n = ""]) => [d, t, s, l ? "yes" : "no", n].map(csvField).join(","));
   return `${CSV_HEADER}\n${lines.join("\n")}\n`;
+}
+
+/** The header and three starter rows for the paste box and the template download. Baseball is the original text. */
+export function csvTemplate(sport: Sport = "baseball"): string {
+  const w = SPORT_WORDS[sport];
+  if (sport === "baseball") return CSV_TEMPLATE;
+  const a = w.dateExample;
+  return `${CSV_HEADER}\n${a},Bluey Night,Harbor Credit Union,no,${w.kidsNote}\n${addDays(a, 7)},${w.promo},,no,\n${addDays(a, 28)},Star Wars Night,Gulf Coast Dental,yes,Sponsor contract signed\n`;
 }
