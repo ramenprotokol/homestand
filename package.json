@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A season-planning agent for Minor League promotions directors: theme nights scored against what the ballpark's own market loves.",
+  "description": "A season-planning agent for minor league (baseball, basketball, hockey, soccer) promotions directors and concert venues: theme nights and dates scored against what the town loves.",
   "license": "MIT",
   "scripts": {
     "dev": "vite",

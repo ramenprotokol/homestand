@@ -178,7 +178,7 @@ describe("analyze", () => {
   it("rate-limits per caller", async () => {
     const h = harness();
     let last = 200;
-    for (let i = 0; i < 13; i++) last = (await route(post("/api/analyze", analyzeBody), h.deps)).status;
+    for (let i = 0; i < 31; i++) last = (await route(post("/api/analyze", analyzeBody), h.deps)).status;
     expect(last).toBe(429);
   });
 

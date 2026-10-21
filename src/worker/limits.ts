@@ -1,5 +1,5 @@
-/** Per-minute limits by route, used by the in-memory fallback and as the numbers wrangler.toml's rate limit bindings mirror. */
-export const LIMITS: Record<string, number> = { analyze: 12, propose: 20, recheck: 6, geocode: 20 };
+/** Per-minute limits by route (raised for judging: several judges can share one office address), used by the in-memory fallback and as the numbers wrangler.toml's rate limit bindings mirror. */
+export const LIMITS: Record<string, number> = { analyze: 30, propose: 40, recheck: 15, geocode: 60 };
 
 export type Limiter = (route: string, clientId: string) => Promise<boolean>;
 

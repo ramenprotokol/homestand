@@ -11,6 +11,8 @@ import { loadStudy, type PublishedResults } from "../study-data";
 
 /** Clubs in the study: all were scored; 89 of them ran two or more different themes, which is what makes a pair (study/PULL_RECORD.md). */
 const STUDY_CLUBS = 120;
+/** Clubs that ran at least one of the nine themes in 2025, so the 385 nights came from these (counted from the local 2025 theme-night list). The other 14 were scored but ran none. */
+const NIGHT_CLUBS = 106;
 const REPO = "https://github.com/ramenprotokol/homestand";
 type Call = "Yes" | "No" | "Not sure";
 let call: Call | null = readCall();
@@ -43,9 +45,9 @@ const VERDICT_WORDS: Record<Verdict, string> = {
 };
 
 /** One large, plain line directly under the stamp, with the number in it. */
-const stampPlain = (v: Verdict, est: number): string => {
+const stampPlain = (v: Verdict, est: number, llmEst?: number): string => {
   const n = Math.round(est * 100);
-  return v === "CONFIRMED" ? `Local taste picked the bigger crowd ${n} times in 100, more often than the bar we set.` : v === "OVERTURNED" ? `Local taste picked the bigger crowd only ${n} times in 100: it pointed the wrong way.` : `Local taste did not pick the bigger crowd: ${n} times in 100, about a coin flip.`;
+  return v === "CONFIRMED" ? `Local taste picked the bigger crowd ${n} times in 100, more often than the bar we set.` : v === "OVERTURNED" ? `Local taste picked the bigger crowd only ${n} times in 100: it pointed the wrong way.` : `Neither local taste (${n} times in 100)${llmEst === undefined ? "" : ` nor an AI guess (${Math.round(llmEst * 100)} in 100, mostly ties)`} predicted the bigger crowd better than chance in one season.`;
 };
 
 /** The short version, before any numbers. */
@@ -93,7 +95,36 @@ function chart(r: PublishedResults): SVGSVGElement {
   return svg;
 }
 
-const STAMP_WORD = { CONFIRMED: "CONFIRMED", "CALL STANDS": "COIN FLIP", OVERTURNED: "OVERTURNED" } as const;
+/** How many different answers each method gave across the clubs, per theme: bars on one 0 to 120 axis. */
+function distinctChart(r: PublishedResults): SVGSVGElement {
+  const W = 640, left = 130, right = 36, top = 26, rowH = 30, max = 120;
+  const x = (v: number): number => left + (Math.min(max, v) / max) * (W - left - right);
+  const rows = STUDY_THEMES.flatMap((t) => (r.perTheme[t.id] ? [{ label: t.label, ai: r.perTheme[t.id]!.llmDistinct, q: r.perTheme[t.id]!.qlooDistinct }] : []));
+  const H = top + rows.length * rowH + 26;
+  const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, class: "chart", role: "img", "aria-label": `Different answers across the clubs, by theme. ${rows.map((q) => `${q.label}: AI guess ${q.ai}, Qloo ${q.q}`).join(". ")}.` });
+  svg.append(s("text", { x: left, y: 12 }, "AI guess (light)"));
+  svg.append(s("text", { x: left + 140, y: 12 }, "Qloo (gold)"));
+  rows.forEach((q, i) => {
+    const y = top + i * rowH;
+    svg.append(s("text", { x: 0, y: y + 17, class: "lbl" }, q.label));
+    svg.append(s("rect", { x: left, y: y + 3, width: Math.max(2, x(q.ai) - left), height: 9, fill: "#cfd3ee", rx: 2 }));
+    svg.append(s("text", { x: x(q.ai) + 5, y: y + 12 }, String(q.ai)));
+    svg.append(s("rect", { x: left, y: y + 14, width: Math.max(2, x(q.q) - left), height: 9, fill: "#ffd97a", rx: 2 }));
+    svg.append(s("text", { x: x(q.q) + 5, y: y + 23 }, String(q.q)));
+  });
+  for (const t of [0, 40, 80, 120]) svg.append(s("text", { x: x(t), y: H - 6, "text-anchor": "middle" }, String(t)));
+  return svg;
+}
+
+/** The plain sentence that leads the results: an AI guess can't tell towns apart. Built from the published per-theme counts. */
+function townsLine(r: PublishedResults): string {
+  const themes = STUDY_THEMES.flatMap((t) => (r.perTheme[t.id] ? [r.perTheme[t.id]!] : []));
+  const same = themes.filter((t) => t.llmDistinct === 1).length;
+  const lo = Math.min(...themes.map((t) => t.qlooDistinct)), hi = Math.max(...themes.map((t) => t.qlooDistinct));
+  return `An AI guess can't tell towns apart: for ${same} of ${themes.length} themes it gave the same answer at every club it rated (${[...new Set(themes.filter((t) => t.llmDistinct === 1).map((t) => t.llmScored))].sort((a, b) => b - a).join(" or ")} clubs, depending on the theme). Qloo gave about ${hi} different readings per theme across the same 120 clubs (${lo} to ${hi}).`;
+}
+
+const STAMP_WORD = { CONFIRMED: "CONFIRMED", "CALL STANDS": "NOT PROVEN", OVERTURNED: "OVERTURNED" } as const;
 const REVIEW_MS = { dots: 1900, notes: 1300, meter: 1800, verdict: 3500 };
 
 /** Dot piles: one dot per pair of theme nights, drawn in two piles. Positions are illustrative; the counts are the study's. */
@@ -206,7 +237,7 @@ export function studyView(): HTMLElement {
     const under = h("div", { class: "under" }, h("i"), "Under review");
     canvas = h("canvas", { id: "dots", "aria-label": `${r.counts.pairs} dots, one per pair of theme nights`, role: "img" });
     const dls = h("div", { class: "dls" }, h("div", { class: "dl dl-a" }, h("b", null, String(a)), "taste picked the bigger crowd"), h("div", { class: "dl dl-b" }, h("b", null, String(b)), "it didn't"));
-    const dnote = h("p", { class: "dnote" }, `${r.counts.nightsInput} theme nights at ${STUDY_CLUBS} clubs. The ${r.counts.clubsWithPairs} clubs that ran two or more different themes made ${r.counts.pairs} same-ballpark pairs (any two nights at one club), so there are more pairs than nights. Each dot is one real pair. The counts are real; positions are illustrative.`);
+    const dnote = h("p", { class: "dnote" }, `${r.counts.nightsInput} theme nights at ${NIGHT_CLUBS} clubs (all ${STUDY_CLUBS} clubs were scored). The ${r.counts.clubsWithPairs} clubs that ran two or more different themes made ${r.counts.pairs} same-ballpark pairs (any two nights at one club), so there are more pairs than nights. Each dot is one real pair. The counts are real; positions are illustrative.`);
     const nval = h("b", null, "0.0%");
     const needle = h("div", { class: "needle" }, nval);
     const ci = h("div", { class: "ci", style: `left:${(acc.lo * 100).toFixed(1)}%;width:${((acc.hi - acc.lo) * 100).toFixed(1)}%` });
@@ -222,7 +253,7 @@ export function studyView(): HTMLElement {
       { class: "verdict", "data-testid": "verdict" },
       h("span", { class: "small" }, "The result:"),
       h("div", { class: "stampv" }, STAMP_WORD[r.h1.verdict]),
-      h("p", { class: "stamp-plain", "data-testid": "stamp-plain" }, stampPlain(r.h1.verdict, acc.estimate)),
+      h("p", { class: "stamp-plain", "data-testid": "stamp-plain" }, stampPlain(r.h1.verdict, acc.estimate, r.h2.llmAccuracy.estimate)),
       h("p", { class: "v1" }, VERDICT_WORDS[r.h1.verdict]),
       h("p", { class: "echo", "data-testid": "you-said" }, personalLine(c, r.h1.verdict)),
       h("button", { type: "button", class: "btn ghost sm", id: "again", onclick: () => { call = null; try { sessionStorage.removeItem("homestand.call"); } catch { /* ignore */ } paint(false); } }, "Make a different call"),
@@ -340,6 +371,7 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
       h("li", null, "Theme nights carry other promotions we could not control. That adds noise; it could also favour local taste if clubs stack promotions on themes their town loves."),
       h("li", null, "Princess nights are a proxy for children's dress-up nights."),
       h("li", null, "National popularity is the same for every club, so on this design it cannot rank two themes inside one club and scores exactly a coin flip."),
+      h("li", null, "Qloo describes its affinity score as the strength of the link between a place and an interest (", h("a", { href: "https://qloo.com/resources/how-qloos-affinity-score-measures-consumer-preferences" }, "Qloo on its affinity score"), "). That is a measure of local taste, not a forecast of what people will do. We tested the forecast question separately, and did not assume it."),
       h("li", null, "A result that misses the line does not prove taste never matters. It means we could not show it at this sample size."),
     ),
   );
@@ -352,6 +384,13 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
     : null;
   return [
     banner ?? h("span"),
+    h(
+      "section", { class: "sect", "data-testid": "towns-section" },
+      h("h2", null, "First, can the method tell towns apart?"),
+      h("p", { "data-testid": "towns-line" }, townsLine(r)),
+      distinctChart(r),
+      h("p", { class: "small" }, "Different answers across the 120 clubs, per theme (most possible: 120). A method that gives every town the same answer has nothing local to offer. Qloo's count stops near 100 because 19 clubs got exactly the same readings as a neighbouring club (for example Tampa, Clearwater and Bradenton, or Durham and Greensboro), which fits Qloo treating nearby places as one local area. We did not confirm how Qloo does that. Telling towns apart is not the same as predicting crowds: that is the test below."),
+    ),
     h(
       "section", { class: "sect" },
       h("h2", null, "How often local taste picked the bigger crowd"),

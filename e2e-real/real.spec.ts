@@ -95,12 +95,14 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(page.getByTestId("verdict")).toHaveCount(0);
   await shot(page, info, "study-call");
   await page.getByTestId("call-not-sure").click();
-  await expect(page.getByTestId("verdict")).toContainText("COIN FLIP");
-  await expect(page.getByTestId("stamp-plain")).toContainText("Local taste did not pick the bigger crowd: 49 times in 100, about a coin flip.");
+  await expect(page.getByTestId("verdict")).toContainText("NOT PROVEN");
+  await expect(page.getByTestId("stamp-plain")).toContainText("Neither local taste (49 times in 100) nor an AI guess (51 in 100, mostly ties) predicted the bigger crowd better than chance in one season.");
+  await expect(page.getByTestId("towns-line")).toContainText("same answer at every club it rated");
+  await expect(page.getByTestId("towns-line")).toContainText("for 5 of 9 themes");
   await expect(page.getByTestId("h1-text")).toContainText("49.1%");
   await expect(page.getByTestId("h1-text")).toContainText("521 pairs");
   await expect(page.getByTestId("results-pending")).toHaveCount(0);
-  await expect(page.getByTestId("stamp-plain")).toHaveText("Local taste did not pick the bigger crowd: 49 times in 100, about a coin flip.");
+  await expect(page.getByTestId("stamp-plain")).toHaveText("Neither local taste (49 times in 100) nor an AI guess (51 in 100, mostly ties) predicted the bigger crowd better than chance in one season.");
   await noSideScroll(page);
   await shot(page, info, "study-result");
 });

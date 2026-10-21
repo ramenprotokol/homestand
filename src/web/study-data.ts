@@ -12,7 +12,7 @@ export interface PublishedResults {
   h1: { accuracy: Interval; pass: boolean; verdict: Verdict };
   h2: { llmAccuracy: Interval; difference: Interval; beats: boolean };
   rawLiftAccuracy: { qloo: number; llm: number; nationalPopularity: number; nationalPopularityCentred: number };
-  perTheme: Record<string, { pairs: number; qlooAccuracy: number | null; llmDistinct: number }>;
+  perTheme: Record<string, { pairs: number; qlooAccuracy: number | null; qlooDistinct: number; clubsScored: number; llmDistinct: number; llmScored: number }>;
   flatThemes: { qloo: string[]; llm: string[] };
   binnedByQlooZ: Bin[];
 }
@@ -29,7 +29,7 @@ const iv = (estimate: number, lo: number, hi: number): Interval => ({ estimate, 
 
 /** SYNTHETIC. Every number here is invented to exercise the page. Never shown in a production build. */
 function fixture(): PublishedResults {
-  const perTheme = Object.fromEntries(STUDY_THEMES.map((t, i) => [t.id, { pairs: 60 + i * 3, qlooAccuracy: 0.46 + (i % 5) * 0.03, llmDistinct: 2 }]));
+  const perTheme = Object.fromEntries(STUDY_THEMES.map((t, i) => [t.id, { pairs: 60 + i * 3, qlooAccuracy: 0.46 + (i % 5) * 0.03, qlooDistinct: 100, clubsScored: 120, llmDistinct: i % 2 === 0 ? 1 : 3, llmScored: 120 }]));
   const binnedByQlooZ: Bin[] = [-1.2, -0.6, 0, 0.6, 1.2].map((z, i) => ({ n: 40, zMin: z - 0.3, zMax: z + 0.3, meanZ: z, meanCentredLift: -0.02 + i * 0.01 }));
   return {
     verdict: "CALL STANDS",

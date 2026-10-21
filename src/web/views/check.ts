@@ -2,7 +2,7 @@ import type { ThemeScoreOut } from "../../app/api-types";
 import { bridgeSentence, classicReason, comparisonSentence, fitMeaning, fitWord, marketLevelSentence, NEAR_TOP_NOTE, vsMarketsWords, type FitLabel } from "../../app/score";
 import { cityOfLabel } from "../../app/kind";
 import { themeById } from "../../app/themes/artists";
-import { dateWithYear, passedCount, seasonSpan } from "../../app/dates";
+import { dateWithYear, passedCount, seasonEyebrow } from "../../app/dates";
 import { checkResultLine, cleanTitle, fitSummary, localDay, lockedLine } from "../../app/text";
 import { ApiFailure } from "../api";
 import { fitChip, savedCopyBanner, syntheticBanner } from "../components";
@@ -160,7 +160,7 @@ export function checkView(): HTMLElement {
       { class: "dl-top" },
       h("div", { class: "eyebrow" }, "Step 1 of 3 \u00b7 Check"),
       h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
-      h("p", { class: "small season-line", "data-testid": "season-span" }, seasonSpan(a.nights.map((n) => n.date))),
+      h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(a.nights.map((n) => n.date))),
       h("p", { class: "check-line", "data-testid": "summary" }, result),
       passed > 0 ? h("p", { class: "small past-note", "data-testid": "past-note" }, `${passed} of these ${copy().nights} ${passed === 1 ? "has" : "have"} already passed.`) : null,
       asks,

@@ -38,12 +38,7 @@ async function snapshotOf(m: MarketIn): Promise<Snapshot | null> {
 const serverDown = (status: number): boolean => status === 502 || status === 503 || status === 504;
 
 async function call<T>(path: string, init?: RequestInit, saved?: () => Promise<T | null>): Promise<T> {
-  let res: Response | null = null;
-  try {
-    res = await fetch(`${BASE}${path}`, init);
-  } catch {
-    res = null;
-  }
+  const res: Response | null = await fetch(`${BASE}${path}`, init).catch(() => null);
   if (res === null || serverDown(res.status)) {
     const copy = saved ? await saved() : null;
     if (copy) {
@@ -52,8 +47,8 @@ async function call<T>(path: string, init?: RequestInit, saved?: () => Promise<T
     }
     if (res === null) throw new ApiFailure("network", "The Homestand server isn't answering right now. Please try again in a minute. If it keeps happening, the sample calendars may still open.");
   }
-  const body = (await res!.json().catch(() => null)) as T | ApiError | null;
-  if (!res!.ok) {
+  const body = (await res.json().catch(() => null)) as T | ApiError | null;
+  if (!res.ok) {
     const e = body as ApiError | null;
     throw new ApiFailure(e?.error ?? "error", e?.message ?? "Something went wrong. Try again.");
   }

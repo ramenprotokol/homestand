@@ -1,4 +1,7 @@
-# Copy to .dev.vars (gitignored). Values here are Worker bindings for `wrangler dev` only.
-# They do NOT change which Cloudflare account wrangler deploys to.
-# Deploy ONLY with ~/RamenProtocol/_ops/infra/ramen-deploy.sh — it refuses unless the Ramen
-# account id and token are set, so the global wrangler login is never used.
+# Copy to .dev.vars (gitignored). Values here are Worker bindings for `wrangler dev` and the qloo:* scripts only.
+# Never commit the real file.
+
+QLOO_API_KEY=
+QLOO_API_URL=https://hackathon.api.qloo.com
+# Any random string of 16 or more characters; it signs the cities the search returns.
+MARKET_SIGNING_KEY=

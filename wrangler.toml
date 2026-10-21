@@ -25,22 +25,22 @@ id = "4447d78d27ae4134966ec9bac7984b85"
 [[ratelimits]]
 name = "LIMIT_GEOCODE"
 namespace_id = "41001"
-simple = { limit = 20, period = 60 }
+simple = { limit = 60, period = 60 }
 
 [[ratelimits]]
 name = "LIMIT_ANALYZE"
 namespace_id = "41002"
-simple = { limit = 12, period = 60 }
+simple = { limit = 30, period = 60 }
 
 [[ratelimits]]
 name = "LIMIT_PROPOSE"
 namespace_id = "41003"
-simple = { limit = 20, period = 60 }
+simple = { limit = 40, period = 60 }
 
 [[ratelimits]]
 name = "LIMIT_RECHECK"
 namespace_id = "41004"
-simple = { limit = 6, period = 60 }
+simple = { limit = 15, period = 60 }
 
 # Production. Secrets (not here): QLOO_API_KEY and MARKET_SIGNING_KEY (any random string of 16+ characters; without it only the
 # sample clubs work). Non-secret values only.

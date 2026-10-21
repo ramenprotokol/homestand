@@ -27,3 +27,16 @@ export function seasonSpan(dates: string[]): string {
 
 /** How many of these dates are before today (YYYY-MM-DD, both). */
 export const passedCount = (dates: string[], today: string): number => dates.filter((d) => d < today).length;
+
+/** The small label over a set of nights: "2027 season · Mar 5 – Jul 3", or "2026–27 season · Nov 6 – Mar 26" across New Year. Empty for no dates. */
+export function seasonEyebrow(dates: string[]): string {
+  if (dates.length === 0) return "";
+  const sorted = [...dates].sort();
+  const first = sorted[0]!;
+  const last = sorted[sorted.length - 1]!;
+  const noYear = (iso: string): string => dateWithYear(iso).replace(/, \d{4}$/, "");
+  const y1 = first.slice(0, 4);
+  const y2 = last.slice(0, 4);
+  const season = y1 === y2 ? y1 : `${y1}\u2013${y2.slice(2)}`;
+  return `${season} season \u00b7 ${first === last ? noYear(first) : `${noYear(first)} \u2013 ${noYear(last)}`}`;
+}

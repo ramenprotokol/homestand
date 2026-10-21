@@ -254,13 +254,13 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("verdict")).toHaveCount(0);
   await shot(page, info, "09-study-call");
   await page.getByTestId("call-yes").click();
-  await expect(page.getByTestId("verdict")).toContainText("COIN FLIP");
-  await expect(page.getByTestId("stamp-plain")).toHaveText(/^Local taste did not pick the bigger crowd: \d+ times in 100, about a coin flip\.$/);
+  await expect(page.getByTestId("verdict")).toContainText("NOT PROVEN");
+  await expect(page.getByTestId("stamp-plain")).toHaveText(/^Neither local taste \(\d+ times in 100\)( nor an AI guess \(\d+ in 100, mostly ties\))? predicted the bigger crowd better than chance in one season\.$/);
   // The user's own call is answered once, in one line.
   await expect(page.getByTestId("you-said")).toHaveText("You said Yes. The data didn't back that up.");
   expect(await page.getByText(/You said Yes/).count()).toBe(1);
   await expect(page.getByTestId("plain-result")).toBeVisible();
-  await expect(page.locator(".dnote")).toContainText("385 theme nights at 120 clubs. The 89 clubs that ran two or more different themes made 521 same-ballpark pairs");
+  await expect(page.locator(".dnote")).toContainText("385 theme nights at 106 clubs (all 120 clubs were scored). The 89 clubs that ran two or more different themes made 521 same-ballpark pairs");
   // The stamp does not touch the line under it.
   const stampBox = (await page.locator(".stampv").boundingBox())!;
   expect(overlap(stampBox, (await page.getByTestId("stamp-plain").boundingBox())!), "stamp overlaps its plain line").toBe(false);

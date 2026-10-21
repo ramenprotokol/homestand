@@ -188,7 +188,7 @@ test("Use your own: soccer in Vancouver, October 2026: the example is next seaso
   await page.getByTestId("check-mine").click();
   await expect(page.getByTestId("summary")).toBeVisible();
   const span = page.getByTestId("season-span");
-  await expect(span).toHaveText(/^Mar 5 \u2013 Jul \d+, 2027$/);
+  await expect(span).toHaveText(/^2027 season \u00b7 Mar 5 \u2013 Jul \d+$/);
   await expect(page.getByTestId("past-note")).toHaveCount(0);
   await noSideScroll(page);
 });
@@ -202,5 +202,5 @@ test("a calendar with nights before today gets a small note, and a fixed clock k
   await page.getByRole("button", { name: "Tulsa, OK" }).click();
   await page.getByTestId("check-mine").click();
   await expect(page.getByTestId("past-note")).toHaveText("2 of these nights have already passed.");
-  await expect(page.getByTestId("season-span")).toHaveText("Apr 10 \u2013 Nov 6, 2026");
+  await expect(page.getByTestId("season-span")).toHaveText("2026 season \u00b7 Apr 10 \u2013 Nov 6");
 });
