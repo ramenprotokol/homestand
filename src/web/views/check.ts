@@ -33,7 +33,7 @@ function fitList(views: NightView[]): HTMLElement {
       const n = views.filter((v) => v.fit === fit).length;
       if (fit === "found" && n === 0) return [];
       const lean = views.filter((v) => v.fit === fit && v.slight).length;
-      return [h("li", { class: `fl${fit === "leans-away" ? " away" : ""}`, "data-k": fit }, gemChip(fit), h("b", { class: "fl-n" }, String(n)), h("span", { class: "fl-t" }, h("b", null, fitWord(fit)), ` ${fitMeaning(fit, state.kind)}`, lean > 0 ? ` ${lean} of ${n === 1 ? "this" : "these"} only ${lean === 1 ? "leans" : "lean"} that way: the raw gap is tiny.` : ""))];
+      return [h("li", { class: `fl${fit === "leans-away" ? " away" : ""}`, "data-k": fit }, gemChip(fit), h("b", { class: "fl-n" }, String(n)), h("span", { class: "fl-t" }, h("b", null, fitWord(fit)), ` ${fitMeaning(fit, state.kind)}`, lean > 0 ? (n === 1 ? " It only leans that way: the raw gap is tiny." : ` ${lean} of these only ${lean === 1 ? "leans" : "lean"} that way: the raw gap is tiny.`) : ""))];
     }),
   );
 }
