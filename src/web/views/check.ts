@@ -2,7 +2,8 @@ import type { ThemeScoreOut } from "../../app/api-types";
 import { bridgeSentence, classicReason, comparisonSentence, fitMeaning, fitWord, marketLevelSentence, NEAR_TOP_NOTE, vsMarketsWords, type FitLabel } from "../../app/score";
 import { cityOfLabel } from "../../app/kind";
 import { themeById } from "../../app/themes/artists";
-import { checkResultLine, cleanTitle, fitSummary, lockedLine } from "../../app/text";
+import { dateWithYear, passedCount, seasonSpan } from "../../app/dates";
+import { checkResultLine, cleanTitle, fitSummary, localDay, lockedLine } from "../../app/text";
 import { ApiFailure } from "../api";
 import { fitChip, syntheticBanner } from "../components";
 import { formatDate, formatDateTime, h, type Child } from "../dom";
@@ -148,6 +149,7 @@ export function checkView(): HTMLElement {
     tap(c);
   });
 
+  const passed = passedCount(a.nights.map((n) => n.date), localDay());
   const deckL = h(
     "div",
     { class: "deck-l", id: "deckL" },
@@ -156,7 +158,9 @@ export function checkView(): HTMLElement {
       { class: "dl-top" },
       h("div", { class: "eyebrow" }, "Step 1 of 3 \u00b7 Check"),
       h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
+      h("p", { class: "small season-line", "data-testid": "season-span" }, seasonSpan(a.nights.map((n) => n.date))),
       h("p", { class: "check-line", "data-testid": "summary" }, result),
+      passed > 0 ? h("p", { class: "small past-note", "data-testid": "past-note" }, `${passed} of these ${copy().nights} ${passed === 1 ? "has" : "have"} already passed.`) : null,
       asks,
       picked,
       pendingViews.length > 0 ? h("p", { class: "small pick-hint" }, `${pendingViews.length} ${pendingViews.length === 1 ? `${copy().night} needs` : `${copy().nights} need`} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} ungraded.`) : null,
@@ -281,7 +285,7 @@ function backOf(v: NightView): BackSpec {
     total: state.analysis!.nights.length,
     city: city(),
     title: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme,
-    dateLine: `${formatDate(n.date)} · ${n.weekday}`,
+    dateLine: `${dateWithYear(n.date)} · ${n.weekday}`,
     rows: scored ? s.entities.map((e) => ({ name: e.name, type: e.type, affinity: e.affinity })) : pool ? [{ name: pool.name, type: pool.type, affinity: pool.affinity }] : [],
     index: scored ? s.index : pool ? pool.z : null,
     z: scored ? s.z : pool ? pool.zRaw : null,

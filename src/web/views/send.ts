@@ -8,7 +8,7 @@ import { makeCard, specOf } from "../foil/cards";
 import { actIdeas, clubAngleParts, ideaTitles, openerLine } from "./fix";
 import { cityOfLabel } from "../../app/kind";
 import { fitWord } from "../../app/score";
-import { shortDate } from "../../app/dates";
+import { seasonSpan, shortDate } from "../../app/dates";
 import { Fireworks } from "../foil/fx";
 import { onCleanup, onMount, onResize, route, routeContext, whileVisible } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
@@ -122,6 +122,7 @@ export function sendView(): HTMLElement {
           { class: "send-l" },
           h("div", { class: "eyebrow" }, "Step 3 of 3 \u00b7 Send"),
           h("h1", { class: "h2", tabindex: "-1" }, "Send: ", h("em", null, "your revised calendar")),
+          h("p", { class: "small season-line", "data-testid": "season-span" }, seasonSpan(a.nights.map((n) => n.date))),
           h("p", { class: "sum", "data-testid": "send-summary" }, summary),
           syntheticBanner(),
           h(

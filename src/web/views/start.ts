@@ -2,7 +2,7 @@ import type { GeoHit } from "../../app/api-types";
 import { CSV_HEADER, csvField, parseCalendar, parseDate, parseLocked, splitRecords } from "../../app/calendar/csv";
 import { copyFor, SPORT_WORDS, SPORTS, sportOf, type Sport } from "../../app/kind";
 import { SAMPLE_MARKETS } from "../../app/markets";
-import { csvTemplate, exampleCsv, sampleCsv } from "../../app/samples";
+import { csvTemplate, dateExample, exampleCsv, sampleCsv } from "../../app/samples";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
 import { heroShell } from "../foil/hero";
@@ -225,7 +225,8 @@ export function ownView(): HTMLElement {
     sportButtons.forEach((b, i) => b.setAttribute("aria-checked", String(SPORTS[i] === sport)));
     sportHint.textContent = `${w.name.replace(/^./, (c) => c.toUpperCase())} seasons usually run ${w.months}. Next, the city your ${w.venue} is in.`;
     themeHelp.textContent = `The theme night's name, like Bluey Night or ${w.promo}.`;
-    dateHelp.textContent = `The game date, like ${w.dateExample} or ${usDate(w.dateExample)}.`;
+    const e = dateExample(sport);
+    dateHelp.textContent = `The game date, like ${e} or ${usDate(e)}.`;
     paste.setAttribute("placeholder", csvTemplate(sport));
   }
   const errors = h("div", { role: "alert", class: "error" });
@@ -373,6 +374,7 @@ export function ownView(): HTMLElement {
           { class: "field" },
           h("label", { for: "csvtext" }, "2. Your theme nights"),
           h("p", { id: "csvhelp", class: "help" }, "One row per theme night, with a header row on top. Upload a file or paste the rows here."),
+          h("p", { class: "help", "data-testid": "any-dates" }, "Use any dates you like, this season or next. Qloo scores what your town likes, so the dates are yours."),
           h(
             "dl",
             { class: "cols" },

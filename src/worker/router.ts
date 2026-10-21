@@ -147,6 +147,7 @@ const STUB_PLACES: Array<Omit<GeoHit, "sig">> = [
   { label: "Tulsa, OK", lon: -95.99278, lat: 36.15398 },
   { label: "Boise, ID", lon: -116.20345, lat: 43.6135 },
   { label: "Columbus, OH", lon: -83.00207, lat: 39.96118 },
+  { label: "Vancouver, BC", lon: -123.11934, lat: 49.24966 },
 ];
 
 /**

@@ -605,3 +605,5 @@ body.why-open .nav{visibility:hidden}
 .study-scope{margin-top:10px}
 .study-scope strong{color:var(--gold2)}
 @media (max-width:760px){.sport-chips{display:grid;grid-template-columns:1fr 1fr}.hero-sports{font-size:12px;letter-spacing:.1em}}
+.season-line{margin:0 0 8px;font-weight:600;letter-spacing:.02em}
+.past-note{margin:8px 0 0}
