@@ -1,8 +1,9 @@
 import type { GeoHit } from "../../app/api-types";
-import { CSV_HEADER, csvField, parseCalendar, parseDate, parseLocked, splitRecords } from "../../app/calendar/csv";
+import { CSV_HEADER, csvField, parseCalendar, parseDate, parseLocked, type ParsedCalendar } from "../../app/calendar/csv";
+import { MAX_CITY } from "../../app/geo";
 import { copyFor, SPORT_WORDS, SPORTS, sportOf, type Sport } from "../../app/kind";
 import { SAMPLE_MARKETS } from "../../app/markets";
-import { csvTemplate, exampleCsv, sampleCsv } from "../../app/samples";
+import { csvTemplate, dateExample, exampleCsv, sampleCsv } from "../../app/samples";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
 import { heroShell } from "../foil/hero";
@@ -206,7 +207,7 @@ export function ownView(): HTMLElement {
   let chosen: GeoHit | null = lastChosen;
   const status = h("p", { class: "help", role: "status" });
   const results = h("ul", { class: "results" });
-  const q = h("input", { id: "city", type: "search", autocomplete: "off", placeholder: "For example, Tulsa" });
+  const q = h("input", { id: "city", type: "search", autocomplete: "off", maxlength: String(MAX_CITY), placeholder: "For example, Tulsa, OK" });
   const file = h("input", { id: "csvfile", type: "file", accept: ".csv,text/csv,.txt", "aria-label": "Upload a CSV file" });
   const paste = h("textarea", { id: "csvtext", "aria-describedby": "csvhelp", spellcheck: "false", placeholder: csvTemplate(lastSport) });
   let sport: Sport = lastSport;
@@ -221,69 +222,97 @@ export function ownView(): HTMLElement {
     sport = s;
     rememberSport(s);
     paintSport();
+    if (paste.value.trim() !== "") refresh(); // the date example inside each row message follows the sport
   }
   function paintSport(): void {
     const w = SPORT_WORDS[sport];
     sportButtons.forEach((b, i) => b.setAttribute("aria-checked", String(SPORTS[i] === sport)));
     sportHint.textContent = `${w.name.replace(/^./, (c) => c.toUpperCase())} seasons usually run ${w.months}. Next, the city your ${w.venue} is in.`;
     themeHelp.textContent = `The theme night's name, like Bluey Night or ${w.promo}.`;
-    dateHelp.textContent = `The game date, like ${w.dateExample} or ${usDate(w.dateExample)}.`;
+    const e = dateExample(sport);
+    dateHelp.textContent = `The game date, like ${e} or ${usDate(e)}.`;
     paste.setAttribute("placeholder", csvTemplate(sport));
   }
   const errors = h("div", { role: "alert", class: "error" });
   const check = h("div", { class: "rowcheck", "data-testid": "rowcheck", "aria-live": "polite" });
   const table = h("div", { class: "rowtable", "data-testid": "rowtable" });
+  const barCount = h("span", { class: "ab-count", "data-testid": "ab-count", "aria-hidden": "true" });
 
-  interface EdRow { date: string; theme: string; sponsor: string; locked: boolean; notes: string }
+  // The editor shows exactly what Check will do: every count and message below comes from parseCalendar, the same reader Check uses.
+  interface EdRow { line: number; date: string; theme: string; sponsor: string; locked: string; notes: string }
   let model: EdRow[] = [];
-  const rowText = (r: EdRow): string => [r.date, r.theme, r.sponsor, r.locked ? "yes" : "no", r.notes].map(csvField).join(",");
-  /** What is wrong with one row, in plain words, or null when it is fine. */
-  function rowProblem(r: EdRow): string | null {
-    if (parseDate(r.date) === null) return "Not a date. Use 2027-04-10.";
-    if (r.theme.trim() === "") return "Needs a theme name.";
-    return parseCalendar(`${CSV_HEADER}\n${rowText(r)}`).errors[0]?.message ?? null;
+  let report: ParsedCalendar = parseCalendar("", dateExample(sport));
+  /** The note element under each row's date cell, so one edit can refresh them all (a date can change how the whole file is read). */
+  let notes = new Map<EdRow, HTMLElement>();
+  const rowText = (r: EdRow): string => [r.date, r.theme, r.sponsor, r.locked, r.notes].map(csvField).join(",");
+  const writeBack = (): void => {
+    model.forEach((r, i) => (r.line = i + 2));
+    paste.value = [CSV_HEADER, ...model.map(rowText)].join("\n") + "\n";
+    report = parseCalendar(paste.value, dateExample(sport));
+  };
+  /** What Check would say about one row: why it is skipped, or (not blocking) what to double-check. */
+  const noteFor = (r: EdRow): { text: string; warn: boolean } | null => {
+    const bad = report.errors.find((e) => e.line === r.line);
+    if (bad) return { text: bad.message, warn: false };
+    const dup = report.warnings.find((e) => e.line === r.line);
+    return dup ? { text: dup.message, warn: true } : null;
+  };
+  function paintNotes(): void {
+    for (const [r, el] of notes) {
+      const n = noteFor(r);
+      el.textContent = n?.text ?? "";
+      el.hidden = n === null;
+      el.classList.toggle("rc-dup", n?.warn === true);
+      el.setAttribute("role", n?.warn ? "status" : "alert");
+    }
   }
-  /** The pasted text as rows. A row with a bad date is kept, so it can be fixed in place. */
-  function parseModel(text: string): EdRow[] {
-    const recs = splitRecords(text.trim().startsWith("date") ? text : `${CSV_HEADER}\n${text}`, text.includes("\t") && !text.includes(",") ? "\t" : text.includes(";") && !text.includes(",") ? ";" : ",");
-    const head = (recs[0] ?? []).map((x) => x.trim().toLowerCase());
-    const at = (rec: string[], name: string, alt = ""): string => (rec[head.indexOf(name) >= 0 ? head.indexOf(name) : head.indexOf(alt)] ?? "").trim();
-    return recs.slice(1).filter((rec) => rec.some((x) => x.trim() !== "")).map((rec) => ({ date: at(rec, "date"), theme: at(rec, "theme", "act"), sponsor: at(rec, "sponsor"), locked: parseLocked(at(rec, "locked")) === true, notes: at(rec, "notes") }));
-  }
-  const writeBack = (): void => { paste.value = [CSV_HEADER, ...model.map(rowText)].join("\n") + "\n"; };
   function summary(): void {
-    const bad = model.filter((r) => rowProblem(r) !== null).length;
-    const ok = model.length - bad;
-    check.replaceChildren(h("p", { class: bad ? "rc-warn" : "rc-ok" }, `${ok} ${ok === 1 ? "night" : "nights"} ready.${bad ? ` ${bad} ${bad === 1 ? "needs" : "need"} a fix (marked below).` : ""}`));
+    const ok = report.rows.length;
+    const bad = report.errors.length;
+    const words = `${ok} ${ok === 1 ? "night" : "nights"} ready`;
+    barCount.textContent = words + (bad ? `, ${bad} to fix` : "");
+    const lines: HTMLElement[] = [];
+    if (!report.headerOk) {
+      lines.push(h("p", { class: "rc-warn", "data-testid": "rc-count" }, `${words}.`), h("p", { class: "rc-warn", "data-testid": "rc-header" }, report.errors[0]?.message ?? ""));
+      // A pasted spreadsheet without its header row: one click puts the header on top.
+      const first = paste.value.split(/\r?\n/, 1)[0]?.split(/[,\t;]/, 1)[0] ?? "";
+      if (parseDate(first) !== null) lines.push(h("button", { type: "button", class: "btn ghost sm dark", "data-testid": "add-header", onclick: () => { paste.value = `${CSV_HEADER}\n${paste.value}`; refresh(); } }, "Add the header row"));
+    } else {
+      lines.push(h("p", { class: bad ? "rc-warn" : "rc-ok", "data-testid": "rc-count" }, `${words}.${bad ? ` ${bad} ${bad === 1 ? "needs" : "need"} a fix (marked below).` : ""}`));
+    }
+    for (const n of report.notes) lines.push(h("p", { class: "rc-note", "data-testid": "rc-note" }, n));
+    check.replaceChildren(...lines);
   }
   /** Draws the table. Only called when rows come or go; editing a cell never redraws it, so focus and typing are kept. */
   function drawTable(): void {
-    const cell = (r: EdRow, key: "date" | "theme" | "sponsor", label: string, msg: HTMLElement): HTMLElement =>
-      h("input", { type: "text", value: r[key], "aria-label": `${label}, row ${model.indexOf(r) + 1}`, oninput: (e: Event) => { r[key] = (e.target as HTMLInputElement).value; writeBack(); summary(); showProblem(r, msg); } });
-    const showProblem = (r: EdRow, msg: HTMLElement): void => { const pr = rowProblem(r); msg.textContent = pr ?? ""; msg.hidden = pr === null; };
+    notes = new Map();
+    const afterEdit = (): void => { writeBack(); summary(); paintNotes(); };
+    const cell = (r: EdRow, key: "date" | "theme" | "sponsor", label: string): HTMLElement =>
+      h("input", { type: "text", value: r[key], "aria-label": `${label}, row ${model.indexOf(r) + 1}`, oninput: (e: Event) => { r[key] = (e.target as HTMLInputElement).value; afterEdit(); } });
     table.replaceChildren(
       h("table", { class: "rows-ed" },
         h("thead", null, h("tr", null, ["Date", "Theme", "Sponsor", "Locked", ""].map((t) => h("th", null, t || h("span", { class: "sr-only" }, "Remove"))))),
         h("tbody", null, model.map((r) => {
           const msg = h("div", { class: "rc-inline", role: "alert", hidden: "" });
-          const tr = h("tr", null,
-            h("td", { "data-label": "Date" }, cell(r, "date", "Date", msg), msg),
-            h("td", { "data-label": "Theme" }, cell(r, "theme", "Theme", msg)),
-            h("td", { "data-label": "Sponsor" }, cell(r, "sponsor", "Sponsor", msg)),
-            h("td", { "data-label": "Locked" }, h("input", { type: "checkbox", checked: r.locked, "aria-label": `Locked, row ${model.indexOf(r) + 1}`, onchange: (e: Event) => { r.locked = (e.target as HTMLInputElement).checked; writeBack(); } })),
-            h("td", null, h("button", { type: "button", class: "btn ghost sm dark", "aria-label": `Delete row ${model.indexOf(r) + 1}`, onclick: () => { model = model.filter((x) => x !== r); writeBack(); summary(); drawTable(); } }, "Delete")),
+          notes.set(r, msg);
+          return h("tr", null,
+            h("td", { "data-label": "Date" }, cell(r, "date", "Date"), msg),
+            h("td", { "data-label": "Theme" }, cell(r, "theme", "Theme")),
+            h("td", { "data-label": "Sponsor" }, cell(r, "sponsor", "Sponsor")),
+            h("td", { "data-label": "Locked" }, h("input", { type: "checkbox", checked: parseLocked(r.locked) === true, "aria-label": `Locked, row ${model.indexOf(r) + 1}`, onchange: (e: Event) => { r.locked = (e.target as HTMLInputElement).checked ? "yes" : "no"; afterEdit(); } })),
+            h("td", null, h("button", { type: "button", class: "btn ghost sm dark", "aria-label": `Delete row ${model.indexOf(r) + 1}`, onclick: () => { model = model.filter((x) => x !== r); afterEdit(); drawTable(); } }, "Delete")),
           );
-          showProblem(r, msg);
-          return tr;
         })),
       ),
-      h("button", { type: "button", class: "btn ghost sm dark", "data-testid": "add-row", onclick: () => { model = [...model, { date: nextWeek(model), theme: "New night", sponsor: "", locked: false, notes: "" }]; writeBack(); summary(); drawTable(); } }, "Add row"),
+      h("button", { type: "button", class: "btn ghost sm dark", "data-testid": "add-row", onclick: () => { model = [...model, { line: 0, date: nextWeek(model.map((m) => ({ date: parseDate(m.date, report.dayFirst) ?? "" }))), theme: "New night", sponsor: "", locked: "no", notes: "" }]; afterEdit(); drawTable(); paintNotes(); } }, "Add row"),
     );
+    paintNotes();
   }
   /** Reads the paste box again (it was typed in, uploaded or filled) and redraws. */
   function refresh(): void {
-    if (paste.value.trim() === "") { model = []; check.replaceChildren(); table.replaceChildren(); return; }
-    model = parseModel(paste.value);
+    if (paste.value.trim() === "") { model = []; report = parseCalendar("", dateExample(sport)); check.replaceChildren(); barCount.textContent = ""; table.replaceChildren(); return; }
+    report = parseCalendar(paste.value, dateExample(sport));
+    model = report.raw.map((r) => ({ ...r }));
     summary();
     drawTable();
   }
@@ -298,10 +327,14 @@ export function ownView(): HTMLElement {
       status.textContent = "Type at least two letters.";
       return;
     }
+    if (text.length > MAX_CITY) {
+      status.textContent = `That is too long for a city name. Use ${MAX_CITY} characters or fewer, for example "Tulsa, OK".`;
+      return;
+    }
     status.textContent = "Searching...";
     try {
-      const { results: hits } = await api.geocode(text);
-      status.textContent = hits.length ? "Choose your home city." : `No city called "${text}". Check the spelling, for example "Tulsa, OK".`;
+      const { results: hits, message } = await api.geocode(text);
+      status.textContent = hits.length ? (message ? `Choose your home city. ${message}` : "Choose your home city.") : (message ?? `No city called "${text}". Check the spelling, for example "Tulsa, OK".`);
       for (const hit of hits) {
         const b = h(
           "button",
@@ -343,13 +376,15 @@ export function ownView(): HTMLElement {
     errors.replaceChildren();
     if (!chosen) {
       errors.textContent = "Search for your city and choose it first.";
+      errors.scrollIntoView({ block: "center" });
       return;
     }
     lastText = paste.value;
     lastChosen = chosen;
-    const { rows, errors: rowErrors } = parseCalendar(paste.value);
+    const { rows, errors: rowErrors } = parseCalendar(paste.value, dateExample(sport));
     if (rows.length === 0) {
       errors.replaceChildren(...rowErrors.map((e) => h("p", null, `Line ${e.line}: ${e.message}`)));
+      errors.scrollIntoView({ block: "center" });
       return;
     }
     void startCheck({ label: chosen.label, lon: chosen.lon, lat: chosen.lat, sig: chosen.sig }, rows, rowErrors, null, true, "club", sport);
@@ -360,7 +395,7 @@ export function ownView(): HTMLElement {
   if (lastChosen) status.textContent = `Home city: ${lastChosen.label}.`;
   return h(
     "section",
-    { class: "scene scene--pick" },
+    { class: "scene scene--pick scene--own" },
     h(
       "div",
       { class: "wrap" },
@@ -375,6 +410,7 @@ export function ownView(): HTMLElement {
           { class: "field" },
           h("label", { for: "csvtext" }, "2. Your theme nights"),
           h("p", { id: "csvhelp", class: "help" }, "One row per theme night, with a header row on top. Upload a file or paste the rows here."),
+          h("p", { class: "help", "data-testid": "any-dates" }, "Use any dates you like, this season or next. Qloo scores what your town likes, so the dates are yours."),
           h(
             "dl",
             { class: "cols" },
@@ -398,7 +434,8 @@ export function ownView(): HTMLElement {
           table,
         ),
         errors,
-        h("div", { class: "actions" }, go),
+        // On a phone this bar sticks to the bottom of the screen, so the button is always in reach however long the table gets.
+        h("div", { class: "actionbar", "data-testid": "actionbar" }, barCount, go),
       ),
     ),
   );

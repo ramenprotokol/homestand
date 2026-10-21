@@ -38,6 +38,16 @@ playwright-report/
 data/raw/
 data/derived/
 
+# Qloo-derived reference data: Qloo's terms say not to store response data in a public repository. Kept locally, bundled into the
+# Worker at deploy time by scripts/prepare-data.mjs. A clean clone falls back to the committed *.synthetic.json files.
+src/app/data/reference-stats.json
+src/app/data/acts-reference.json
+src/app/data/discovery-reference.json
+src/worker/data/
+# Saved copies of the samples, built from the Worker's own scoring and bundled into dist/ (Qloo-derived, never committed)
+public/snapshots/
+.snapshot-input/
+
 dist-e2e/
 study/results/
 dist-real/
@@ -45,3 +55,4 @@ reference/
 
 # Working notes, kept locally
 docs/superpowers/
+study/private/

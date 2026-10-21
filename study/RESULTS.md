@@ -1,6 +1,6 @@
 # Results
 
-**Verdict: CALL STANDS.** In this sample, Qloo's local-taste score did not call which theme night drew better at the same ballpark any more often than a coin flip would. This is "not detected at this sample size", not "disproved".
+**Verdict: CALL STANDS (shown on the site as NOT PROVEN).** In this sample, Qloo's local-taste score did not call which theme night drew better at the same ballpark any more often than a coin flip would. This is "not detected at this sample size", not "disproved".
 
 Everything below follows `study/PREREGISTRATION.md` (Amendments 1 to 5). The scores were frozen first (`study/PULL_RECORD.md`, commit `6f82c29`, `scores.json` SHA-256 `6154a76e…f535`). The analysis was then run once, with seed 20261030 and 10,000 club-bootstrap draws. Aggregates are in `study/results.json`.
 
@@ -16,7 +16,7 @@ The power check in Amendment 1 said a true accuracy near 58% would be caught abo
 
 ## The comparisons (secondary)
 
-- **LLM guess alone:** 50.6% (49.2% to 52.0%). Qloo minus the LLM was -1.4 points (-7.1 to +4.1), so Qloo does not beat it. But the LLM's ratings carried almost no information: it answered "8" for nearly every town. Five of the nine themes (Star Wars, Princess, Bluey, Margaritaville, Marvel) had no variation at all and scored as ties, so its 50.6% is mostly ties.
+- **LLM guess alone:** 50.6% (49.2% to 52.0%). Qloo minus the LLM was -1.4 points (-7.1 to +4.1), so Qloo does not beat it, and neither did better than chance. The two differ in what they can do at all: the LLM could not tell towns apart. It answered "8" for nearly every town. For five of the nine themes (Star Wars, Princess, Bluey, Margaritaville, Marvel) it gave the same answer at every club it rated (120 clubs, or 114 for Bluey), so those themes scored as ties and its 50.6% is mostly ties. Qloo gave 98 to 101 different readings per theme across the same 120 clubs (`perTheme.qlooDistinct` and `llmDistinct` in `study/results.json`). Telling towns apart is not predicting crowds, and this study found no crowd prediction from either.
 - **Raw lift, not adjusted for each theme's overall pull** (descriptive): Qloo 51.2%, LLM 52.3%, national popularity 49.1%. The popularity figure rests on about nine themes, so treat it as nine data points.
 - **Pooled association (H3):** the effect of one standard deviation of Qloo's score on a night's lift was +0.009 in log attendance (about 0.9%), interval -0.019 to +0.039, partial correlation 0.03 (-0.07 to 0.14). For the LLM, +0.004 (-0.028 to +0.059). Neither is distinguishable from zero.
 - **National popularity** (context only, no theme adjustment): the pooled coefficient is negative and its interval excludes zero (partial r -0.25). With only nine distinct popularity values, mostly near 1.0, this says little about local taste. I have not investigated why it is negative. The Spearman correlation between popularity and the nine theme mean lifts is 0.18.
@@ -43,7 +43,7 @@ The power check in Amendment 1 said a true accuracy near 58% would be caught abo
 - **Proxies.** Harry Potter is the first book standing in for the series. Princess is a proxy for the children's dress-up audience, and many matched nights are "Pirates & Princesses" style events.
 - **Promo stacking.** Theme nights carry more other promotions than ordinary nights. R2 checks this only crudely; jersey auctions, appearances and drink specials are not controlled.
 - **One season, one set of theme rules, one 80 km radius.** The radius and request shape were fixed on Day 1 from Qloo coverage alone, not from outcomes.
-- **Scores for nearby ballparks often coincide.** The 120 clubs sit at 119 distinct coordinates but have only about 100 distinct Qloo values per theme. I have not investigated why.
+- **Scores for nearby ballparks often coincide.** The 120 clubs sit at 119 distinct coordinates (two Jupiter, FL clubs share one ballpark) but have 98 to 101 distinct Qloo values per theme. Checked on 2026-10-20 from the local scores and club coordinates: the repeats are whole readings, not rounding. Nineteen clubs have exactly the same values, to full precision, on all nine themes as another club, in 15 groups (for example Tampa, Clearwater and Bradenton; Durham and Greensboro; Allentown, Reading and Wilmington; Akron and Eastlake). That is why the count is 101 sets of readings for 120 clubs. It is not a plain distance rule: the matching clubs are 0 to 134 km apart, while some much closer clubs differ (Clearwater and Dunedin, 6 km apart, got different readings; Birmingham and Montgomery, 134 km apart, got the same). So it is not rounding and not simple nearness. The likeliest cause is that Qloo maps a query point to a nearby local area and returns that area's reading, but we did not confirm how Qloo does it. The practical effect is that there are about 101 independent local readings, not 120.
 - **The analysis ran with an uncommitted `package.json` edit** (the `study:analyze` script line), so the printed commit reads `68c12e0…-dirty`. No analysis code changed after the freeze.
 - **The Workers AI response labelled its model `…llama-3.3-70b-instruct-sd`** in the one call I inspected, although the request named `…-fp8-fast`.
 
@@ -54,3 +54,8 @@ H1 did not pass, so per the pre-registration the claim becomes a reasoned, cited
 ## A note on commit ids
 
 On 2026-10-15, before this repository was first published, its git history was rewritten once to turn a local absolute file path in two files into a relative one. Commit dates, order and all other content are unchanged, and so is the SHA-256 of `scores.json`. The freeze commit's id changed from `68c12e0` to `6f82c29` (the "-dirty" line above shows the old id, as printed at the time).
+
+## Addendum, 2026-10-20 (the results above are frozen; this only adds context)
+
+- **The tiny differences are real values, not noise.** Where this file says small differences "may" not mean much (Ceiling compression, above), read it more exactly: Qloo's readings for very popular entities repeat to full precision and are simply tiny. Qloo's own guidance is that "a slight difference, like 0.91 versus 0.92, usually indicates similar relevance" ([Interpreting affinity scores](https://docs.qloo.com/docs/interpreting-affinity-scores)). That is why the app now marks a Strong or Weak label whose raw gap is under 0.01 as a slight lean ("Leans strong" or "Leans weak"). It does not change anything in the study.
+- **Why nearby clubs got identical readings.** The note above on the 119 coordinates and about 100 distinct values asked why 19 clubs share a full set of readings with a neighbour, even though close clubs sometimes differ. Qloo's documentation says that "in rural areas we will navigate up the geohash hierarchy" ([Insights with location](https://docs.qloo.com/docs/insights-with-location)), so nearby places can share one larger area's reading. That fits what we saw: matching clubs 0 to 134 km apart and no simple distance rule.

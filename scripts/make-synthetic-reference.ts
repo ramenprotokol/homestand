@@ -1,10 +1,12 @@
 // Writes src/app/data/reference-stats.synthetic.json from the MADE-UP affinity function (src/worker/synthetic.ts), so the app, the
-// Worker and the e2e run offline. Nothing here is Qloo data. The real aggregates live in reference-stats.json.
+// Worker and the e2e run offline. Nothing here is Qloo data. The real aggregates live in reference-stats.json (gitignored).
 import { writeFileSync } from "node:fs";
 import { bundleScore } from "../src/app/score";
 import { ALL_THEMES } from "../src/app/themes/artists";
 import { activeLibrary } from "../src/app/themes/ids";
 import { populationSd, mean, mulberry32 } from "../src/study/stats";
+import { syntheticActsReference } from "../src/app/acts";
+import { syntheticDiscoveryReference } from "../src/app/discovery";
 import { syntheticAffinity } from "../src/worker/synthetic";
 
 const rand = mulberry32(20261015);
@@ -26,3 +28,8 @@ const out = {
 };
 writeFileSync(new URL("../src/app/data/reference-stats.synthetic.json", import.meta.url), JSON.stringify(out, null, 2) + "\n");
 console.log(`wrote synthetic reference for ${Object.keys(themes).length} themes`);
+
+const note = "PLACEHOLDER. Made-up titles and numbers, not from Qloo. The real pool is pulled with your own key (see README, Rebuilding the reference data).";
+writeFileSync(new URL("../src/app/data/acts-reference.synthetic.json", import.meta.url), JSON.stringify({ note, ...syntheticActsReference() }, null, 2) + "\n");
+writeFileSync(new URL("../src/app/data/discovery-reference.synthetic.json", import.meta.url), JSON.stringify({ note, ...syntheticDiscoveryReference() }, null, 2) + "\n");
+console.log("wrote synthetic acts and discovery pools");

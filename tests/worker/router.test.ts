@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyzeResponse, ApiError, ProposeResponse, RecheckResponse } from "../../src/app/api-types";
 import { parseCalendar } from "../../src/app/calendar/csv";
-import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/worker/reference";
 import { sampleCsv } from "../../src/app/samples";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { syntheticDiscoveryReference } from "../../src/app/discovery";
@@ -178,7 +178,7 @@ describe("analyze", () => {
   it("rate-limits per caller", async () => {
     const h = harness();
     let last = 200;
-    for (let i = 0; i < 13; i++) last = (await route(post("/api/analyze", analyzeBody), h.deps)).status;
+    for (let i = 0; i < 31; i++) last = (await route(post("/api/analyze", analyzeBody), h.deps)).status;
     expect(last).toBe(429);
   });
 
@@ -531,7 +531,8 @@ describe("geocode", () => {
     const r = (name: string, admin1: string, cc: string, lat: number) => ({ name, admin1, country_code: cc, latitude: lat, longitude: -90, feature_code: "PPL" });
     h.deps.geocodeFetch = async () => new Response(JSON.stringify({ results: [r("Tulsa", "Oklahoma", "US", 36.1), r("Tulsa", "Gujarat", "IN", 21.5), r("Tulsa", "Oklahoma", "US", 36.2), r("Calgary", "Alberta", "CA", 51), r("Tulsa", "Punjab", "PK", 33)] }));
     const res = await geo(h);
-    expect(((await res.json()) as { results: Array<{ label: string }> }).results.map((x) => x.label)).toEqual(["Tulsa, OK", "Calgary, AB"]);
+    // Calgary came back too, but it is not what "Tulsa" asked for.
+    expect(((await res.json()) as { results: Array<{ label: string }> }).results.map((x) => x.label)).toEqual(["Tulsa, OK"]);
   });
 
   it("calls geocodeFetch without the deps object as this (Workers throw Illegal invocation otherwise)", async () => {
@@ -573,6 +574,187 @@ describe("geocode", () => {
     };
     expect((await geo(h3)).status).toBe(502);
     expect(calls3).toBe(1);
+  });
+});
+
+/** A small stand-in for Open-Meteo: matches the start of a name (accents ignored) or of an alternate name, like the real one. */
+const PLACES: Array<RawPlaceFixture> = ([
+  p("Chicago", "Illinois", "US", 2720546, ["Chicago"]),
+  p("Willard", "Ohio", "US", 6000, ["Chicago Junction"]),
+  p("Craigmont", "Idaho", "US", 500, ["Chicago"]),
+  p("New Chicago", "California", "US", 80),
+  p("Brooklyn", "New York", "US", 2600000, ["Brooklyn"]),
+  p("Salem", "Wisconsin", "US", 2700, ["Brooklyn"]),
+  p("Brooklyn", "Ohio", "US", 11000),
+  p("Fargo", "North Dakota", "US", 125990),
+  p("Fargo", "Georgia", "US", 300),
+  p("Tulsa", "Oklahoma", "US", 413066),
+  p("Cincinnati", "Ohio", "US", 311097),
+  p("Cincinnati", "Iowa", "US", 345),
+  p("Cincinnatus", "New York", "US", 1056),
+  p("Québec", "Quebec", "CA", 531902),
+  p("Quebec", "Texas", "US", 0),
+  p("San Juan", "San Juan", "PR", 418140, [], "Puerto Rico"),
+  p("San Juan", "Texas", "US", 36556),
+  p("San Juan", "San Juan", "AR", 109123, [], "Argentina"),
+  p("Mexico City", "Mexico City", "MX", 12294193, [], "Mexico"),
+  p("Paris", "Ile-de-France", "FR", 2138551, [], "France"),
+  p("Paris", "Texas", "US", 24171),
+  p("Montréal", "Quebec", "CA", 1762949),
+  p("Saint Paul", "Minnesota", "US", 311527),
+  p("Winston-Salem", "North Carolina", "US", 249545),
+  p("Kansas City", "Missouri", "US", 508090),
+  p("Washington D.C.", "District of Columbia", "US", 689545),
+  p("Washington", "Pennsylvania", "US", 13497),
+  p("Toronto", "Ontario", "CA", 2731571),
+  p("Toronto", "Ohio", "US", 5000),
+  p("Albuquerque", "New Mexico", "US", 560326),
+  p("Alba", "Piedmont", "IT", 31000, [], "Italy"),
+  p("Springfield", "Illinois", "US", 114230),
+  p("Springfield", "Missouri", "US", 169176),
+  p("Springfeld", "Saskatchewan", "CA", 40),
+  p("Tulia", "Texas", "US", 4500),
+]).map((x, i) => ({ ...x, latitude: 40 + i / 100 }));
+interface RawPlaceFixture { name: string; admin1: string; country_code: string; country: string; population: number; latitude: number; longitude: number; feature_code: string; alt: string[] }
+function p(name: string, admin1: string, cc: string, population: number, alt: string[] = [], country = cc === "US" ? "United States" : cc === "CA" ? "Canada" : cc): RawPlaceFixture {
+  return { name, admin1, country_code: cc, country, population, latitude: 40, longitude: -90, feature_code: "PPL", alt };
+}
+const fold = (s: string): string => s.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+
+describe("geocode: what directors actually type", () => {
+  interface Out { results: Array<{ label: string }>; message?: string }
+  async function find(q: string): Promise<{ out: Out; calls: string[] }> {
+    const h = harness();
+    const calls: string[] = [];
+    h.deps.geocodeFetch = async (u) => {
+      const name = fold(new URL(String(u)).searchParams.get("name") ?? "");
+      calls.push(name);
+      const hit = PLACES.filter((x) => [x.name, ...x.alt].some((n) => fold(n).startsWith(name)));
+      return new Response(JSON.stringify({ results: hit }));
+    };
+    const res = await route(new Request(`https://api.test/api/geocode?q=${encodeURIComponent(q)}`, { headers: { origin: ORIGIN } }), h.deps);
+    expect(res.status).toBe(200);
+    return { out: (await res.json()) as Out, calls };
+  }
+  const labels = async (q: string): Promise<string[]> => (await find(q)).out.results.map((x) => x.label);
+
+  it("reads a state or province with or without a comma, by code or by name", async () => {
+    expect(await labels("Fargo ND")).toEqual(["Fargo, ND"]);
+    expect(await labels("Tulsa OK")).toEqual(["Tulsa, OK"]);
+    expect(await labels("tulsa, oklahoma")).toEqual(["Tulsa, OK"]);
+    expect(await labels("Fargo North Dakota")).toEqual(["Fargo, ND"]);
+    expect(await labels("Toronto, ON")).toEqual(["Toronto, ON"]);
+    expect(await labels("Toronto Ontario")).toEqual(["Toronto, ON"]);
+    expect(await labels("Washington DC")).toEqual(["Washington D.C., DC"]);
+    expect(await labels("Tulsa, OK, USA")).toEqual(["Tulsa, OK"]);
+    expect(await labels("Toronto, Canada")).toEqual(["Toronto, ON"]);
+  });
+
+  it("finds a city typed without its accent, and a name with a trailing City", async () => {
+    expect(await labels("Quebec City")).toEqual(["Québec, QC", "Quebec, TX"]);
+    expect(await labels("Québec City")).toEqual(["Québec, QC", "Quebec, TX"]);
+    expect(await labels("Montreal")).toEqual(["Montréal, QC"]);
+    expect(await labels("St Paul")).toEqual(["Saint Paul, MN"]);
+    expect(await labels("Quebec City, QC")).toEqual(["Québec, QC"]);
+  });
+
+  it("forgives a typo or two", async () => {
+    expect((await labels("Cincinatti"))[0]).toBe("Cincinnati, OH");
+    expect(await labels("Chicgo")).toEqual(["Chicago, IL"]);
+    expect((await labels("Tulsaa"))[0]).toBe("Tulsa, OK");
+    // A typo in the first letters needs the three-letter start, which still finds it.
+    expect(await labels("Albequerque")).toEqual(["Albuquerque, NM"]);
+    expect((await labels("Springfeld IL"))[0]).toBe("Springfield, IL");
+  });
+
+  it("explains when the state typed has no such town, and still offers the town as typed", async () => {
+    const { out } = await find("Tulsa, TX");
+    expect(out.message).toContain("No Tulsa in Texas");
+    // Tulia is a real town in Texas, one letter away. It comes first because the state was typed, but Tulsa is still offered.
+    expect(out.results.map((x) => x.label)).toEqual(["Tulia, TX", "Tulsa, OK"]);
+    expect((await find("Fargo, GA")).out.message).toBeUndefined();
+  });
+
+  it("the start of a name is fine, a four-letter name takes no typo", async () => {
+    expect(await labels("Albu")).toEqual(["Albuquerque, NM"]); // the Italian Alba is not offered
+    expect((await find("Tulx")).out.results).toEqual([]);
+  });
+
+  it("does not guess when the name is short: three letters take no typos", async () => {
+    expect(await labels("Tuls")).toEqual(["Tulsa, OK"]); // a start of a name is fine
+    expect(await labels("Fargx")).toEqual(["Fargo, ND", "Fargo, GA"]);
+  });
+
+  it("drops results that matched only through an alternate name, and ranks by name then population", async () => {
+    expect(await labels("Chicago")).toEqual(["Chicago, IL"]);
+    expect(await labels("Brooklyn")).toEqual(["Brooklyn, NY", "Brooklyn, OH"]);
+    expect(await labels("Fargo")).toEqual(["Fargo, ND", "Fargo, GA"]);
+  });
+
+  it("puts the larger town first for a plain name, with the exact name ahead of longer ones", async () => {
+    expect((await labels("Toronto"))).toEqual(["Toronto, ON", "Toronto, OH"]);
+    expect((await labels("Winston"))[0]).toBe("Winston-Salem, NC");
+  });
+
+  it("says plainly that Puerto Rico and the other territories are not covered, and does not call the geocoder for them", async () => {
+    const { out, calls } = await find("San Juan, PR");
+    expect(out.results).toEqual([]);
+    expect(out.message).toContain("Puerto Rico");
+    expect(out.message).toContain("not covered");
+    expect(calls).toEqual([]);
+    expect((await find("San Juan Puerto Rico")).out.message).toContain("not covered");
+    expect((await find("Hagatna, Guam")).out.message).toContain("not covered");
+  });
+
+  it("shows the US town for a bare San Juan, and says the bigger San Juan is in Puerto Rico and not covered", async () => {
+    const { out } = await find("San Juan");
+    expect(out.results.map((x) => x.label)).toEqual(["San Juan, TX"]);
+    expect(out.message).toMatch(/Puerto Rico.*not covered/);
+  });
+
+  it("says Homestand covers the US and Canada for a place elsewhere", async () => {
+    const mx = (await find("Mexico City")).out;
+    expect(mx.results).toEqual([]);
+    expect(mx.message).toContain("Homestand covers towns in the US and Canada");
+    const fr = (await find("Paris, France")).out;
+    expect(fr.results).toEqual([]);
+    expect(fr.message).toContain("Homestand covers towns in the US and Canada");
+    // Without a country, Paris is the Texas one.
+    expect(await labels("Paris")).toEqual(["Paris, TX"]);
+  });
+
+
+  it("returns nothing, and no message, for a made-up name; it asks the geocoder only a few times", async () => {
+    const { out, calls } = await find("Zzyzzyx");
+    expect(out).toEqual({ results: [] });
+    expect(calls.length).toBeLessThanOrEqual(5);
+  });
+
+  it("stops after the first lookup that finds the city", async () => {
+    expect((await find("Tulsa")).calls).toHaveLength(1);
+  });
+
+  it("refuses a 3,000-character search with a length message, not 'type at least two letters'", async () => {
+    const h = harness();
+    const res = await route(new Request(`https://api.test/api/geocode?q=${"a".repeat(3000)}`, { headers: { origin: ORIGIN } }), h.deps);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as ApiError;
+    expect(body.message).toContain("too long");
+    expect(body.message).not.toContain("at least two");
+    const short = await route(new Request("https://api.test/api/geocode?q=a", { headers: { origin: ORIGIN } }), h.deps);
+    expect(((await short.json()) as ApiError).message).toContain("at least two");
+  });
+
+  it("a failing later lookup keeps what the first found; a failing first lookup is a 502", async () => {
+    const h = harness();
+    let n = 0;
+    h.deps.geocodeFetch = async () => {
+      n++;
+      throw new TypeError("network");
+    };
+    const res = await route(new Request("https://api.test/api/geocode?q=Cincinatti", { headers: { origin: ORIGIN } }), h.deps);
+    expect(res.status).toBe(502);
+    expect(n).toBe(2); // the first lookup and its one retry
   });
 });
 
@@ -628,31 +810,32 @@ describe("markets must come from the search", () => {
 describe("per-client daily quotas", () => {
   const city = (i: number) => signed({ label: `City ${i}, KS`, lon: -100 + i * 0.5, lat: 38 });
 
-  it("allows 6 new-city pulls a day per client, never counts sample clubs or cached cities, and is per client", async () => {
+  it("allows 30 new-city pulls a day per client, never counts sample clubs or cached cities, and is per client", async () => {
     const h = harness();
-    for (let i = 0; i < 6; i++) expect((await analyzeWith(h, await city(i))).status).toBe(200);
-    const seventh = await analyzeWith(h, await city(6));
-    expect(seventh.status).toBe(429);
-    const body = (await seventh.json()) as ApiError;
+    h.deps.limiter = memoryLimiter(10, () => h.deps.agent.now().getTime()); // the per-minute limit is a separate guard
+    for (let i = 0; i < 30; i++) expect((await analyzeWith(h, await city(i))).status).toBe(200);
+    const thirtyFirst = await analyzeWith(h, await city(30));
+    expect(thirtyFirst.status).toBe(429);
+    const body = (await thirtyFirst.json()) as ApiError;
     expect(body.error).toBe("quota");
-    expect(body.message).toContain("sample clubs still work");
+    expect(body.message).toContain("sample calendars still work");
     // sample clubs and a city already pulled are still fine
     expect((await analyzeWith(h, market)).status).toBe(200);
     expect((await analyzeWith(h, await city(0))).status).toBe(200);
     // another client has its own allowance
     (h.deps as unknown as { ip: string }).ip = "b";
-    expect((await analyzeWith(h, await city(6))).status).toBe(200);
+    expect((await analyzeWith(h, await city(30))).status).toBe(200);
   });
 
-  it("allows 10 live re-checks a day per client", async () => {
+  it("allows 20 live re-checks a day per client", async () => {
     const h = harness();
     h.deps.limiter = memoryLimiter(10, () => h.deps.agent.now().getTime()); // the per-minute limit is a separate guard
-    const ids = activeLibrary({}, true).map((t) => t.id).slice(0, 11);
+    const ids = activeLibrary({}, true).map((t) => t.id).slice(0, 21);
     await analyzeOk(h);
     const statuses: number[] = [];
     for (const themeId of ids) statuses.push((await route(post("/api/recheck", { market, themeId }), h.deps)).status);
-    expect(statuses.slice(0, 10).every((x) => x === 200)).toBe(true);
-    expect(statuses[10]).toBe(429);
+    expect(statuses.slice(0, 20).every((x) => x === 200)).toBe(true);
+    expect(statuses[20]).toBe(429);
   });
 });
 
@@ -706,6 +889,8 @@ describe("saved reasons are only ever real model wording", () => {
     },
   };
   const whyKeys = (h: Harness) => [...h.kv.data.keys()].filter((k) => k.startsWith("ai:why:"));
+  /** The pairs saved for the town: one key holds them all. */
+  const savedPairs = (h: Harness): Record<string, string> => (whyKeys(h).length === 0 ? {} : (JSON.parse(h.kv.data.get(whyKeys(h)[0]!)!) as Record<string, string>));
 
   it("never saves template text, a failure or a rejected reply, so the next visit asks the model again", async () => {
     for (const reply of [{}, { response: "not json at all" }, { response: JSON.stringify([{ id: "1", why: "But the sponsor does not stay." }]) }]) {
@@ -721,19 +906,22 @@ describe("saved reasons are only ever real model wording", () => {
     }
   });
 
-  it("saves each validated pair on its own, and a partial hit asks the model only for the missing pairs", async () => {
+  it("saves each validated pair under one key per town, and a partial hit asks the model only for the missing pairs", async () => {
     const h = harness({}, goodAi);
     const out = await analyzeOk(h, akronBody);
     const body = { market: akronBody.market, nights: planFor(out), allowDuplicates: false };
     const first = (await (await route(post("/api/propose", body), h.deps)).json()) as ProposeResponse;
     const modelPairs = first.proposals.filter((x) => x.whySource === "model").length;
     expect(modelPairs).toBeGreaterThanOrEqual(3);
-    expect(whyKeys(h)).toHaveLength(modelPairs);
+    expect(whyKeys(h)).toHaveLength(1);
+    expect(Object.keys(savedPairs(h))).toHaveLength(modelPairs);
     expect(first.trace.some((t) => /used saved model wording/.test(t.text))).toBe(false);
     const askedFirst = factsOf(swapCalls(h)[0]!);
     expect(askedFirst).toHaveLength(modelPairs);
     // Forget one pair: only that one is asked about, the rest come from the saved wording.
-    h.kv.data.delete(whyKeys(h)[0]!);
+    const kept = savedPairs(h);
+    delete kept[Object.keys(kept)[0]!];
+    h.kv.data.set(whyKeys(h)[0]!, JSON.stringify(kept));
     const second = (await (await route(post("/api/propose", body), h.deps)).json()) as ProposeResponse;
     expect(swapCalls(h)).toHaveLength(2);
     expect(factsOf(swapCalls(h)[1]!)).toHaveLength(1);
@@ -989,5 +1177,52 @@ describe("one pulled-from-Qloo time", () => {
     expect(cached.recordedOn).toBe("2026-10-15");
     expect(cached.themes["bluey"]!.fetchedAt).toBe(cached.recordedAt);
     expect(cached.trace.some((s) => s.detail === "Saved 2026-10-15T12:00:00.000Z.")).toBe(true);
+  });
+});
+
+describe("Qloo stops answering", () => {
+  const city = () => signed({ label: "Fresno, CA", lon: -119.78707, lat: 36.74773 });
+  const run = async (status: number) => {
+    const h = harness({}, null, async () => new Response("{}", { status }));
+    const res = await analyzeWith(h, await city());
+    return { res, body: (await res.json()) as ApiError, h };
+  };
+
+  it("says live lookups ended with the hackathon when the key is refused, and the samples still work", async () => {
+    const { res, body, h } = await run(403);
+    expect(res.status).toBe(503);
+    expect(body.error).toBe("live-ended");
+    expect(body.message).toContain("ended with the hackathon");
+    expect(body.message).toContain("sample calendars still work");
+    // A sample that already has saved results is unaffected: seed it first with a working Qloo, then break Qloo.
+    const ok = harness();
+    expect((await analyzeWith(ok, market)).status).toBe(200);
+    expect(h.qlooUrls.length).toBeGreaterThan(0);
+  });
+
+  it("gives a friendly 429 when Qloo is at its own limit", async () => {
+    const { res, body } = await run(429);
+    expect(res.status).toBe(429);
+    expect(body.error).toBe("qloo-busy");
+    expect(body.message).toContain("sample calendars");
+    expect(body.message).not.toMatch(/HTTP|429|Qloo \//);
+  });
+});
+
+describe("the shared counters survive a refused write", () => {
+  it("writes the usage counter to another key when one is refused, instead of failing closed", async () => {
+    const h = harness();
+    const put = h.deps.agent.kv.put.bind(h.deps.agent.kv);
+    let refused = 0;
+    h.deps.agent.kv.put = async (k, v, o) => {
+      if (k.startsWith("cap:") && refused < 1) {
+        refused++;
+        throw new Error("KV PUT failed: 429 Too Many Requests");
+      }
+      return put(k, v, o);
+    };
+    expect((await analyzeWith(h, await signed({ label: "Fresno, CA", lon: -119.78707, lat: 36.74773 }))).status).toBe(200);
+    expect(refused).toBe(1);
+    expect([...h.kv.data.keys()].some((k) => k.startsWith("cap:qloo:"))).toBe(true);
   });
 });

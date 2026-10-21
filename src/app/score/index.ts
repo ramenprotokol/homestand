@@ -1,5 +1,3 @@
-import statsFile from "../data/reference-stats.json";
-import syntheticFile from "../data/reference-stats.synthetic.json";
 import { copyFor, type Kind, type Sport } from "../kind";
 
 export type FitLabel = "leans-in" | "average" | "leans-away" | "not-scored" | "classic" | "found";
@@ -27,7 +25,7 @@ const FIT_MEANING_CLUB: Record<FitLabel, string> = {
 };
 
 /** The same lines for a venue say "acts" where a club says "themes". */
-export const fitMeaning = (fit: FitLabel, kind?: Kind): string => (kind === "venue" ? FIT_MEANING_CLUB[fit].replace("other themes", "other acts").replace("this name", "this act") : FIT_MEANING_CLUB[fit]);
+export const fitMeaning = (fit: FitLabel, kind?: Kind): string => (kind === "venue" ? FIT_MEANING_CLUB[fit].replace("this town's other themes", "this city's other acts").replace("this name", "this act").replace("People in this town like", "People in this city like").replace("most towns", "most cities") : FIT_MEANING_CLUB[fit]);
 export const FIT_MEANING = FIT_MEANING_CLUB;
 
 /** z at or beyond these cut-offs is a Strong fit / a Weak fit. */
@@ -46,9 +44,6 @@ export interface ReferenceStats {
   themes: Record<string, RefStat>;
 }
 
-export const REFERENCE: ReferenceStats = statsFile as ReferenceStats;
-/** Made-up aggregates for the offline synthetic mode (local runs and tests only). */
-export const SYNTHETIC_REFERENCE: ReferenceStats = syntheticFile as ReferenceStats;
 
 /** Below this a reference SD is treated as flat: there is nothing to compare against. */
 const MIN_SD = 1e-6;
@@ -139,10 +134,33 @@ export function fitLine(themeLabel: string, city: string, index: number | null, 
   return `${city} likes ${themeLabel} ${how} ${kind === "venue" ? "its other acts" : "its other themes"}.`;
 }
 
+/**
+ * The raw affinity distance behind a label is index x the reference spread. Qloo says gaps this small usually mean similar relevance, so a Strong or
+ * Weak label whose raw gap is under this is kept but marked a slight lean, and no swap is pushed for it.
+ */
+export const RAW_FLOOR = 0.01;
+
+/** The raw gap behind an index (index x the theme's spread over the reference towns). Null when either is missing. */
+export const rawGap = (index: number | null, sd: number | null | undefined): number | null => (index === null || sd === null || sd === undefined ? null : index * sd);
+
+/** True when the index is outside the Average band but the raw gap behind it is under RAW_FLOOR: a lean, not a verdict. */
+export const strengthOf = (index: number | null, sd: number | null | undefined): "clear" | "slight" | null => {
+  if (index === null || Math.abs(index) < Z_CUT) return null;
+  const gap = rawGap(index, sd);
+  return gap !== null && Math.abs(gap) < RAW_FLOOR ? "slight" : "clear";
+};
+
+/** "Leans strong" / "Leans weak" for a slight lean, else the usual word. */
+export const fitWordFor = (fit: FitLabel, slight?: boolean): string => (slight && fit === "leans-in" ? "Leans strong" : slight && fit === "leans-away" ? "Leans weak" : fitWord(fit));
+
+/** The Why-panel line for a slight lean, with the real gap. */
+export const slightNote = (gap: number): string => `Slight: only ${Math.abs(gap).toFixed(3)} from this town's usual. Qloo says gaps this small usually mean similar relevance, so treat it as a lean, not a verdict.`;
+
 /** How the method works, in plain words. Shown only under "Show the numbers". */
 export const methodWords = (kind?: Kind): string =>
   `We ask Qloo how strongly people near this ${copyFor(kind).place} like each thing in a theme, and compare that with 40 other ${copyFor(kind).markets}. ` +
   "Then we compare each theme with this town's own average. A theme clearly above that average (by at least half the usual gap between towns) is a Strong fit. Clearly below is a Weak fit. In between is an Average fit. " +
+  `When the raw gap behind a Strong or Weak label is under ${RAW_FLOOR}, it is marked "Leans strong" or "Leans weak" instead: Qloo says gaps that small usually mean similar relevance, so no swap is pushed for it. ` +
   "It describes local taste. It does not say a theme will raise attendance.";
 
 export const METHOD_WORDS = methodWords("club");
@@ -158,10 +176,11 @@ export function fitPhrase(index: number | null): string {
  * When the label (against this town's other themes) and the comparison with other towns point opposite ways, say so in plain words, so a Strong fit
  * never sits beside "well below most towns" unexplained. Empty when they agree (or the theme is average either way).
  */
-export function bridgeSentence(fit: FitLabel | "pick", z: number | null, city: string): string {
+export function bridgeSentence(fit: FitLabel | "pick", z: number | null, city: string, kind?: Kind): string {
+  const towns = copyFor(kind).markets;
   if (z === null) return "";
-  if (fit === "leans-in" && z <= -Z_CUT) return `Below most towns, but strong for ${city}'s usual taste.`;
-  if (fit === "leans-away" && z >= Z_CUT) return `Above most towns, but weak for ${city}'s usual taste.`;
+  if (fit === "leans-in" && z <= -Z_CUT) return `Below most ${towns}, but strong for ${city}'s usual taste.`;
+  if (fit === "leans-away" && z >= Z_CUT) return `Above most ${towns}, but weak for ${city}'s usual taste.`;
   return "";
 }
 

@@ -1,4 +1,3 @@
-import referenceFile from "./data/discovery-reference.json";
 import { labelForZ } from "./score";
 import type { Discovered } from "./propose/propose";
 
@@ -26,7 +25,6 @@ export interface DiscoveryReference {
   stats: Record<string, { n: number; mean: number; sd: number }>;
 }
 
-export const DISCOVERY_REFERENCE: DiscoveryReference = referenceFile as DiscoveryReference;
 
 /** Titles with fewer reference readings than this, or no spread between markets, cannot be ranked. */
 export const MIN_DISCOVERY_N = 20;

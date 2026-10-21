@@ -2,7 +2,8 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
 
-const BASE = "http://127.0.0.1:5199";
+const PROXY_PORT = Number(process.env.E2E_PROXY_PORT ?? 5199);
+const BASE = `http://127.0.0.1:${PROXY_PORT}`;
 
 // Screenshots for each step land in test-results/screens/ (gitignored): <project>-<step>.png
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -93,7 +94,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(why.getByText("Fit number = z")).toHaveCount(0);
   await expect(why.getByText(/standard step/)).toHaveCount(0);
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Raw scores sit near 0.99 everywhere/)).toBeVisible();
+  await expect(why.getByText(/Raw scores (for this (theme|act) sit near [\d.]+ everywhere|differ only a little between towns), so we compare the (small )?gaps/)).toBeVisible();
   await expect(why.getByText("Normal gap between towns")).toBeVisible();
   await expect(why.getByText("Akron's usual", { exact: true })).toBeVisible();
   await expect(why.getByTestId("vs-others")).toContainText(/Bluey here: (well )?(below|above|about typical for) (most )?towns\./);
@@ -254,13 +255,13 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.getByTestId("verdict")).toHaveCount(0);
   await shot(page, info, "09-study-call");
   await page.getByTestId("call-yes").click();
-  await expect(page.getByTestId("verdict")).toContainText("COIN FLIP");
-  await expect(page.getByTestId("stamp-plain")).toHaveText(/^Local taste did not pick the bigger crowd: \d+ times in 100, about a coin flip\.$/);
+  await expect(page.getByTestId("verdict")).toContainText("NOT PROVEN");
+  await expect(page.getByTestId("stamp-plain")).toHaveText(/^Neither local taste \(\d+ times in 100\)( nor an AI guess \(\d+ in 100, mostly ties\))? predicted the bigger crowd better than chance in one season\.$/);
   // The user's own call is answered once, in one line.
   await expect(page.getByTestId("you-said")).toHaveText("You said Yes. The data didn't back that up.");
   expect(await page.getByText(/You said Yes/).count()).toBe(1);
   await expect(page.getByTestId("plain-result")).toBeVisible();
-  await expect(page.locator(".dnote")).toContainText("385 theme nights at 120 clubs. The 89 clubs that ran two or more different themes made 521 same-ballpark pairs");
+  await expect(page.locator(".dnote")).toContainText("385 theme nights at 106 clubs (all 120 clubs were scored). The 89 clubs that ran two or more different themes made 521 same-ballpark pairs");
   // The stamp does not touch the line under it.
   const stampBox = (await page.locator(".stampv").boundingBox())!;
   expect(overlap(stampBox, (await page.getByTestId("stamp-plain").boundingBox())!), "stamp overlaps its plain line").toBe(false);
@@ -433,16 +434,16 @@ test("the production CSP and security headers break nothing on any screen", asyn
   // local Worker. (Rewriting the document inside the browser makes Chrome treat it as a public page and block the local API.)
   const headersFile = await readFile("public/_headers", "utf8");
   const policy: Record<string, string> = {};
-  for (const m of headersFile.matchAll(/^ {2}([A-Za-z-]+): (.+)$/gm)) policy[m[1]!.toLowerCase()] = m[2]!.replace("https://homestand-api.ramenprotokol.workers.dev", "http://127.0.0.1:8788");
+  for (const m of headersFile.matchAll(/^ {2}([A-Za-z-]+): (.+)$/gm)) policy[m[1]!.toLowerCase()] = m[2]!.replace("https://homestand-api.ramenprotokol.workers.dev", `http://127.0.0.1:${process.env.E2E_API_PORT ?? 8788}`);
   expect(Object.keys(policy)).toEqual(expect.arrayContaining(["content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cross-origin-opener-policy"]));
   const proxy = createServer((req, res) => {
-    const up = httpRequest({ host: "127.0.0.1", port: 5173, path: req.url, method: req.method, headers: req.headers }, (r) => {
+    const up = httpRequest({ host: "127.0.0.1", port: Number(process.env.E2E_WEB_PORT ?? 5173), path: req.url, method: req.method, headers: req.headers }, (r) => {
       res.writeHead(r.statusCode ?? 502, { ...r.headers, ...policy });
       r.pipe(res);
     });
     req.pipe(up);
   });
-  await new Promise<void>((resolve) => proxy.listen(5199, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => proxy.listen(PROXY_PORT, "127.0.0.1", resolve));
   try {
     await cspTour(page);
   } finally {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/worker/reference";
 import { activeLibrary } from "../../src/app/themes/ids";
 import type { TraceStep } from "../../src/app/trace";
 import { replyText, runModel, type Deps } from "../../src/worker/agent";

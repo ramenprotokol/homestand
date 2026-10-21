@@ -1,0 +1,250 @@
+{
+  "note": "PLACEHOLDER. Made-up titles and numbers, not from Qloo. The real pool is pulled with your own key (see README, Rebuilding the reference data).",
+  "synthetic": true,
+  "markets": 40,
+  "pulledAt": null,
+  "pool": [
+    {
+      "entityId": "SYN-A-country-0",
+      "name": "Dusty Lantern Band (made up)",
+      "genre": "country",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-country-1",
+      "name": "Hollis Creek (made up)",
+      "genre": "country",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-rock-0",
+      "name": "The Static Parade (made up)",
+      "genre": "rock",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-rock-1",
+      "name": "Brass Comet (made up)",
+      "genre": "rock",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-pop-0",
+      "name": "Velvet Arcade (made up)",
+      "genre": "pop",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-pop-1",
+      "name": "Mina Starling (made up)",
+      "genre": "pop",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-hip-hop-0",
+      "name": "Lowtide Kid (made up)",
+      "genre": "hip-hop",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-hip-hop-1",
+      "name": "Cassette Royal (made up)",
+      "genre": "hip-hop",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-latin-0",
+      "name": "Luna Cobre (made up)",
+      "genre": "latin",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-latin-1",
+      "name": "Sol y Marea (made up)",
+      "genre": "latin",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-classic-rock-0",
+      "name": "The Midnight Ramblers (made up)",
+      "genre": "classic-rock",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-classic-rock-1",
+      "name": "Silver Canyon (made up)",
+      "genre": "classic-rock",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-jam-0",
+      "name": "Parade of Owls (made up)",
+      "genre": "jam",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-jam-1",
+      "name": "Fern & Lantern (made up)",
+      "genre": "jam",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-indie-0",
+      "name": "Paper Lighthouse (made up)",
+      "genre": "indie",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-indie-1",
+      "name": "Quiet Maple (made up)",
+      "genre": "indie",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-r&b-0",
+      "name": "Satin Hours (made up)",
+      "genre": "r&b",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-r&b-1",
+      "name": "Dev Marlowe (made up)",
+      "genre": "r&b",
+      "tier": "theatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-emo-0",
+      "name": "Lights Out Sunday (made up)",
+      "genre": "emo",
+      "tier": "amphitheatre",
+      "popularity": 0.99
+    },
+    {
+      "entityId": "SYN-A-emo-1",
+      "name": "Paper Hearts Club (made up)",
+      "genre": "emo",
+      "tier": "theatre",
+      "popularity": 0.99
+    }
+  ],
+  "stats": {
+    "SYN-A-country-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-country-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-rock-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-rock-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-pop-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-pop-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-hip-hop-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-hip-hop-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-latin-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-latin-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-classic-rock-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-classic-rock-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-jam-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-jam-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-indie-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-indie-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-r&b-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-r&b-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-emo-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-A-emo-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    }
+  }
+}

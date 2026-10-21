@@ -13,6 +13,8 @@ export interface Env {
   RATE_LIMIT_SCALE?: string;
   /** Secret: signs the places /api/geocode returns. Production needs it set (`wrangler secret put MARKET_SIGNING_KEY`). */
   MARKET_SIGNING_KEY?: string;
+  /** Secret: lets POST /api/warm start a pre-warm run (see warm.ts). Unset means the route does not exist. */
+  WARM_TOKEN?: string;
   /** Cloudflare Rate Limiting bindings, one per route (wrangler.toml). */
   LIMIT_GEOCODE?: RateLimit;
   LIMIT_ANALYZE?: RateLimit;

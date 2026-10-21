@@ -19,7 +19,7 @@ Popularity was **constant across clubs for every kept entity** (min = max at eve
 
 | Star Wars | Princess | Bluey | Harry Potter | Margaritaville | Dinosaur | Country | Marvel | Wrestling |
 |---|---|---|---|---|---|---|---|---|
-| 0.99892 | 0.99694 | 0.91962 | 0.99925 | 0.98888 | 0.99771 | 0.98158 | 0.99910 | 0.99941 |
+| [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] |
 
 ## LLM baseline (Amendment 5 parsing)
 
@@ -29,3 +29,5 @@ Popularity was **constant across clubs for every kept entity** (min = max at eve
 - **Cost:** about 2.7 neurons per call, about 3,210 neurons in total (free allowance 10,000 per day). The full 1,080 completed in one day.
 - **Non-integer first replies:** 6, all for Bluey. The model answered in a sentence ending in a number instead of a bare integer. Each was retried once with the identical request. All 6 were non-integer again, so all 6 are **missing**: Bluey 6 missing (114 of 120 scored). Every other theme: 0 missing. 1,074 of 1,080 scored.
 - **The LLM scores barely vary.** Distinct values over the 120 clubs: Star Wars 1 (all 8), Princess 1 (all 8), Bluey 1 (all 8), Harry Potter 4, Margaritaville 1 (all 8), Dinosaur 2, Country 4, Marvel 1 (all 8), Wrestling 2. Under Amendment 2, a theme with no variation makes no call, so its pairs score 0.5. This is stated before the analysis and changes nothing.
+
+> Later note (2026-10-20, not part of the frozen record): the "I have not investigated why" above is answered in `study/RESULTS.md` (Sample and missing data). The ties are whole identical readings shared by 19 clubs in 15 groups, not rounding.

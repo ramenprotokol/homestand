@@ -2,8 +2,17 @@ name = "homestand-api"
 main = "src/worker/index.ts"
 compatibility_date = "2026-10-01"
 
+# Picks the real (private) or synthetic reference data before wrangler bundles the Worker. Runs on `wrangler deploy` and `wrangler dev`.
+[build]
+command = "node scripts/prepare-data.mjs"
+
 [ai]
 binding = "AI"
+
+# Pre-warm (src/worker/warm.ts): every 3 hours, up to 8 new towns from the list of the largest US and Canadian metros, within the free-plan
+# KV write budget and 40% of the day's Qloo allowance. Towns already saved cost nothing. Not inherited by [env.check] (no cron locally).
+[triggers]
+crons = ["17 */3 * * *"]
 
 # KV cache for Qloo results, daily counters and rate limits. The id is a placeholder: the ship step creates the
 # namespace (through ~/RamenProtocol/_ops/infra/ramen-deploy.sh) and replaces it. Never run a bare `wrangler deploy`.
@@ -16,29 +25,29 @@ id = "4447d78d27ae4134966ec9bac7984b85"
 [[ratelimits]]
 name = "LIMIT_GEOCODE"
 namespace_id = "41001"
-simple = { limit = 20, period = 60 }
+simple = { limit = 60, period = 60 }
 
 [[ratelimits]]
 name = "LIMIT_ANALYZE"
 namespace_id = "41002"
-simple = { limit = 12, period = 60 }
+simple = { limit = 30, period = 60 }
 
 [[ratelimits]]
 name = "LIMIT_PROPOSE"
 namespace_id = "41003"
-simple = { limit = 20, period = 60 }
+simple = { limit = 40, period = 60 }
 
 [[ratelimits]]
 name = "LIMIT_RECHECK"
 namespace_id = "41004"
-simple = { limit = 6, period = 60 }
+simple = { limit = 15, period = 60 }
 
 # Production. Secrets (not here): QLOO_API_KEY and MARKET_SIGNING_KEY (any random string of 16+ characters; without it only the
 # sample clubs work). Non-secret values only.
 [vars]
 ALLOWED_ORIGINS = "https://homestand-6az.pages.dev"
 QLOO_API_URL = "https://hackathon.api.qloo.com"
-QLOO_DAILY_CAP = "400"
+QLOO_DAILY_CAP = "1500"
 AI_DAILY_CAP = "400"
 
 # Local runs and e2e: `npm run worker:dev`. No AI binding (the agent writes template text) and synthetic Qloo

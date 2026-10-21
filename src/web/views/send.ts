@@ -3,19 +3,19 @@ import { exportCsv } from "../../app/export/csv";
 import { exportIcs } from "../../app/export/ics";
 import { buildMemoHtml, memoDocument, type MemoData } from "../../app/export/memo";
 import { themeById } from "../../app/themes/artists";
-import { syntheticBanner } from "../components";
+import { savedCopyBanner, syntheticBanner } from "../components";
 import { makeCard, specOf } from "../foil/cards";
 import { actIdeas, clubAngleParts, ideaTitles, openerLine } from "./fix";
 import { cityOfLabel } from "../../app/kind";
-import { fitWord } from "../../app/score";
-import { shortDate } from "../../app/dates";
+import { fitWordFor } from "../../app/score";
+import { dateWithYear, seasonEyebrow } from "../../app/dates";
 import { Fireworks } from "../foil/fx";
 import { onCleanup, onMount, onResize, route, routeContext, whileVisible } from "../foil/lifecycle";
 import { gsap, reduced } from "../foil/motion";
 import { crowdBar } from "../foil/scenery";
-import { download, formatDate, formatDateTime, h } from "../dom";
+import { download, formatDateTime, h } from "../dom";
 import { navigate } from "../flow";
-import { cleanTitle, localDay } from "../../app/text";
+import { cleanTitle, localDay, longDate } from "../../app/text";
 import { icon } from "../icons";
 import { approvedSwaps, copy, shownAngles, state, swapTitle, viewOf } from "../store";
 
@@ -26,7 +26,7 @@ function exportRows(): ExportRow[] {
     const v = viewOf(n);
     // A venue's swapped date is a new hold: the old note ("offer out") belongs to the act that was dropped, so it is never inherited.
     const note = !v.swappedFrom ? n.notes : state.kind === "venue" ? `New hold${v.discovered ? " (local favorite)" : ""}: withdraw the offer to ${n.theme}` : [n.notes, `Swapped from ${n.theme} (Homestand${v.discovered ? ", local favorite" : ""})`].filter(Boolean).join(". ");
-    return { date: n.date, theme: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: note, fit: fitWord(v.fit) };
+    return { date: n.date, theme: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme, sponsor: n.sponsor, locked: n.locked, notes: note, fit: fitWordFor(v.fit, v.slight) };
   });
 }
 
@@ -48,15 +48,19 @@ function memoData(): MemoData {
   const a = state.analysis!;
   const swaps = approvedSwaps().map((p) => ({
     date: p.date, weekday: p.weekday, from: a.nights[p.index]!.theme, to: swapTitle(a.nights[p.index]!.theme, p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId), sponsor: p.sponsor,
-    fromZ: p.from.z, toZ: p.to.z, fromEntities: (a.themes[p.fromThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), toEntities: p.discovered ? [p.discovered.name] : (a.themes[p.toThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
+    fromZ: p.from.z, toZ: p.to.z, fromSlight: p.from.slight === true, toSlight: p.to.slight === true, fromEntities: (a.themes[p.fromThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), toEntities: p.discovered ? [p.discovered.name] : (a.themes[p.toThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
   }));
   const views = a.nights.map(viewOf);
-  const stillWeak = views.filter((v) => v.fit === "leans-away" && !v.swappedFrom).map((v) => `${shortDate(v.night.date)} ${v.night.theme}`);
-  const rejected = (state.propose?.proposals ?? []).filter((p) => state.decisions[p.id] === "rejected").map((p) => `${a.nights[p.index]!.theme} \u2192 ${p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId} (${shortDate(p.date)})`);
+  const props = state.propose?.proposals ?? [];
+  const proposedFor = new Map(props.map((p) => [p.index, p]));
+  // A clear weak night with no swap at all, versus one that had a swap offered and left undecided. A slight lean is neither.
+  const stillWeak = views.filter((v) => v.fit === "leans-away" && !v.slight && !v.swappedFrom && !proposedFor.has(v.night.index)).map((v) => `${dateWithYear(v.night.date)} ${v.night.theme}`);
+  const offered = props.filter((p) => !state.decisions[p.id]).map((p) => `${dateWithYear(p.date)} ${a.nights[p.index]!.theme} (offered: ${p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId}${p.optional ? ", optional: only a slight lean" : ""})`);
+  const rejected = (state.propose?.proposals ?? []).filter((p) => state.decisions[p.id] === "rejected").map((p) => `${a.nights[p.index]!.theme} \u2192 ${p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId} (${dateWithYear(p.date)})`);
   return {
-    stillWeak, rejected,
+    stillWeak, offered, rejected,
     ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : state.sport !== "baseball" ? { sport: state.sport, sample: state.sampleId !== null } : {}), club: a.market.label, city: cityOfLabel(a.market.label), generatedOn: localDay(), swaps,
-    angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : (([h1, b1, e1]) => [`${h1}.`, b1, e1].filter(Boolean).join(" "))(clubAngleParts(x, cityOfLabel(a.market.label), state.sport))), nights: a.nights.length, suggested: state.propose?.proposals.length ?? 0, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
+    angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : (([h1, b1, e1]) => [`${h1}.`, b1, e1].filter(Boolean).join(" "))(clubAngleParts(x, cityOfLabel(a.market.label), state.sport))), nights: a.nights.length, suggested: props.filter((p) => !p.optional).length, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),
     ...(state.kind === "venue" ? { acts: actsOf(a.market.label) } : {}),
     synthetic: a.mode === "synthetic" || a.reference.synthetic, recordedLabel: a.recordedAt ? formatDateTime(a.recordedAt) : null,
@@ -75,7 +79,7 @@ export function sendView(): HTMLElement {
   const stem = state.kind === "venue" ? `${state.sampleId ?? "my-venue"}-summer-series` : (state.sampleId ?? `my-${copy().team}`) + "-season";
   const data = memoData();
 
-  const weakLeft = views.filter((v) => v.fit === "leans-away").length;
+  const weakLeft = views.filter((v) => v.fit === "leans-away" && !v.slight).length;
   const summary = swaps.length === 0 ? `No ${state.kind === "venue" ? "offers" : "swaps"} made, so the calendar is unchanged. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left. You can still download the memo.` : `${swaps.length} ${state.kind === "venue" ? "offer" : "swap"}${swaps.length === 1 ? "" : "s"} made. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left.`;
 
   // The fan: every approved swap, landed, in the glowing frame.
@@ -122,8 +126,10 @@ export function sendView(): HTMLElement {
           { class: "send-l" },
           h("div", { class: "eyebrow" }, "Step 3 of 3 \u00b7 Send"),
           h("h1", { class: "h2", tabindex: "-1" }, "Send: ", h("em", null, "your revised calendar")),
+          h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(a.nights.map((n) => n.date), copy().season)),
           h("p", { class: "sum", "data-testid": "send-summary" }, summary),
           syntheticBanner(),
+          savedCopyBanner(),
           h(
             "div",
             { class: "exp" },
@@ -136,7 +142,7 @@ export function sendView(): HTMLElement {
               h("button", { type: "button", class: "btn ghost sm", "data-testid": "print-memo", onclick: () => window.print() }, icon("printer"), "Print the memo"),
             ),
           ),
-          h("h2", { class: "memo-h" }, `Rationale memo, ${formatDate(data.generatedOn)}`),
+          h("h2", { class: "memo-h" }, `Rationale memo, ${longDate(data.generatedOn)}`),
           memoSheet(data),
           h("a", { class: "btn pri", href: "#/study", "data-testid": "to-study" }, state.kind === "venue" || state.sport !== "baseball" ? "Did local taste predict crowds? The Study tested Minor League baseball only" : "Did local taste really predict crowds? See The Study", icon("arrowRight")),
         ),

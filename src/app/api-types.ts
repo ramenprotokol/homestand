@@ -29,6 +29,10 @@ export interface ThemeScoreOut {
   marketMeanZ: number | null;
   scoredThemes: number;
   score: number | null;
+  /** True when the Strong or Weak label rests on a raw affinity gap under 0.01 (see RAW_FLOOR): a lean, not a verdict. */
+  slight?: boolean;
+  /** index x the reference spread: the raw affinity distance behind the label. Null when there is no comparison. */
+  gap?: number | null;
   reason?: string;
   entities: EntityOut[];
   /** When Qloo was asked. */
@@ -67,6 +71,8 @@ export interface NightOut {
   candidates: string[];
   themeId: string | null;
   label: FitLabel;
+  /** The Strong or Weak label rests on a raw gap under 0.01 (see ThemeScoreOut.slight). */
+  slight?: boolean;
   /** The theme's index (see ThemeScoreOut). */
   z: number | null;
   /** Set when the name is a library theme we recognise but have no live Qloo scores for. The night is left alone. */
@@ -143,6 +149,12 @@ export interface RecheckResponse {
   caps: Caps;
   /** True when this theme was already re-checked live in the last 24 hours and the saved answer came back. */
   withinDay?: boolean;
+}
+
+/** The city search answer. `message` is a plain-words note for the director: a place outside the US and Canada, a territory, no match in the state they typed. */
+export interface GeoResponse {
+  results: GeoHit[];
+  message?: string;
 }
 
 export interface GeoHit {

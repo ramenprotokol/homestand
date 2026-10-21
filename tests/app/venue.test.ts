@@ -7,7 +7,7 @@ import { cityOfLabel, copyFor, shortLabel } from "../../src/app/kind";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { genreRank, genreTier, propose, type Discovered, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
 import { sampleCsv, VENUE_CALENDAR_IDS } from "../../src/app/samples";
-import { SYNTHETIC_REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE } from "../../src/worker/reference";
 import { ALL_THEMES, ARTIST_LIBRARY, VENUE_CLASSIC_PHRASES, VENUE_LIBRARY } from "../../src/app/themes/artists";
 import { activeLibrary, COMMITTED_IDS } from "../../src/app/themes/ids";
 import { THEME_LIBRARY } from "../../src/app/themes/library";

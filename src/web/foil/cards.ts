@@ -1,4 +1,4 @@
-import { fitLine, fitWord, type FitLabel } from "../../app/score";
+import { fitLine, fitWordFor, type FitLabel } from "../../app/score";
 import { themeById } from "../../app/themes/artists";
 import { h } from "../dom";
 import { canHover, gsap, reduced } from "./motion";
@@ -9,11 +9,13 @@ import { copy, swapTitle, type NightView } from "../store";
 export type CardFit = FitLabel | "pick";
 
 /** The rating word on a card. A proven promo reads short on the card ("Proven promo"); the full "(not graded)" is in the lists. */
-export const fitName = (fit: CardFit): string => (fit === "pick" ? "Needs your pick" : fit === "classic" ? "Proven promo" : fitWord(fit));
+export const fitName = (fit: CardFit, slight?: boolean): string => (fit === "pick" ? "Needs your pick" : fit === "classic" ? "Proven promo" : fitWordFor(fit, slight));
 
 export interface CardSpec {
   title: string;
   fit: CardFit;
+  /** A Strong or Weak fit on a raw gap under 0.01: the card says "Leans strong" or "Leans weak". */
+  slight?: boolean;
   emblem: string;
   month: string;
   day: number;
@@ -44,6 +46,7 @@ export interface BackSpec {
   /** The theme's own name ("Star Wars"), for the sentence comparing it with other markets. */
   themeName: string;
   fit: CardFit;
+  slight?: boolean;
   /** Shown instead of the stat table when a night has no scores. */
   reason: string | null;
   /** When this town's data was checked, already formatted ("Oct 15, 8:02 PM"), or null. */
@@ -107,10 +110,11 @@ export function specOf(v: NightView): CardSpec {
   const title = v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme;
   const category = v.themeId ? (themeById(v.themeId)?.category ?? null) : null;
   const { month, day } = parts(n.date);
-  const words = fitName(fit);
+  const words = fitName(fit, v.slight);
   return {
     title,
     fit,
+    ...(v.slight ? { slight: true } : {}),
     emblem: emblemFor(v.discovered ? (v.discovered.type === "artist" ? "music" : v.discovered.type === "movie" ? "film" : "tv") : v.themeId, v.discovered?.type === "artist" ? "music" : category, n.theme, n.resolution.kind === "classic", v.discovered?.genre ?? (v.themeId ? themeById(v.themeId)?.genre : null)),
     month,
     day,
@@ -123,9 +127,11 @@ export function specOf(v: NightView): CardSpec {
 }
 
 /** A card for a theme the agent proposes: the night's date and sponsor, the new theme's art and fit. */
-export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel, genre?: string | null): CardSpec {
+export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel, genre?: string | null, slight?: boolean): CardSpec {
   const category = themeId === "music" ? "music" : (themeById(themeId)?.category ?? null);
-  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: cardLabel(base.month, base.day, fitWord(fit), themeLabel, base.sponsor, [base.weekday]) };
+  const { slight: _planned, ...rest } = base; // the planned night's slight flag must not carry over to the new theme
+  void _planned;
+  return { ...rest, ...(slight ? { slight: true } : {}), title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: cardLabel(base.month, base.day, fitWordFor(fit, slight), themeLabel, base.sponsor, [base.weekday]) };
 }
 
 function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
@@ -147,7 +153,7 @@ function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
     // The plain spaces between pieces are for assistive tech and audits that read the card's text: "APR 23 STRONG FIT Star Wars NIGHT", not "APR23STRONG FITStar WarsNIGHT".
     penn,
     " ",
-    h("span", { class: "fitword" }, fitName(s.fit)),
+    h("span", { class: "fitword" }, fitName(s.fit, s.slight)),
     " ",
     h("div", { class: "plate" }, h("span", { class: `nm-s${long ? " long" : ""}`, style: `--fs:${fs}cqw`, title: s.title }, script), " ", slab ? h("span", { class: "nm-b" }, slab) : null, " ", s.sponsor ? h("span", { class: "spons" }, s.sponsor) : null),
     h("div", { class: "foil" }),
@@ -164,11 +170,11 @@ function backFace(b: BackSpec): HTMLElement {
   const body: Node[] = [];
   if (scored && ix !== null) {
     body.push(
-      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Fit", h("b", null, fitName(b.fit)))),
+      h("div", { class: "bk-idx" }, h("div", { class: `n ${ix < 0 ? "neg" : ix > 0 ? "pos" : ""}`, "aria-hidden": "true" }, ix <= -0.5 ? "\u25bc" : ix >= 0.5 ? "\u25b2" : "\u25cf"), h("div", { class: "t" }, "Fit", h("b", null, fitName(b.fit, b.slight)))),
       h("div", { class: "bk-why", "data-testid": "bk-line" }, fitLine(b.themeName, b.city, ix, copy().night === "date" ? "venue" : "club")),
     );
   } else {
-    body.push(h("div", { class: "bk-why" }, h("b", null, fitName(b.fit)), b.reason ?? ""));
+    body.push(h("div", { class: "bk-why" }, h("b", null, fitName(b.fit, b.slight)), b.reason ?? ""));
   }
   return h(
     "div",

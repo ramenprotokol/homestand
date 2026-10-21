@@ -249,27 +249,29 @@ This records what A4 requires: the chosen request shape, the bundle entity IDs, 
 
 | Theme | Entity (Qloo name) | Type | Qloo ID | Popularity |
 |---|---|---|---|---|
-| Star Wars | Star Wars: Episode IV - A New Hope | movie | `1EC3A1AE-9466-4338-BAF6-E20659697569` | 0.9995 |
-| Star Wars | The Mandalorian | tv_show | `24FA08F2-0B47-4A01-B44E-CF18C06E5781` | 0.9983 |
-| Princess | Frozen | movie | `3CE60F10-EA7D-4743-B67A-8B53D84351C5` | 0.9980 |
-| Princess | Moana | movie | `B4783599-F934-4159-8003-720406FC1C80` | 0.9959 |
-| Bluey | Bluey | tv_show | `F6013EAC-8F32-4080-B1ED-2BFABB9C706E` | 0.9196 |
-| Harry Potter | Harry Potter and the Sorcerer's Stone (Harry Potter, #1) | book | `0C97E7FE-8A86-4B48-9F54-CB0A73CC2B96` | 0.9992 |
-| Margaritaville | Jimmy Buffett | artist | `33B34573-DBF2-49C8-BCEB-CBECF31038F0` | 0.9889 |
-| Dinosaur | Jurassic Park | movie | `D3529AD8-9349-481E-8FCB-D107EFB75E68` | 0.9988 |
-| Dinosaur | Jurassic World | movie | `8573DA59-4BA6-406A-A022-1BEE0E09B678` | 0.9966 |
-| Country | Luke Combs | artist | `3CBD78B1-D2F2-4551-A342-4621B6BDB5E2` | 0.9746 |
-| Country | Morgan Wallen | artist | `59DCDFA8-5082-47D9-B3E5-2B49CF2A778F` | 0.9733 |
-| Country | Carrie Underwood | artist | `19AC0383-5BB2-4423-8598-709713C22148` | 0.9968 |
-| Marvel | Spider-Man: No Way Home | movie | `CB376BE9-384A-41C5-9231-3592AF84ADCD` | 0.9991 |
-| Wrestling | WWE | brand | `764E1D34-B48B-4757-94F2-063B9F912C03` | 0.9994 |
+| Star Wars | Star Wars: Episode IV - A New Hope | movie | `1EC3A1AE-9466-4338-BAF6-E20659697569` | [redacted under Qloo data terms] |
+| Star Wars | The Mandalorian | tv_show | `24FA08F2-0B47-4A01-B44E-CF18C06E5781` | [redacted under Qloo data terms] |
+| Princess | Frozen | movie | `3CE60F10-EA7D-4743-B67A-8B53D84351C5` | [redacted under Qloo data terms] |
+| Princess | Moana | movie | `B4783599-F934-4159-8003-720406FC1C80` | [redacted under Qloo data terms] |
+| Bluey | Bluey | tv_show | `F6013EAC-8F32-4080-B1ED-2BFABB9C706E` | [redacted under Qloo data terms] |
+| Harry Potter | Harry Potter and the Sorcerer's Stone (Harry Potter, #1) | book | `0C97E7FE-8A86-4B48-9F54-CB0A73CC2B96` | [redacted under Qloo data terms] |
+| Margaritaville | Jimmy Buffett | artist | `33B34573-DBF2-49C8-BCEB-CBECF31038F0` | [redacted under Qloo data terms] |
+| Dinosaur | Jurassic Park | movie | `D3529AD8-9349-481E-8FCB-D107EFB75E68` | [redacted under Qloo data terms] |
+| Dinosaur | Jurassic World | movie | `8573DA59-4BA6-406A-A022-1BEE0E09B678` | [redacted under Qloo data terms] |
+| Country | Luke Combs | artist | `3CBD78B1-D2F2-4551-A342-4621B6BDB5E2` | [redacted under Qloo data terms] |
+| Country | Morgan Wallen | artist | `59DCDFA8-5082-47D9-B3E5-2B49CF2A778F` | [redacted under Qloo data terms] |
+| Country | Carrie Underwood | artist | `19AC0383-5BB2-4423-8598-709713C22148` | [redacted under Qloo data terms] |
+| Marvel | Spider-Man: No Way Home | movie | `CB376BE9-384A-41C5-9231-3592AF84ADCD` | [redacted under Qloo data terms] |
+| Wrestling | WWE | brand | `764E1D34-B48B-4757-94F2-063B9F912C03` | [redacted under Qloo data terms] |
 
 - **The Harry Potter books:** Qloo has no series entity. The exact-name book entity has no popularity and returns no local data. The entity above (the series' first book, as listed by Qloo) stands in for the series, as the original text allows.
 - **Day-1 national popularity per theme (A1):**
 
   | Star Wars | Princess | Bluey | Harry Potter | Margaritaville | Dinosaur | Country | Marvel | Wrestling |
   |---|---|---|---|---|---|---|---|---|
-  | 0.9989 | 0.9969 | 0.9196 | 0.9992 | 0.9889 | 0.9977 | 0.9816 | 0.9991 | 0.9994 |
+  | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] |
+
+  - **Redaction note.** Qloo's data terms say not to keep Qloo response data in a public repository, so the popularity numbers that stood in this section (the Popularity column of the table above and the per-theme row above) were replaced with "[redacted under Qloo data terms]". Entity names and IDs are unchanged. The numbers were recorded before the pull and are kept off-repository. To keep this record verifiable, the SHA-256 of the original text of those two tables (the two tables' lines joined by newlines, with no trailing newline) is `e1c0cb6676b3a5e4880f530c0583adc6eb4860d33e0b8dc1f27168e5f9651411`. The same numbers are in this repository's earlier commit history.
 
   A1's rule stands: the analysis uses the values at the time of the full pull.
 

@@ -4,7 +4,7 @@ import { syntheticDiscoveryReference } from "../../src/app/discovery";
 import { parseCalendar } from "../../src/app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { sampleCsv } from "../../src/app/samples";
-import { SYNTHETIC_REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE } from "../../src/worker/reference";
 import { VENUE_LIBRARY } from "../../src/app/themes/artists";
 import { activeLibrary } from "../../src/app/themes/ids";
 import { analyze, forKind, MAX_LIVE_TASTE, proposeSwaps, type Deps } from "../../src/worker/agent";
@@ -73,7 +73,7 @@ describe("the taste graph is bounded", () => {
   });
 
   it("counts against the client's daily taste quota even on a sample market, and a recorded answer does not count", async () => {
-    expect(DAILY_QUOTA.taste).toBe(20);
+    expect(DAILY_QUOTA.taste).toBe(40);
     const asked: string[] = [];
     const { d, urls } = setup({ gate: { allow: async (k) => (asked.push(k), k !== "taste") } });
     const nights = await plan(d);

@@ -11,6 +11,20 @@ export function checkResultLine(away: number, total: number, city: string, night
   return `${away} of ${total} ${nights} ${away === 1 ? "is" : "are"} a weak fit for ${city}.`;
 }
 
+/**
+ * The Check headline from the counts: how many nights are a clear weak fit, how many only lean weak, and plain words when nothing could be graded
+ * (every name unknown, or only proven promos), so "None of the 2 nights is a weak fit" never reads as good news about nights that were never rated.
+ */
+export function checkHeadline(c: { clearAway: number; slightAway: number; total: number; graded: number; classic: number; notScored: number }, city: string, night = "night", nights = "nights"): string {
+  if (c.graded === 0 && c.total > 0) {
+    const these = c.total === 1 ? `this ${night}` : `these ${c.total} ${nights}`;
+    const why = c.notScored === 0 ? `${c.total === 1 ? "it is a" : "they are"} proven promo${c.total === 1 ? "" : "s"}, which Homestand does not grade` : c.classic === 0 ? `Homestand has no data for ${c.total === 1 ? "its" : "their"} theme${c.total === 1 ? "" : "s"}` : "they are proven promos, which Homestand does not grade, or names it has no data for";
+    return `Nothing could be graded for ${these}: ${why}. They stay as planned.`;
+  }
+  const base = checkResultLine(c.clearAway, c.total, city, night, nights);
+  return c.slightAway > 0 ? `${base} ${c.slightAway} more ${c.slightAway === 1 ? "only leans" : "only lean"} weak.` : base;
+}
+
 export function fitSummary(c: { in: number; average: number; away: number; notScored: number; classic: number; found?: number }): string {
   const found = c.found ? `, ${c.found} local favorite` : "";
   return `${c.in} strong fit, ${c.average} average fit, ${c.away} weak fit, ${c.notScored} no data, ${c.classic} proven promo${found}.`;
@@ -42,12 +56,20 @@ export function personalLine(call: "Yes" | "No" | "Not sure", verdict: "CONFIRME
 
 const NIGHT_SUFFIXES = ["Night", "Day", "Friday", "Giveaway", "Showdown"];
 
+const SMALL_WORDS = new Set(["a", "an", "and", "of", "the", "in", "on", "at", "to", "vs"]);
+/** "Country music" as "Country Music" (a night's name is written in title case; "LEGO Movie" and "T-Shirt" are already). */
+export const titleCase = (s: string): string => {
+  // Only a label written in plain sentence case ("Country music"); "LEGO Movie", "T-Shirt" and a title with a bracket are left alone.
+  if (!/^[A-Z][a-z]+( [a-z]+)+$/.test(s)) return s;
+  return s.replace(/(^|\s)([a-z])(\S*)/g, (m, sp: string, c: string, rest: string, off: number) => (off > 0 && SMALL_WORDS.has(c + rest) ? m : `${sp}${c.toUpperCase()}${rest}`));
+};
+
 /** The real night name for a swap: the new theme keeps the original's ending. "Barbie Day" with LEGO Movie is "LEGO Movie Day". A concert date is just the act's name. */
 export function swapName(original: string, newLabel: string, kind?: "club" | "venue"): string {
   if (kind === "venue") return newLabel;
   const w = original.trim().split(/\s+/);
   const last = w[w.length - 1] ?? "";
-  return `${newLabel} ${w.length > 1 && NIGHT_SUFFIXES.includes(last) ? last : "Night"}`;
+  return `${titleCase(newLabel)} ${w.length > 1 && NIGHT_SUFFIXES.includes(last) ? last : "Night"}`;
 }
 
 /**

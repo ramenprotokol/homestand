@@ -86,6 +86,16 @@ function notFoundView(): HTMLElement {
 
 const TITLES: Record<string, string> = { "/check": "Check", "/fix": "Fix", "/send": "Send", "/study": "The Study", "/sample": "Pick a sample club", "/own": "Use your own" };
 
+/** The tab title for a route: the screen, plus the club and sport once one is loaded; an unknown route says so. */
+function titleOf(route: string): string {
+  const base = baseOf(route);
+  if (route === "/") return "Your market, not the national chart | Homestand";
+  const t = TITLES[base];
+  if (t === undefined) return "Page not found | Homestand";
+  if ((base === "/check" || base === "/fix" || base === "/send") && state.market) return `${t}: ${state.market.label} (${state.kind === "venue" ? "concert venue" : state.sport}) | Homestand`;
+  return `${t} | Homestand`;
+}
+
 function render(): void {
   const route = location.hash.replace(/^#/, "") || "/";
   const changed = route !== lastRoute;
@@ -104,7 +114,7 @@ function render(): void {
   const main = h("main", { id: "main", tabindex: "-1" });
   main.append(view(route));
   app.append(topbar(route), main);
-  document.title = `${TITLES[baseOf(route)] ?? "Your market, not the national chart"} | Homestand`;
+  document.title = titleOf(route);
   runMounts();
   const nav = document.getElementById("nav")!;
   const solid = (): void => {

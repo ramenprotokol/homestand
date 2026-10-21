@@ -16,7 +16,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: "npx wrangler dev --local --env check --var QLOO_MODE:live --var ALLOWED_ORIGINS:http://127.0.0.1:5174 --var RATE_LIMIT_SCALE:10 --ip 127.0.0.1 --port 8789 --persist-to .wrangler/real",
+      command: "node scripts/prepare-data.mjs && npx wrangler dev --local --env check --var QLOO_MODE:live --var ALLOWED_ORIGINS:http://127.0.0.1:5174 --var RATE_LIMIT_SCALE:10 --ip 127.0.0.1 --port 8789 --persist-to .wrangler/real",
       url: "http://127.0.0.1:8789/api/health",
       reuseExistingServer: false,
       timeout: 120_000,

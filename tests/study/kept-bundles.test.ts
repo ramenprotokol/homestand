@@ -11,7 +11,7 @@ const amendment4 = prereg.slice(prereg.indexOf("### Amendment 4"), prereg.indexO
 const THEME_BY_LABEL: Record<string, StudyThemeId> = Object.fromEntries(STUDY_THEMES.map((t) => [t.label, t.id]));
 
 describe("kept bundles vs Amendment 4", () => {
-  const rows = [...amendment4.matchAll(/^\| ([A-Za-z ]+) \| (.+?) \| (movie|tv_show|book|artist|brand) \| `([0-9A-F-]{36})` \| ([0-9.]+) \|$/gm)];
+  const rows = [...amendment4.matchAll(/^\| ([A-Za-z ]+) \| (.+?) \| (movie|tv_show|book|artist|brand) \| `([0-9A-F-]{36})` \| (\[redacted under Qloo data terms\]|[0-9.]+) \|$/gm)];
 
   it("the amendment table has the 14 kept entities", () => {
     expect(rows).toHaveLength(14);
