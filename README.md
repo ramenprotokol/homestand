@@ -160,3 +160,14 @@ Built with AI coding assistants, credited in [`BUILD_LOG.md`](BUILD_LOG.md).
 ## License
 
 MIT
+
+## Use Homestand from an AI assistant (MCP)
+
+Homestand also runs as an [MCP](https://modelcontextprotocol.io) server, so an AI assistant can check a calendar and suggest swaps for you. The address is `https://homestand-api.ramenprotokol.workers.dev/mcp`. There is no sign-in. It uses the same daily limits as the website, and it never returns raw Qloo numbers, only fits and reasons.
+
+- **Claude:** Settings, then Connectors, then Add custom connector. Paste the address.
+- **Other MCP clients (ChatGPT, Cursor, the MCP Inspector):** add a remote server of type "Streamable HTTP" with the same address. To try it from a terminal: `npx @modelcontextprotocol/inspector --cli https://homestand-api.ramenprotokol.workers.dev/mcp --transport http --method tools/list`.
+
+Tools: `check_calendar` (rates every night), `propose_swaps` (replacements for the weak nights; locked nights, dates and sponsors stay), `explain_night` (why one theme got its rating) and `sample_teams` (the made-up demo teams, so you can try it without typing a calendar).
+
+Example prompt: "Check this hockey calendar for Fargo, ND and fix the weak nights."
