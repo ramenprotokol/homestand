@@ -394,7 +394,7 @@ class FixStage {
     const p = effective(top);
     const base = specOf(viewOf(state.analysis!.nights[p.index]!));
     const night = state.analysis!.nights[p.index]!;
-    return { front: specForSwap(base, p.fromThemeId, swapTitle(night.theme, label(p.fromThemeId)), p.from.label), alt: specForSwap(base, p.discovered ? (p.discovered.type === "artist" ? "music" : p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, swapTitle(night.theme, toLabel(p)), p.to.label, p.discovered?.genre) };
+    return { front: specForSwap(base, p.fromThemeId, swapTitle(night.theme, label(p.fromThemeId)), p.from.label, undefined, p.from.slight), alt: specForSwap(base, p.discovered ? (p.discovered.type === "artist" ? "music" : p.discovered.type === "movie" ? "film" : "tv") : p.toThemeId, swapTitle(night.theme, toLabel(p)), p.to.label, p.discovered?.genre, p.to.slight) };
   }
 
   private buildSlides(): void {
@@ -525,7 +525,7 @@ class FixStage {
         "div",
         { class: "meta" },
         h("div", { class: "pinbar" }, icon("pin"), h("span", null, `${shortDateYear(p.date)}`), h("span", null, "·"), h("span", null, night.sponsor || "No sponsor on this date"), h("small", null, "Date and sponsor stay")),
-        d ? h("div", { class: "idx" }, h("span", { class: "k" }, "Fit"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, !d ? `${fromRating} \u2192 ${toRating(p)}` : found && d === "approved" ? toRating(p) : ratingWord(shown)), sub ? h("div", { class: "pp" }, sub) : null) : null,
+        d ? h("div", { class: "idx" }, h("span", { class: "k" }, "Fit"), h("span", { class: `v v--word ${found && d === "approved" ? "pos" : bandClass(shown)}`, id: "idxV" }, !d ? `${fromRating} \u2192 ${toRating(p)}` : found && d === "approved" ? toRating(p) : d === "approved" ? toRating(p) : fromRating), sub ? h("div", { class: "pp" }, sub) : null) : null,
       ),
       h(
         "div",
@@ -657,7 +657,7 @@ class FixStage {
     const th = state.analysis?.themes[themeId];
     const items: Child[] = (th?.entities ?? []).flatMap((e, i) => [i > 0 ? " · " : null, h("b", null, cleanTitle(e.name)), ` (${TYPE_WORDS[e.type] ?? e.type.replace("_", " ")})`, e.affinity === null ? h("i", null, " no reading") : null]);
     const index = th?.index ?? null;
-    return this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, kicker), h("div", { class: "m" }, items, index === null ? null : h("span", { class: `ix ${bandClass(index)}` }, `→ fit: ${ratingWord(index)}`)))], instant);
+    return this.add([h("div", { class: "ic" }, "Q"), h("div", null, h("div", { class: "k" }, kicker), h("div", { class: "m" }, items, index === null ? null : h("span", { class: `ix ${bandClass(index)}` }, `→ fit: ${th?.slight ? fitWordFor(th.label, true) : ratingWord(index)}`)))], instant);
   }
 
   private idleAgent(): void {

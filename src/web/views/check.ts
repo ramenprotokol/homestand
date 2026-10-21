@@ -1,5 +1,5 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { bridgeSentence, classicReason, comparisonSentence, fitMeaning, fitWord, marketLevelSentence, NEAR_TOP_NOTE, slightNote, vsMarketsWords, type FitLabel } from "../../app/score";
+import { bridgeSentence, classicReason, comparisonSentence, fitMeaning, fitWord, fitWordFor, marketLevelSentence, NEAR_TOP_NOTE, slightNote, vsMarketsWords, type FitLabel } from "../../app/score";
 import { cityOfLabel } from "../../app/kind";
 import { themeById } from "../../app/themes/artists";
 import { dateWithYear, passedCount, seasonEyebrow } from "../../app/dates";
@@ -122,7 +122,7 @@ export function checkView(): HTMLElement {
   );
   // After a pick the choice stays on screen as one line, with a way back.
   const picked = views.filter((v) => v.night.resolution.kind === "ambiguous" && state.choices[v.night.index] !== undefined).map((v) =>
-    h("p", { class: "picked-line", "data-testid": "picked-line" }, `${dateWithYear(v.night.date)} scored as ${v.themeLabel}: ${fitWord(v.fit).toLowerCase()}. `,
+    h("p", { class: "picked-line", "data-testid": "picked-line" }, `${dateWithYear(v.night.date)} scored as ${v.themeLabel}: ${fitWordFor(v.fit, v.slight).toLowerCase()}. `,
       h("button", { type: "button", class: "linkbtn", onclick: () => { delete state.choices[v.night.index]; window.dispatchEvent(new HashChangeEvent("hashchange")); } }, "Change")),
   );
 
@@ -420,7 +420,7 @@ function whyInfo(index: number): Child {
               const r = await recheckTheme(v.themeId!);
               rechecked[v.themeId!] = new Date().toISOString();
               const at = new Date().toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-              recheckMessage = r === "changed" ? `Fresh data at ${at}: changed, now ${fitWord(state.analysis!.themes[v.themeId!]!.label)}. Earlier swaps were cleared.` : `Fresh data at ${at}: same result.`;
+              recheckMessage = r === "changed" ? `Fresh data at ${at}: changed, now ${fitWordFor(state.analysis!.themes[v.themeId!]!.label, state.analysis!.themes[v.themeId!]!.slight)}. Earlier swaps were cleared.` : `Fresh data at ${at}: same result.`;
             } catch (err) {
               recheckMessage = err instanceof ApiFailure ? err.message : "Getting fresh data failed. Try again.";
             }

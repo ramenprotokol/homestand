@@ -101,3 +101,10 @@ describe("memo sections and wording", () => {
     expect(fitMeaning("found", "venue")).toBe("People in this city like it more than people in most cities do.");
   });
 });
+
+describe("the memo uses the same slight words as the screen", () => {
+  it("writes Leans strong or Leans weak in the fit column", () => {
+    const d: MemoData = { club: "Fresno, CA", generatedOn: "2026-10-20", swaps: [{ date: "2027-07-10", weekday: "Saturday", from: "Elvis Night", to: "The Beatles Night", sponsor: "", fromZ: -1.2, toZ: 0.9, fromSlight: false, toSlight: true, fromScore: 0.9, toScore: 0.9, why: "x" }], angles: [], nights: 20, suggested: 1, classic: 0, synthetic: false, recordedLabel: null };
+    expect(buildMemoHtml(d)).toContain("Weak fit → Leans strong");
+  });
+});

@@ -1,5 +1,5 @@
 import { copyFor, type Kind, type Sport } from "../kind";
-import { FIT_WORDS, pullBand } from "../score";
+import { FIT_WORDS, fitWordFor, pullBand } from "../score";
 import { longDate } from "../text";
 
 export interface MemoSwap {
@@ -10,6 +10,9 @@ export interface MemoSwap {
   sponsor: string;
   fromZ: number | null;
   toZ: number | null;
+  /** The rating rests on a raw gap under 0.01: written "Leans strong" or "Leans weak". */
+  fromSlight?: boolean;
+  toSlight?: boolean;
   fromScore: number | null;
   toScore: number | null;
   why: string;
@@ -59,9 +62,9 @@ export function escapeHtml(s: string): string {
 }
 
 /** "Strong fit", "Average fit" or "Weak fit": the rating in words, never a raw index. */
-const ratingText = (z: number | null): string => {
+const ratingText = (z: number | null, slight?: boolean): string => {
   const b = pullBand(z);
-  return b === null ? "No data" : b === "about" ? "Average fit" : b === "above" || b === "well above" ? "Strong fit" : "Weak fit";
+  return b === null ? "No data" : b === "about" ? "Average fit" : b === "above" || b === "well above" ? fitWordFor("leans-in", slight) : fitWordFor("leans-away", slight);
 };
 const lower = (t: string): string => t.charAt(0).toLowerCase() + t.slice(1);
 
@@ -84,7 +87,7 @@ export function buildMemoHtml(d: MemoData): string {
   const rows = d.swaps
     .map(
       (s) => `<tr><td data-label="${C.night.replace(/^./, (c) => c.toUpperCase())}">${escapeHtml(s.weekday.slice(0, 3))} ${escapeHtml(longDate(s.date).replace(/^(\w{3})\w*/, "$1"))}</td><td data-label="Was">${escapeHtml(s.from)}</td><td data-label="Now">${escapeHtml(s.to)}${s.discovered ? ` <em>(${FIT_WORDS.found})</em>` : ""}</td>${anySponsor ? `<td data-label="Sponsor">${escapeHtml(s.sponsor)}</td>` : ""}` +
-        `<td data-label="Fit">${ratingText(s.fromZ)} \u2192 ${s.discovered ? FIT_WORDS.found : ratingText(s.toZ)}</td></tr>`,
+        `<td data-label="Fit">${ratingText(s.fromZ, s.fromSlight)} \u2192 ${s.discovered ? FIT_WORDS.found : ratingText(s.toZ, s.toSlight)}</td></tr>`,
     )
     .join("");
   // Template reasons for library themes are the same sentence with different names, so they are said once, not once per swap.
@@ -94,7 +97,7 @@ export function buildMemoHtml(d: MemoData): string {
       .map((s) => {
         const head = `<strong>${escapeHtml(s.from)} to ${escapeHtml(s.to)}${s.discovered ? ` (${FIT_WORDS.found})` : ""}, ${escapeHtml(longDate(s.date))}.</strong>`;
         const checked = s.fromEntities?.length || s.toEntities?.length
-          ? ` Qloo checked ${s.fromEntities?.length ? `${escapeHtml(s.fromEntities.join(", "))} for the planned ${C.night} (${lower(ratingText(s.fromZ))})` : ""}${s.fromEntities?.length && s.toEntities?.length ? " and " : ""}${s.toEntities?.length ? `${escapeHtml(s.toEntities.join(", "))} for the swap (${s.discovered ? `local favorite${d.city ? `: people in ${escapeHtml(d.city)} like it more than people in most towns do` : ""}` : lower(ratingText(s.toZ))})` : ""}.`
+          ? ` Qloo checked ${s.fromEntities?.length ? `${escapeHtml(s.fromEntities.join(", "))} for the planned ${C.night} (${lower(ratingText(s.fromZ, s.fromSlight))})` : ""}${s.fromEntities?.length && s.toEntities?.length ? " and " : ""}${s.toEntities?.length ? `${escapeHtml(s.toEntities.join(", "))} for the swap (${s.discovered ? `local favorite${d.city ? `: people in ${escapeHtml(d.city)} like it more than people in most towns do` : ""}` : lower(ratingText(s.toZ, s.toSlight))})` : ""}.`
           : "";
         return collapse && !s.discovered && s.source !== "model" ? `<li>${head}${checked}</li>` : `<li>${head} ${escapeHtml(s.why)}${checked}</li>`;
       })

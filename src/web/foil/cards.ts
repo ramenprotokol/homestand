@@ -120,9 +120,11 @@ export function specOf(v: NightView): CardSpec {
 }
 
 /** A card for a theme the agent proposes: the night's date and sponsor, the new theme's art and fit. */
-export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel, genre?: string | null): CardSpec {
+export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel, genre?: string | null, slight?: boolean): CardSpec {
   const category = themeId === "music" ? "music" : (themeById(themeId)?.category ?? null);
-  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWordFor(fit)}` };
+  const { slight: _planned, ...rest } = base; // the planned night's slight flag must not carry over to the new theme
+  void _planned;
+  return { ...rest, ...(slight ? { slight: true } : {}), title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWordFor(fit, slight)}` };
 }
 
 function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {

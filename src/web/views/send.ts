@@ -48,7 +48,7 @@ function memoData(): MemoData {
   const a = state.analysis!;
   const swaps = approvedSwaps().map((p) => ({
     date: p.date, weekday: p.weekday, from: a.nights[p.index]!.theme, to: swapTitle(a.nights[p.index]!.theme, p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId), sponsor: p.sponsor,
-    fromZ: p.from.z, toZ: p.to.z, fromEntities: (a.themes[p.fromThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), toEntities: p.discovered ? [p.discovered.name] : (a.themes[p.toThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
+    fromZ: p.from.z, toZ: p.to.z, fromSlight: p.from.slight === true, toSlight: p.to.slight === true, fromEntities: (a.themes[p.fromThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), toEntities: p.discovered ? [p.discovered.name] : (a.themes[p.toThemeId]?.entities ?? []).map((e) => cleanTitle(e.name)), fromScore: p.from.score, toScore: p.to.score, why: p.why, source: p.whySource, discovered: !!p.discovered,
   }));
   const views = a.nights.map(viewOf);
   const props = state.propose?.proposals ?? [];
