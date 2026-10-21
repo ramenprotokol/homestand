@@ -120,8 +120,8 @@ A pre-registered test of one question: **at the same ballpark, did the theme wit
 npm ci
 npm run worker:dev                                  # Worker with synthetic Qloo answers and template text (no keys, no network)
 VITE_API_BASE=http://127.0.0.1:8788 npm run dev     # front end
-npm test && npm run typecheck && npm run lint && npm run build
-npm run e2e                                         # Playwright against the local Worker (@E2E@ checks)
+npm test && npm run typecheck && npm run lint && npm run build   # 455 unit tests (453 and 2 skipped on a clean clone, where the real reference data is absent)
+npm run e2e                                         # Playwright against the local Worker (74 checks: 37 at desktop width, 37 at phone width)
 ```
 
 A clean clone needs no keys and no Qloo data: the real reference data is not in the repository, so the Worker bundles made-up stand-ins (`src/app/data/*.synthetic.json`) and says so ("Synthetic demo data"). To use real Qloo data, put your own `QLOO_API_KEY`, `QLOO_API_URL` and a random `MARKET_SIGNING_KEY` (16+ characters; it signs the cities the search returns, and the API only accepts searched cities and the sample clubs) in `.dev.vars` (gitignored). Re-running the Study needs the 2025 schedules fetched locally (`npm run study:fetch`, see [`DATA_RIGHTS.md`](DATA_RIGHTS.md)).

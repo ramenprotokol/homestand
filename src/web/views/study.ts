@@ -121,7 +121,7 @@ function townsLine(r: PublishedResults): string {
   const themes = STUDY_THEMES.flatMap((t) => (r.perTheme[t.id] ? [r.perTheme[t.id]!] : []));
   const same = themes.filter((t) => t.llmDistinct === 1).length;
   const lo = Math.min(...themes.map((t) => t.qlooDistinct)), hi = Math.max(...themes.map((t) => t.qlooDistinct));
-  return `An AI guess can't tell towns apart: for ${same} of ${themes.length} themes it gave the same answer at every club it rated (${[...new Set(themes.filter((t) => t.llmDistinct === 1).map((t) => t.llmScored))].sort((a, b) => b - a).join(" or ")} clubs, depending on the theme). Qloo gave about ${hi} different readings per theme across the same 120 clubs (${lo} to ${hi}).`;
+  return `An AI guess can't tell towns apart: for ${same} of ${themes.length} themes it gave the same answer at every club it rated (${[...new Set(themes.filter((t) => t.llmDistinct === 1).map((t) => t.llmScored))].sort((a, b) => b - a).join(" or ")} clubs, depending on the theme). Qloo gave ${lo === hi ? hi : `${lo} to ${hi}`} different readings per theme across the same 120 clubs.`;
 }
 
 const STAMP_WORD = { CONFIRMED: "CONFIRMED", "CALL STANDS": "NOT PROVEN", OVERTURNED: "OVERTURNED" } as const;
