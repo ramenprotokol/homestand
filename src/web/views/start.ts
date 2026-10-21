@@ -72,6 +72,7 @@ function teaseSection(): HTMLElement {
       h("div", { class: "eyebrow" }, "How it plays"),
       h("h2", { class: "h2" }, "Three moves, ", h("em", null, "one season")),
       h("p", { class: "honest honest-line", "data-testid": "hero-honest" }, "It reads what your town likes. It doesn't forecast ticket sales, and we tested that: ", h("a", { href: "#/study" }, "see The Study"), "."),
+      h("p", { class: "qloo-line", "data-testid": "qloo-line" }, h("b", null, "Qloo\u2019s Taste AI"), " supplies the local taste for each town: what people there actually like. Every card is rated against it."),
       h("ol", { class: "how", "aria-label": "How it works" }, beats.map((b) => h("li", { class: "beat" }, h("div", { class: "beat-art" }, b.art), h("div", { class: "beat-copy" }, h("span", { class: "n" }, b.n), h("h3", null, b.name), h("p", null, b.text))))),
       teaser(),
       h("div", { class: "page-end" }, h("a", { class: "btn pri", href: "#/sample", "data-testid": "end-try-sample" }, "Try a sample club", icon("arrowRight"))),
@@ -103,6 +104,7 @@ export function startView(): HTMLElement {
     h("h1", { class: "sub", id: "sub", tabindex: "-1" }, "Theme nights your town will actually like."),
     h("p", { class: "hero-lede", "data-testid": "hero-intro" }, "Planning next season's theme nights? Homestand rates each one against what people in your town like, and suggests swaps for the weak ones. Your dates and sponsors stay put, and every swap comes with a reason you can show a sponsor."),
     h("p", { class: "hero-sports", "data-testid": "hero-sports" }, "Built for minor league teams: ", h("b", null, "baseball"), ", ", h("b", null, "basketball"), ", ", h("b", null, "hockey"), " and ", h("b", null, "soccer"), "."),
+    h("p", { class: "hero-qloo", "data-testid": "hero-qloo" }, h("span", { class: "gem-dot", "aria-hidden": "true" }), "Powered by ", h("b", null, "Qloo\u2019s Taste AI")),
     h(
       "div",
       { class: "hero-actions", id: "cta" },
@@ -261,7 +263,7 @@ export function ownView(): HTMLElement {
     const showProblem = (r: EdRow, msg: HTMLElement): void => { const pr = rowProblem(r); msg.textContent = pr ?? ""; msg.hidden = pr === null; };
     table.replaceChildren(
       h("table", { class: "rows-ed" },
-        h("thead", null, h("tr", null, ["Date", "Theme", "Sponsor", "Locked", ""].map((t) => h("th", null, t)))),
+        h("thead", null, h("tr", null, ["Date", "Theme", "Sponsor", "Locked", ""].map((t) => h("th", null, t || h("span", { class: "sr-only" }, "Remove"))))),
         h("tbody", null, model.map((r) => {
           const msg = h("div", { class: "rc-inline", role: "alert", hidden: "" });
           const tr = h("tr", null,

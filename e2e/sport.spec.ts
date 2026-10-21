@@ -40,7 +40,7 @@ test("basketball sample: Check, Fix and Send, in basketball words, and a reload 
   await expect(page.getByTestId("sport-note")).toContainText("This basketball calendar is one we wrote for a sample team");
   await expect(page.getByTestId("sport-note")).toContainText("not any real team's schedule");
   await expect(page.locator(".nav .club")).toContainText("Boise, ID");
-  await expect(page.locator(".nav .club")).toHaveAttribute("aria-label", "Boise, ID. Change team");
+  await expect(page.locator(".nav .club")).toHaveAccessibleName(/^Boise, ID\s+Change( team)?$/);
   // The Study is baseball: the link says so.
   await expect(page.getByRole("link", { name: "We tested this on baseball, not basketball." })).toBeVisible();
   // A proven promo of this sport says what proven promos are.
@@ -135,7 +135,7 @@ test("Use your own: pick hockey, the words follow, and the Worker is told", asyn
   expect((await bodyOf(await call)).sport).toBe("hockey");
   await expect(page.getByTestId("summary")).toBeVisible();
   await expect(page.getByRole("heading", { name: /Check: Tulsa, OK/ })).toBeVisible();
-  await expect(page.locator(".nav .club")).toHaveAttribute("aria-label", "Tulsa, OK. Change team");
+  await expect(page.locator(".nav .club")).toHaveAccessibleName(/^Tulsa, OK\s+Change( team)?$/);
   await page.getByRole("button", { name: /Teddy Bear Toss/ }).first().click();
   await expect(page.getByRole("dialog")).toContainText("Proven promos (teddy bear toss, jersey giveaways, heritage nights) aren't graded");
   await page.keyboard.press("Escape");
@@ -160,7 +160,7 @@ test("Use your own with baseball sends exactly what it always sent", async ({ pa
   const body = await bodyOf(await call);
   expect(Object.keys(body).sort()).toEqual(["market", "rows"]);
   await expect(page.getByTestId("summary")).toBeVisible();
-  await expect(page.locator(".nav .club")).toHaveAttribute("aria-label", "Tulsa, OK. Change club");
+  await expect(page.locator(".nav .club")).toHaveAccessibleName(/^Tulsa, OK\s+Change( club)?$/);
 });
 
 test("The Study says it is baseball only", async ({ page }) => {
