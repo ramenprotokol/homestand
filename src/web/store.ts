@@ -147,6 +147,8 @@ export interface NightView {
   /** Set when an approved swap replaced the planned theme. */
   swappedFrom: string | null;
   needsChoice: boolean;
+  /** The Strong or Weak fit rests on a raw gap under 0.01: shown as "Leans strong" or "Leans weak". */
+  slight: boolean;
   /** Set when an approved swap replaced the night with a title Qloo found. */
   discovered: { name: string; type: "movie" | "tv_show" | "artist"; z: number | null; genre?: Genre } | null;
 }
@@ -162,7 +164,7 @@ export function viewOf(n: NightOut): NightView {
   const disc = approved?.discovered ?? null;
   const fit: FitLabel = n.resolution.kind === "classic" ? "classic" : disc ? "found" : n.pool ? n.label : score ? score.label : "not-scored";
   const label = disc ? disc.name : themeId ? (themeById(themeId)?.label ?? themeId) : n.theme;
-  return { night: n, themeId, themeLabel: label, fit, z: n.pool ? n.z : (score?.z ?? null), score, swappedFrom: approved ? (themeById(approved.fromThemeId)?.label ?? approved.fromThemeId) : null, needsChoice, discovered: disc ? { name: disc.name, type: disc.type, z: disc.z ?? null, ...(disc.genre ? { genre: disc.genre } : {}) } : null };
+  return { night: n, themeId, themeLabel: label, fit, z: n.pool ? n.z : (score?.z ?? null), score, slight: !disc && !n.pool && !needsChoice && (fit === "leans-in" || fit === "leans-away") && score?.slight === true, swappedFrom: approved ? (themeById(approved.fromThemeId)?.label ?? approved.fromThemeId) : null, needsChoice, discovered: disc ? { name: disc.name, type: disc.type, z: disc.z ?? null, ...(disc.genre ? { genre: disc.genre } : {}) } : null };
 }
 
 export type ShownProposal = Proposal & { whySource: "model" | "template" };
@@ -192,4 +194,4 @@ export function approvedSwaps(): ShownProposal[] {
 }
 
 /** Transient screen status. */
-export const ui = { pickNote: false, loading: false, error: null as string | null, errorCode: null as string | null, proposing: false, proposeError: null as string | null, dupesBefore: null as string | null, dupesNote: null as string | null };
+export const ui = { savedCopy: false, errorCode: null as string | null, pickNote: false, loading: false, error: null as string | null, proposing: false, proposeError: null as string | null, dupesBefore: null as string | null, dupesNote: null as string | null };

@@ -21,7 +21,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `rm -rf .wrangler/e2e-${API} && npx wrangler dev --local --env check --var RATE_LIMIT_SCALE:10 --var ALLOWED_ORIGINS:http://127.0.0.1:${WEB},http://localhost:${WEB},http://127.0.0.1:${PROXY} --ip 127.0.0.1 --port ${API} --persist-to .wrangler/e2e-${API}`,
+      command: `node scripts/prepare-data.mjs && rm -rf .wrangler/e2e-${API} && npx wrangler dev --local --env check --var RATE_LIMIT_SCALE:10 --var ALLOWED_ORIGINS:http://127.0.0.1:${WEB},http://localhost:${WEB},http://127.0.0.1:${PROXY} --ip 127.0.0.1 --port ${API} --persist-to .wrangler/e2e-${API}`,
       url: `http://127.0.0.1:${API}/api/health`,
       reuseExistingServer: false,
       timeout: 120_000,

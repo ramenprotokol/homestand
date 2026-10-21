@@ -42,8 +42,11 @@ export interface MemoData {
   recordedLabel: string | null;
   /** Qloo's local family ideas for this area, when they were available. */
   ideas?: { city: string; titles: string[]; scored: number; poolSize: number };
-  /** Nights still rated a weak fit with no swap made, and swaps the user turned down. */
+  /** Clear weak nights Homestand found no swap for. */
   stillWeak?: string[];
+  /** Nights with a swap offered that is neither approved nor rejected, each with what was offered. */
+  offered?: string[];
+  /** Swaps the user turned down. */
   rejected?: string[];
   /** True for a sample calendar we wrote (the memo then says so). */
   sample?: boolean;
@@ -77,9 +80,10 @@ export function memoOpener(d: Pick<MemoData, "club" | "nights" | "swaps" | "sugg
 export function buildMemoHtml(d: MemoData): string {
   const C = copyFor(d.kind, d.sport);
   const venue = d.kind === "venue";
+  const anySponsor = d.swaps.some((s) => s.sponsor);
   const rows = d.swaps
     .map(
-      (s) => `<tr><td data-label="${C.night.replace(/^./, (c) => c.toUpperCase())}">${escapeHtml(s.weekday.slice(0, 3))} ${escapeHtml(longDate(s.date).replace(/^(\w{3})\w*/, "$1"))}</td><td data-label="Was">${escapeHtml(s.from)}</td><td data-label="Now">${escapeHtml(s.to)}${s.discovered ? ` <em>(${FIT_WORDS.found})</em>` : ""}</td><td data-label="Sponsor">${escapeHtml(s.sponsor || "none")}</td>` +
+      (s) => `<tr><td data-label="${C.night.replace(/^./, (c) => c.toUpperCase())}">${escapeHtml(s.weekday.slice(0, 3))} ${escapeHtml(longDate(s.date).replace(/^(\w{3})\w*/, "$1"))}</td><td data-label="Was">${escapeHtml(s.from)}</td><td data-label="Now">${escapeHtml(s.to)}${s.discovered ? ` <em>(${FIT_WORDS.found})</em>` : ""}</td>${anySponsor ? `<td data-label="Sponsor">${escapeHtml(s.sponsor)}</td>` : ""}` +
         `<td data-label="Fit">${ratingText(s.fromZ)} \u2192 ${s.discovered ? FIT_WORDS.found : ratingText(s.toZ)}</td></tr>`,
     )
     .join("");
@@ -110,19 +114,20 @@ export function buildMemoHtml(d: MemoData): string {
 ${banner}
 <p>${escapeHtml(memoOpener(d))}</p>
 ${d.swaps.length ? `<h2>Approved ${venue ? "offers" : "swaps"}</h2>
-<div class="memo-scroll"><table><thead><tr><th>${C.night.replace(/^./, (c) => c.toUpperCase())}</th><th>Was</th><th>Now</th><th>Sponsor</th><th>Fit: before \u2192 after</th></tr></thead><tbody>${rows}</tbody></table></div>
+<div class="memo-scroll"><table><thead><tr><th>${C.night.replace(/^./, (c) => c.toUpperCase())}</th><th>Was</th><th>Now</th>${anySponsor ? "<th>Sponsor</th>" : ""}<th>Fit: before \u2192 after</th></tr></thead><tbody>${rows}</tbody></table></div>
 <h2>Why</h2><ul>${whys}</ul>` : ``}
 ${d.rejected?.length ? `<h2>Rejected</h2><p>${d.rejected.map(escapeHtml).join("; ")}.</p>` : ""}
-${d.stillWeak?.length ? `<h2>Still weak, no ${venue ? "offer" : "swap"}</h2><p>${d.stillWeak.map(escapeHtml).join("; ")}.</p>` : ""}
+${d.offered?.length ? `<h2>${venue ? "Offer proposed" : "Swap offered"}, not approved</h2><p>${d.offered.map(escapeHtml).join("; ")}.</p>` : ""}
+${d.stillWeak?.length ? `<h2>No ${venue ? "offer" : "swap"} available</h2><p>${d.stillWeak.map(escapeHtml).join("; ")}.</p>` : ""}
 ${venue ? acts : ideas}
-${d.angles.length ? `<h2>${venue ? "Locked headliners: an opener idea" : "Locked nights: an idea for the sponsor"}</h2><ul>${angles}</ul>` : ""}
+${d.angles.length ? `<h2>${venue ? "Locked headliners: a support act idea" : "Locked nights: an idea for the sponsor"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>
 <p>Strong, average and weak compare each ${venue ? "act" : "theme"} with this ${C.place}'s other ${venue ? "acts" : "themes"}. They describe taste, not ticket sales.</p>
-<p>${d.nights} ${C.nights} were reviewed; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : `(${C.provenExamples} and similar)`} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded. Taste data comes from Qloo. Every ${venue ? "offer" : "swap"} keeps its date and sponsor.</p>
+<p>${d.nights} ${C.nights} were reviewed${d.classic > 0 ? `; ${d.classic} proven ${d.classic === 1 ? "promo" : "promos"} ${venue ? "(fireworks, symphony nights, local showcases and similar)" : `(${C.provenExamples} and similar)`} ${d.classic === 1 ? "was" : "were"} left as planned because ${d.classic === 1 ? "it isn't" : "they aren't"} graded` : ""}. Taste data comes from Qloo. A rating that rests on a raw gap under 0.01 is called a slight lean, and no swap is pushed for it. Every ${venue ? "offer" : "swap"} keeps its date and sponsor.</p>
 </article>`;
 }
 
-export const MEMO_CSS = `body{font:15px/1.5 Geist,system-ui,sans-serif;color:#14233c;max-width:760px;margin:2rem auto;padding:0 1rem}h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:1.6rem}table{border-collapse:collapse;width:100%;font-size:.9rem}.memo-scroll{overflow-x:auto}th,td{border:1px solid #9aa4b2;padding:.35rem .5rem;text-align:left}.meta{color:#4a5568}.warn{border:2px solid #b3360b;padding:.5rem;font-weight:600}@media (max-width:640px){body{font-size:16px}.memo-scroll{overflow:visible}table,thead,tbody,tr,th,td{display:block}thead{position:absolute;left:-9999px}tr{border:1px solid #9aa4b2;margin:0 0 .6rem;padding:.3rem .2rem}td{border:0;padding:.15rem .4rem}td::before{content:attr(data-label) ": ";font-weight:700}}`;
+export const MEMO_CSS = `body{font:15px/1.5 Geist,system-ui,sans-serif;color:#14233c;max-width:760px;margin:2rem auto;padding:0 1rem}h1{font-size:1.5rem}h2{font-size:1.1rem;margin-top:1.6rem}table{border-collapse:collapse;width:100%;font-size:.9rem}.memo-scroll{overflow-x:auto}th,td{border:1px solid #9aa4b2;padding:.35rem .5rem;text-align:left}.meta{color:#4a5568}.warn{border:2px solid #b3360b;padding:.5rem;font-weight:600}@media (max-width:640px){body{font-size:16px}.memo-scroll{overflow:visible}table,thead,tbody,tr,th,td{display:block}thead{position:absolute;left:-9999px}tr{border:1px solid #9aa4b2;margin:0 0 .6rem;padding:.3rem .2rem}td{border:0;padding:.15rem .4rem}td:empty{display:none}td::before{content:attr(data-label) ": ";font-weight:700}}`;
 
 export function memoDocument(d: MemoData): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${copyFor(d.kind).memoTitle}: ${escapeHtml(d.club)}</title><style>${MEMO_CSS}</style></head><body>${buildMemoHtml(d)}</body></html>`;

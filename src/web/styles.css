@@ -618,3 +618,5 @@ body.why-open .nav{visibility:hidden}
   .actionbar .ab-count{display:block;flex:1 1 auto;min-width:0;color:#f6ead0;font-size:14px;font-weight:600;line-height:1.3}
   .actionbar .btn{flex:0 0 auto;padding-inline:16px}
 }
+.season-line{margin:2px 0 10px}
+.past-note{margin:8px 0 0}

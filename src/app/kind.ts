@@ -60,8 +60,8 @@ export interface SportWords {
   team: string;
   venue: string;
   months: string;
-  /** A date inside the season, ISO, for the "date" column help. */
-  dateExample: string;
+  /** The first and last month of the season (1 to 12). The season wraps over New Year when the first is after the last. */
+  seasonMonths: readonly [first: number, last: number];
   /** The stand-in promo the template and the example use where baseball has fireworks. */
   promo: string;
   /** What the kids do after the game, for the template row. */
@@ -74,16 +74,16 @@ export interface SportWords {
 }
 
 export const SPORT_WORDS: Record<Sport, SportWords> = {
-  baseball: { name: "baseball", team: "club", venue: "ballpark", months: "April to September", dateExample: "2027-04-10", promo: "Fireworks Friday", kidsNote: "Kids run the bases after the game", dayNote: "Day game", provenExamples: "fireworks, giveaways, heritage nights", firstMoment: "the first pitch", touches: "walk-up songs, PA clips or a photo spot" },
-  basketball: { name: "basketball", team: "team", venue: "arena", months: "November to April", dateExample: "2027-11-12", promo: "T-Shirt Night", kidsNote: "Kids shoot hoops at halftime", dayNote: "Matinee", provenExamples: "T-shirt nights, towel giveaways, heritage nights", firstMoment: "the ceremonial tip-off", touches: "PA clips, video-board moments or a photo spot" },
-  hockey: { name: "hockey", team: "team", venue: "arena", months: "October to April", dateExample: "2027-10-15", promo: "Teddy Bear Toss", kidsNote: "Kids skate with the mascot after the game", dayNote: "Matinee", provenExamples: "teddy bear toss, jersey giveaways, heritage nights", firstMoment: "the ceremonial puck drop", touches: "PA clips, video-board moments or a photo spot" },
-  soccer: { name: "soccer", team: "team", venue: "stadium", months: "March to October", dateExample: "2027-03-12", promo: "Scarf Giveaway Night", kidsNote: "Kids kick on the pitch after the match", dayNote: "Afternoon kickoff", provenExamples: "scarf giveaways, kit nights, heritage nights", firstMoment: "the ceremonial kickoff", touches: "PA clips, video-board moments or a photo spot" },
+  baseball: { name: "baseball", team: "club", venue: "ballpark", months: "April to September", seasonMonths: [4, 9], promo: "Fireworks Friday", kidsNote: "Kids run the bases after the game", dayNote: "Day game", provenExamples: "fireworks, giveaways, heritage nights", firstMoment: "the first pitch", touches: "walk-up songs, PA clips or a photo spot" },
+  basketball: { name: "basketball", team: "team", venue: "arena", months: "November to April", seasonMonths: [11, 4], promo: "T-Shirt Night", kidsNote: "Kids shoot hoops at halftime", dayNote: "Matinee", provenExamples: "T-shirt nights, towel giveaways, heritage nights", firstMoment: "the ceremonial tip-off", touches: "PA clips, video-board moments or a photo spot" },
+  hockey: { name: "hockey", team: "team", venue: "arena", months: "October to April", seasonMonths: [10, 4], promo: "Teddy Bear Toss", kidsNote: "Kids skate with the mascot after the game", dayNote: "Matinee", provenExamples: "teddy bear toss, jersey giveaways, heritage nights", firstMoment: "the ceremonial puck drop", touches: "PA clips, video-board moments or a photo spot" },
+  soccer: { name: "soccer", team: "team", venue: "stadium", months: "March to October", seasonMonths: [3, 10], promo: "Scarf Giveaway Night", kidsNote: "Kids kick on the pitch after the match", dayNote: "Afternoon kickoff", provenExamples: "scarf giveaways, kit nights, heritage nights", firstMoment: "the ceremonial kickoff", touches: "PA clips, video-board moments or a photo spot" },
 };
 
 export const COPY: Record<Kind, Copy> = {
   club: { place: "town", markets: "towns", season: "season", night: "night", nights: "nights", themeNight: "theme night", themeNights: "theme nights", sample: "sample club", memoTitle: "Theme-night rationale", slab: "THEME NIGHT",
     team: SPORT_WORDS.baseball.team, venueWord: SPORT_WORDS.baseball.venue, sport: "baseball", months: SPORT_WORDS.baseball.months, provenExamples: SPORT_WORDS.baseball.provenExamples, firstMoment: SPORT_WORDS.baseball.firstMoment, touches: SPORT_WORDS.baseball.touches },
-  venue: { place: "city", markets: "towns", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "",
+  venue: { place: "city", markets: "cities", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "",
     team: "venue", venueWord: "amphitheatre", sport: "", months: "May to September", provenExamples: "fireworks, symphony nights, local showcases", firstMoment: "a pre-show video", touches: "a stage-side read, a pre-show video or a giveaway" },
 };
 

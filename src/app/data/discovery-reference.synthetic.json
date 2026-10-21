@@ -1,0 +1,250 @@
+{
+  "note": "PLACEHOLDER. Made-up titles and numbers, not from Qloo. The real pool is pulled with your own key (see README, Rebuilding the reference data).",
+  "synthetic": true,
+  "markets": 40,
+  "pulledAt": null,
+  "pool": [
+    {
+      "entityId": "SYN-D-movie-0",
+      "name": "Moonpie Pirates (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-1",
+      "name": "Captain Pocketwatch (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-2",
+      "name": "The Marmalade Express (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-3",
+      "name": "Zippy and the Cloud Zoo (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-4",
+      "name": "Little Lantern Dragon (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-5",
+      "name": "Biscuit Bay Heroes (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-6",
+      "name": "Pip the Rocket Mouse (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-7",
+      "name": "The Tiny Tuba Parade (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-8",
+      "name": "Sunny Side Sleuths (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-movie-9",
+      "name": "Wobbly Knight (made up)",
+      "type": "movie",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-0",
+      "name": "Puddle Patrol (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-1",
+      "name": "The Jellybean Bus (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-2",
+      "name": "Mango Moon Club (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-3",
+      "name": "Clementine Calling (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-4",
+      "name": "Fizz and Flick (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-5",
+      "name": "Treehouse Tuesday (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-6",
+      "name": "Sprocket Street (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-7",
+      "name": "The Pudding Pals (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-8",
+      "name": "Kite Runners (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    },
+    {
+      "entityId": "SYN-D-tv_show-9",
+      "name": "Nimbus Nights (made up)",
+      "type": "tv_show",
+      "popularity": 0.99,
+      "major": true
+    }
+  ],
+  "stats": {
+    "SYN-D-movie-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-2": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-3": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-4": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-5": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-6": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-7": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-8": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-movie-9": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-0": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-1": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-2": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-3": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-4": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-5": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-6": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-7": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-8": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    },
+    "SYN-D-tv_show-9": {
+      "n": 40,
+      "mean": 0.7,
+      "sd": 0.1
+    }
+  }
+}

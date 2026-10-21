@@ -67,6 +67,16 @@ export interface ArtistRow {
   genreTags: string[];
 }
 
+/**
+ * Qloo could not answer. "auth": the key was refused (a deactivated or wrong key, which is what happens after the hackathon).
+ * "busy": it kept answering 429 (its own rate or quota limit). "down": it kept failing otherwise. The message stays technical (server log only).
+ */
+export class QlooUnavailableError extends Error {
+  constructor(readonly why: "auth" | "busy" | "down", message: string) {
+    super(message);
+  }
+}
+
 /** Always sent with discovery: without it, local results include adult and explicit titles. */
 export const FAMILY_TAG = "urn:tag:genre:media:family";
 /** Family AND animation: family alone also returns faith films and sitcoms. Sent as an intersection. */
@@ -144,7 +154,7 @@ export function createQlooClient(opts: ClientOptions) {
         await sleep(1000 * 2 ** attempt);
         continue;
       }
-      if (res.status === 401 || res.status === 403) throw new Error(`Qloo ${path}: HTTP ${res.status} (auth)`);
+      if (res.status === 401 || res.status === 403) throw new QlooUnavailableError("auth", `Qloo ${path}: HTTP ${res.status} (auth)`);
       if (res.status === 429) {
         retries.http429++;
         lastFailure = "rate-limited (429)";
@@ -166,7 +176,7 @@ export function createQlooClient(opts: ClientOptions) {
       opts.onResponse?.(path, params, body);
       return body;
     }
-    throw new Error(`Qloo ${path}: still failing after ${maxTries} tries (${lastFailure})`);
+    throw new QlooUnavailableError(lastFailure.startsWith("rate-limited") ? "busy" : "down", `Qloo ${path}: still failing after ${maxTries} tries (${lastFailure})`);
   }
 
   async function search(query: string, type: QlooType, take = 5): Promise<SearchHit[]> {

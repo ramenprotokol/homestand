@@ -61,8 +61,8 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
   await expect(why).toContainText("What Qloo looked at");
   await expect(why).toContainText(/Stevie Nicks/);
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why).toContainText(/Average of \d+ other towns/);
-  await expect(why).toContainText("Normal gap between towns");
+  await expect(why).toContainText(/Average of \d+ other cities/);
+  await expect(why).toContainText("Normal gap between cities");
   await expect(why).not.toContainText(/ballpark/i);
   await shot(page, info, "03-why");
   await page.keyboard.press("Escape");
@@ -84,8 +84,8 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
   await expect(page.getByTestId("ideas")).toContainText(/Acts Raleigh likes more than most cities|None of the \d+ acts/);
   // Every locked headliner gets a support-act idea from the taste graph.
   await expect(page.getByTestId("angle")).toHaveCount(5);
-  await expect(page.getByTestId("angle").first()).toContainText(/\(.+\) → opener idea: .+/);
-  await expect(page.getByRole("heading", { name: "Locked headliners: an opener idea" })).toBeVisible();
+  await expect(page.getByTestId("angle").first()).toContainText(/\(.+\) → support act idea: .+/);
+  await expect(page.getByRole("heading", { name: "Locked headliners: a support act idea" })).toBeVisible();
   await noClubWords(page);
   await noSideScroll(page);
   await shot(page, info, "04-fix");
@@ -116,7 +116,7 @@ test("venue sample: Check, Why, Fix, Send", async ({ page }, info) => {
   await expect(page.getByTestId("memo")).toContainText("Summer-series rationale: Raleigh, NC sample amphitheatre");
   await expect(page.getByTestId("memo")).toContainText("Homestand checked 18 dates for Raleigh, NC sample amphitheatre");
   await expect(page.getByTestId("memo")).toContainText("made-up calendar for a sample amphitheatre");
-  await expect(page.getByTestId("memo")).toContainText("Locked headliners: an opener idea");
+  await expect(page.getByTestId("memo")).toContainText("Locked headliners: a support act idea");
   await expect(page.getByTestId("memo")).not.toContainText(/ballpark|theme nights|season/i);
   await expect(page.getByTestId("to-study")).toContainText("tested Minor League baseball only");
   await noClubWords(page);

@@ -2,9 +2,11 @@
 
 **Theme nights your town will actually like.**
 
-Homestand checks a Minor League Baseball club's theme-night calendar against what people in its own town like, using Qloo's Taste AI. It then proposes swaps that keep every sponsor and every date. Before building it, we ran a sealed, pre-registered test on 385 real 2025 theme nights of whether local taste predicted bigger crowds. The result is published as it came out.
+Homestand checks a minor league team's theme-night calendar (baseball, basketball, hockey or soccer), or a concert venue's summer dates, against what people in its own town like, using Qloo's Taste AI. It then proposes swaps that keep every sponsor and every date. Before building it, we ran a sealed, pre-registered test, on baseball only, of whether local taste predicted bigger crowds at 385 real 2025 theme nights (at 106 clubs). The result is published as it came out: it did not.
 
 **Live demo:** https://homestand-6az.pages.dev. Pick a sample club, or use your own: type any US or Canadian city, paste or load a calendar, and Homestand scores it live. No sign-up.
+
+Homestand is not affiliated with any team, league, artist or brand named in its examples or sample calendars, and no sponsor in a sample is real. A theme's fit is about what people in a town like, not about an artist's or a brand's draw.
 
 ## What it does
 
@@ -24,6 +26,35 @@ A promotions director plans dozens of theme nights a season, and most of them ar
 3. **Send.** Export the revised calendar as CSV or ICS, plus a one-page rationale memo for sponsors.
 
 **The rule: code computes, the model explains.** Scoring, normalisation, constraints and ranking are plain TypeScript. A language model (Llama 3.3 70B on Cloudflare Workers AI) only words the reasons for each swap. Every number it writes must appear in the computed facts, and it may not claim an effect on sales or attendance, or the app falls back to template text (also used if the model takes longer than six seconds). The memo's opening sentence is fixed wording built from counts.
+
+## How Homestand uses Qloo
+
+For each night, Homestand asks Qloo's Insights API how much people within 80 km like the theme's declared entities (`signal.location` with a fixed `filter.results.entities` list), and compares that reading with the identical request at 40 reference towns, changing only the location. That is the place-to-place comparison Qloo's docs describe ([same page](https://docs.qloo.com/docs/interpreting-affinity-scores); "how well a restaurant appeals to diners in one neighborhood versus another"), and we tested that it holds for our request shape: the same entity at the same place returned the identical value whether asked alone, in lists of 6, 10 or 12, in a tag-filtered query two days later, or on a repeat call.
+
+A theme's index is how far the town sits from the other towns, in units of their spread, minus the town's own average across all themes, so a town that scores high on everything doesn't light up every card. Qloo's affinity for very popular entities sits near 1 everywhere, and Qloo's docs say "a slight difference, like 0.91 versus 0.92, usually indicates similar relevance" ([Interpreting affinity scores](https://docs.qloo.com/docs/interpreting-affinity-scores)). So when the raw gap behind a label is under 0.01, we mark it as a slight lean ("Leans strong" or "Leans weak") and don't push a swap: its swap is offered as optional, never pre-selected, and left out of the count of nights to fix.
+
+We didn't use Heatmap Insights, Qloo's tool for comparing places: it isn't among the hackathon's listed types, and because it ranks places against each other it wouldn't remove the small-gap issue. Our pre-registered study found the score didn't predict which theme night drew the bigger crowd, so Homestand describes local taste and never forecasts ticket sales.
+
+One new city, end to end:
+
+1. **Request.** The browser sends the picked city (name, longitude, latitude, signed by the Worker's search) and the calendar rows to `POST /api/analyze`. For each theme in the library, the Worker calls `GET /v2/insights` with `filter.type` (one call per entity type), `filter.results.entities`, `signal.location=POINT(lon lat)` and `signal.location.radius=80000`. That is five batched calls for the library, then two more for a pool of family titles.
+2. **Result.** Qloo returns, per entity, how strongly that place likes it. In words: "Bluey's local affinity sits in the bottom fifth of the 40 reference towns", so Bluey is a Weak fit here, unless the raw gap is tiny, in which case it reads "Leans weak".
+3. **What you see.** Each night gets Strong, Average or Weak fit (or a lean), with the plain reason and, under "Show the numbers", what Qloo looked at and the raw gap. Clear Weak nights get swap proposals. Nothing in the result is a sales forecast.
+
+The answers are saved server-side for 120 days, so the next visit for that town makes no Qloo call.
+
+## The agent loop
+
+Homestand is an agent in a small, bounded sense: it works through a calendar in steps, and a person decides at the one point that matters.
+
+1. **Looks up local taste through Qloo** for the town (cached after the first time), and logs every call in "How Homestand decided".
+2. **Searches for swaps under the rules:** locked nights and sponsors never change, a kids' night only becomes a kids' or family theme, no theme repeats unless the director allows it, and the best set of swaps overall is chosen, not first come first served.
+3. **Asks the human when a name is unclear.** A night such as "Elvis and the Beatles Night" fits two themes; Homestand asks which one. It never guesses.
+4. **Proposes, then waits.** Every swap is a proposal with its reason and both scores. Nothing changes until the director approves it.
+5. **Rechecks on request.** "Get fresh data" asks Qloo again for one theme (once a day per town and theme).
+6. **Writes the memo** for the approved changes, as a one-page rationale for sponsors, plus the revised CSV and calendar file.
+
+Reliability choice, stated once: code computes, the model explains. Scoring, constraints and ranking are plain TypeScript; a language model (Llama 3.3 70B on Cloudflare Workers AI) only words the reason for each swap, every number it writes must come from the computed facts, and template text is used otherwise.
 
 ## How Qloo is used
 
@@ -45,7 +76,7 @@ A promotions director plans dozens of theme nights a season, and most of them ar
   - **Why a pool:** asking for "the top family titles near X" returns almost the same list in every city. Scoring a fixed pool and ranking each title against its own spread is what makes the answer local (Fresno, Portland ME and El Paso get different titles).
 
 - **A market-relative index.**
-  1. A theme's bundle score (the mean affinity of its entities) is compared with 40 reference towns: z = (score − typical) / spread. Only per-theme aggregates are stored (`src/app/data/reference-stats.json`).
+  1. A theme's bundle score (the mean affinity of its entities) is compared with 40 reference towns: z = (score − typical) / spread. Only per-theme aggregates are stored, and they are not in this repository (see Rebuilding the reference data).
   2. Some markets sit lower or higher on almost everything, so each theme's **index** is its z minus the market's own average z across all scored themes. The Study uses the same within-market comparison.
   3. An index of +0.5 or more is "Strong fit", and −0.5 or less is "Weak fit".
   4. In the app this shows as plain words: "Fit: Weak fit" and "Star Wars here: well below most towns" (the z against the 40 markets). The reference stores only mean and SD per theme, so it can say "below most markets" but not "38th of 40". Star Wars at 0.99 can sit below average because nearly every market scores it near the top, so the small gaps are what is compared.
@@ -73,35 +104,56 @@ The same Check, Fix and Send engine also runs on a touring-act calendar. The one
 A pre-registered test of one question: **at the same ballpark, did the theme with the stronger local Qloo lean draw the bigger crowd?**
 
 - **Locked first.** The hypotheses, sample, outcome model, metrics and the bar we set were committed before any Qloo request ([`study/PREREGISTRATION.md`](study/PREREGISTRATION.md), Amendments 1–5). The scores were then frozen with a SHA-256 hash before any attendance data was opened ([`study/PULL_RECORD.md`](study/PULL_RECORD.md)).
-- **Data.** These were 385 theme nights from 2025 (Star Wars, Princess, Bluey, Harry Potter, Margaritaville, Dinosaur, Country, Marvel, Wrestling) at 120 clubs. A pair is any two different themes at the same club, so only the 89 clubs that ran two or more themes count, and they make 521 pairs (more pairs than nights). Attendance was compared with each club's own baseline, adjusted for weekday, month, fireworks and giveaways.
+- **Data.** These were 385 theme nights from 2025 (Star Wars, Princess, Bluey, Harry Potter, Margaritaville, Dinosaur, Country, Marvel, Wrestling) at 106 of the 120 clubs we scored (the other 14 ran none of the nine themes). A pair is any two different themes at the same club, so only the 89 clubs that ran two or more themes count, and they make 521 pairs (more pairs than nights). Attendance was compared with each club's own baseline, adjusted for weekday, month, fireworks and giveaways.
 - **Verdict: CALL STANDS.** Local taste called 49.1% of 521 within-club pairs (95% interval 43.2% to 54.9%). The pre-registered the bar we set was 55%, with the interval above 50%. An LLM-only baseline scored 50.6%, mostly ties. This is "not detected at this sample size", not "disproved". (A theme's national popularity scores exactly 50.0% in the app because it is the same for every club and can't rank two nights at one club; the 49.1% for it in `study/RESULTS.md` is a different, unadjusted count.)
 - **What that means for the product.** Homestand is a reasoned, cited audit of local taste, not an attendance predictor, and the app says so. Full results: [`study/RESULTS.md`](study/RESULTS.md).
 
-## Limitations
+## Known limitations
 
+- **The Study did not show that local taste predicts crowds.** On 521 within-club pairs of 2025 baseball theme nights, local taste picked the bigger crowd 49.1% of the time (likely range 43.2% to 54.9%); the bar we set before looking was 55%. An AI guess with no local data got 50.6%, mostly ties. The honest reading is "not proven in one season of baseball", not "disproved". What the data did show is narrower: an AI guess could not tell towns apart (the same answer at every club for 5 of 9 themes), while Qloo's readings did differ town to town.
+- Homestand audits local taste. It is not an attendance predictor, and nothing in it claims to be.
+- The Study covered Minor League baseball only. Basketball, hockey, soccer and the concert-venue mode have no sealed test behind them, and no swap is a booking recommendation.
 - Qloo's affinity sits near 1 for very popular entities (Country above all), so differences between markets can be tiny.
 - Several themes rest on a single Qloo entity. Fifteen library entities were dropped for having no local signal, and one more name has no committed Qloo id, so 16 of the 41 recognised themes are not scored.
-- Labels describe what a market likes relative to its own average. They do not forecast ticket sales.
-- The sample calendars are written by us, with fictional sponsors. The venue sample is a made-up calendar for a sample amphitheatre; the Study covered Minor League baseball only, so nothing about attendance is claimed for venues.
-- Venue mode has no sealed test behind it. Its swaps are reasoned from local taste, like the club ones, and no swap here is a booking recommendation.
+- Qloo returned identical readings for some nearby clubs in the Study (19 of 120 shared a full set of readings with a neighbour), so there are about 101 independent local readings, not 120.
+- The sample calendars are written by us, with fictional sponsors, for a made-up team and a made-up amphitheatre.
+- Live lookups for new cities depend on the hackathon Qloo key. After the hackathon they stop; the sample calendars (saved copies) and any city already checked keep working.
+- Free-plan limits apply: each person can look up 30 new cities a day, and the whole site shares a daily Qloo allowance (see Abuse limits).
 
 ## Run it locally
 
 ```
-npm install
+npm ci
 npm run worker:dev                                  # Worker with synthetic Qloo answers and template text (no keys, no network)
 VITE_API_BASE=http://127.0.0.1:8788 npm run dev     # front end
-npm test && npm run typecheck && npm run lint && npm run build
-npm run e2e                                         # Playwright against the local Worker (66 checks: 33 at desktop width, 33 at phone width)
+npm test && npm run typecheck && npm run lint && npm run build   # 455 unit tests (453 and 2 skipped on a clean clone, where the real reference data is absent)
+npm run e2e                                         # Playwright against the local Worker (74 checks: 37 at desktop width, 37 at phone width)
 ```
 
-Local runs show a "Synthetic demo data" banner. To use real Qloo data, put your own `QLOO_API_KEY`, `QLOO_API_URL` and a random `MARKET_SIGNING_KEY` (16+ characters; it signs the cities the search returns, and the API only accepts searched cities and the sample clubs) in `.dev.vars` (gitignored) and run the `qloo:*` scripts. Re-running the Study needs the 2025 schedules fetched locally (`npm run study:fetch`, see [`DATA_RIGHTS.md`](DATA_RIGHTS.md)).
+A clean clone needs no keys and no Qloo data: the real reference data is not in the repository, so the Worker bundles made-up stand-ins (`src/app/data/*.synthetic.json`) and says so ("Synthetic demo data"). To use real Qloo data, put your own `QLOO_API_KEY`, `QLOO_API_URL` and a random `MARKET_SIGNING_KEY` (16+ characters; it signs the cities the search returns, and the API only accepts searched cities and the sample clubs) in `.dev.vars` (gitignored). Re-running the Study needs the 2025 schedules fetched locally (`npm run study:fetch`, see [`DATA_RIGHTS.md`](DATA_RIGHTS.md)).
+
+### Rebuilding the reference data
+
+Qloo's hackathon guide says not to store Qloo response data in a public repository, so the reference data is yours to pull with your own key. Each script reads `.dev.vars` and writes a gitignored file under `src/app/data/`:
+
+| Command | Writes | What it is |
+|---|---|---|
+| `npm run qloo:resolve` | `entity-ids.json` (committed: IDs and names only) | Qloo entity IDs for the theme library |
+| `npm run qloo:reference` | `reference-stats.json` | Per-theme mean and spread over 40 reference towns |
+| `npm run qloo:discovery-reference` | `discovery-reference.json` | The pool of family titles, with per-title aggregates |
+| `npm run qloo:acts-reference` and `npm run qloo:support-acts` | `acts-reference.json` | The touring-act pool for venue mode |
+
+Before every build, test and `wrangler dev` / `wrangler deploy`, `scripts/prepare-data.mjs` copies the real file if it exists, or the committed synthetic one if not, into `src/worker/data/` (gitignored), and only the Worker imports it. The browser bundle never contains these values. To force synthetic data on a machine that has the real files, set `HOMESTAND_SYNTHETIC_DATA=1`.
+
+### Deploying (the ops notes)
+
+The Worker is deployed from a machine that has the real reference files, because `wrangler deploy` runs `prepare-data` first (`[build]` in `wrangler.toml`) and bundles what it picks. Before building the site, run `npm run snapshots -- <api base> <site origin>`: it saves each sample's results from the live API into `public/snapshots/` (gitignored), the build copies them into `dist/`, and the site falls back to them with a "Showing a saved copy" banner if the server does not answer. Optional: set a `WARM_TOKEN` secret, then `WARM_TOKEN=... npm run warm:metros -- <api base> 5` warms the largest US and Canadian metros on demand; a cron does the same a few towns every three hours.
 
 **Stack:** Vite and vanilla TypeScript on Cloudflare Pages; a Cloudflare Worker (KV, Workers AI); Vitest and Playwright.
 
 ## Abuse limits
 
-The public API is limited per client: a Cloudflare Rate Limiting binding per route (per minute, an IPv6 caller counted as its /64), per-client daily quotas (6 new-city lookups, 10 live re-checks, 30 model calls, 20 live taste-graph lookups, which sample markets do not skip), one live re-check per market and theme per day, at most 5 live taste-graph lookups in one request, and shared daily caps on Qloo and model calls. The counters fail closed: if one cannot be read or written (a KV outage, or the free plan's daily write limit), no further live Qloo or model call is made for that request, and the answer comes from recorded results or template text, with a line in the step log. Model answers are cached in KV, so a repeat costs nothing. A visit to a warm sample club writes nothing to KV.
+The public API is limited per client: a Cloudflare Rate Limiting binding per route (per minute, an IPv6 caller counted as its /64), per-client daily quotas (30 new-city lookups, 20 live re-checks, 60 model calls, 40 live taste-graph lookups, which sample markets do not skip), one live re-check per market and theme per day, at most 5 live taste-graph lookups in one request, and shared daily caps on Qloo (1,500 calls) and model calls. The quotas are sized so a team of judges behind one office address is not blocked; the shared caps, not the quotas, bound the total. The counters fail closed: if one cannot be read or written, no further live Qloo or model call is made for that request, and the answer comes from recorded results or template text, with a line in the step log. Each counter is split across a few KV keys so a burst of visitors does not trip KV's one-write-a-second limit on a single key. Saved results live 120 days. One new city costs 5 KV writes (8 with the model's wording), well inside the free plan's 1,000 a day. A visit to a warm sample club writes nothing to KV.
 
 ## Data rights
 
@@ -114,3 +166,14 @@ Built with AI coding assistants, credited in [`BUILD_LOG.md`](BUILD_LOG.md).
 ## License
 
 MIT
+
+## Use Homestand from an AI assistant (MCP)
+
+Homestand also runs as an [MCP](https://modelcontextprotocol.io) server, so an AI assistant can check a calendar and suggest swaps for you. The address is `https://homestand-api.ramenprotokol.workers.dev/mcp`. There is no sign-in. It uses the same daily limits as the website, and it never returns raw Qloo numbers, only fits and reasons.
+
+- **Claude:** Settings, then Connectors, then Add custom connector. Paste the address.
+- **Other MCP clients (ChatGPT, Cursor, the MCP Inspector):** add a remote server of type "Streamable HTTP" with the same address. To try it from a terminal: `npx @modelcontextprotocol/inspector --cli https://homestand-api.ramenprotokol.workers.dev/mcp --transport http --method tools/list`.
+
+Tools: `check_calendar` (rates every night), `propose_swaps` (replacements for the weak nights; locked nights, dates and sponsors stay), `explain_night` (why one theme got its rating) and `sample_teams` (the made-up demo teams, so you can try it without typing a calendar).
+
+Example prompt: "Check this hockey calendar for Fargo, ND and fix the weak nights."

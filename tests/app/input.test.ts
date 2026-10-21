@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { dateExample, dateHint, detectDateOrder, parseCalendar, parseDate } from "../../src/app/calendar/csv";
+import { dateHint, detectDateOrder, parseCalendar, parseDate } from "../../src/app/calendar/csv";
 import { exactTries, matchScore, parsePlaceQuery, prefixTries, queryTargets, rankPlaces, typoDistance, type RawPlace } from "../../src/app/geo";
 import { SPORTS } from "../../src/app/kind";
-import { dateExample as dateExampleFromSamples, exampleCsv } from "../../src/app/samples";
+import { dateExample, exampleCsv } from "../../src/app/samples";
 
 const H = "date,theme,sponsor,locked,notes\n";
 
@@ -100,22 +100,22 @@ describe("ranking what the geocoder returned", () => {
   });
 });
 
-describe("dates: one example, in the future", () => {
-  it("every sport's example date is after today's date in the app, and the hint says both spellings", () => {
-    for (const s of SPORTS) {
-      expect(dateExample(s) > "2026-10-20").toBe(true);
-      expect(dateExampleFromSamples(s)).toBe(dateExample(s));
+
+describe("dates: one example, never in the past", () => {
+  it("the hint uses the next-season example the caller gives, in both spellings; no example means formats only", () => {
+    for (const today of ["2026-10-20", "2027-02-01", "2027-07-15"]) {
+      for (const s of SPORTS) expect(dateExample(s, today) >= today).toBe(true);
     }
-    expect(dateHint("baseball")).toBe("Use 2027-04-10 or 4/10/2027.");
-    expect(dateHint("basketball")).toBe("Use 2027-11-12 or 11/12/2027.");
-    expect(dateHint("baseball", true)).toBe("Use 2027-04-10 or 10/4/2027.");
+    expect(dateHint("2027-04-10")).toBe("Use 2027-04-10 or 4/10/2027.");
+    expect(dateHint("2027-04-10", true)).toBe("Use 2027-04-10 or 10/4/2027.");
+    expect(dateHint()).toBe("Use YYYY-MM-DD or M/D/YYYY.");
   });
 
-  it("a bad date in Check says the same thing the editor says", () => {
-    const { errors } = parseCalendar(`${H}soon,Bluey,,no,\n`);
-    expect(errors[0]!.message).toBe(`"soon" is not a date. ${dateHint("baseball")}`);
-    expect(parseCalendar(`${H}soon,Bluey,,no,\n`, "hockey").errors[0]!.message).toBe(`"soon" is not a date. ${dateHint("hockey")}`);
-    expect(JSON.stringify(parseCalendar(`${H}soon,Bluey,,no,\n`).errors)).not.toContain("2026");
+  it("a bad date says the same thing in Check and in the editor, with the example it was given", () => {
+    const ex = dateExample("hockey", "2026-10-20");
+    const { errors } = parseCalendar(`${H}soon,Bluey,,no,\n`, ex);
+    expect(errors[0]!.message).toBe(`"soon" is not a date. ${dateHint(ex)}`);
+    expect(errors[0]!.message).toContain(ex);
   });
 });
 
@@ -163,7 +163,7 @@ describe("dates: day first or month first", () => {
   });
 
   it("the hint on a bad row in a day-first file shows the day-first spelling", () => {
-    const r = parseCalendar(`${H}25/4/2027,A,,no,\nsoon,B,,no,\n`);
+    const r = parseCalendar(`${H}25/4/2027,A,,no,\nsoon,B,,no,\n`, "2027-04-10");
     expect(r.errors[0]!.message).toBe('"soon" is not a date. Use 2027-04-10 or 10/4/2027.');
   });
 

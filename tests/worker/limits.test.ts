@@ -19,7 +19,7 @@ describe("in-memory limiter", () => {
   it("counts per route, per client and per minute", async () => {
     let t = 0;
     const lim = memoryLimiter(1, () => t);
-    for (let i = 0; i < 12; i++) expect(await lim("analyze", "a")).toBe(true);
+    for (let i = 0; i < 30; i++) expect(await lim("analyze", "a")).toBe(true);
     expect(await lim("analyze", "a")).toBe(false);
     expect(await lim("analyze", "b")).toBe(true);
     expect(await lim("propose", "a")).toBe(true);

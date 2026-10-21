@@ -1,7 +1,7 @@
-import { fitWord, type FitLabel } from "../app/score";
+import { fitWordFor, type FitLabel } from "../app/score";
 import { h, type Child } from "./dom";
 import { icon, type IconName } from "./icons";
-import { state } from "./store";
+import { state, ui } from "./store";
 
 const FIT_ICON: Record<FitLabel, IconName> = {
   "leans-in": "trendUp",
@@ -13,8 +13,8 @@ const FIT_ICON: Record<FitLabel, IconName> = {
 };
 
 /** The fit in words, with an icon: colour is never the only signal. */
-export function fitChip(fit: FitLabel | "pick"): HTMLElement {
-  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWord(fit));
+export function fitChip(fit: FitLabel | "pick", slight?: boolean): HTMLElement {
+  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWordFor(fit, slight));
 }
 
 export function syntheticBanner(): HTMLElement | null {
@@ -26,6 +26,12 @@ export function syntheticBanner(): HTMLElement | null {
     icon("flask"),
     h("span", null, h("strong", null, "Synthetic demo data. "), "These scores are made up for testing the app. They are not from Qloo."),
   );
+}
+
+/** Shown when the screen comes from the copy saved at deploy time because the live server did not answer. */
+export function savedCopyBanner(): HTMLElement | null {
+  if (!ui.savedCopy) return null;
+  return h("div", { class: "notice notice--warn", role: "note", "data-testid": "saved-copy" }, icon("info"), h("span", null, h("strong", null, "Showing a saved copy. "), "The live server isn't answering right now."));
 }
 
 // ---------- drawer ----------

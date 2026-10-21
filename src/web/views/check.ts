@@ -1,12 +1,13 @@
 import type { ThemeScoreOut } from "../../app/api-types";
-import { bridgeSentence, classicReason, comparisonSentence, fitMeaning, fitWord, marketLevelSentence, NEAR_TOP_NOTE, vsMarketsWords, type FitLabel } from "../../app/score";
+import { bridgeSentence, classicReason, comparisonSentence, fitMeaning, fitWord, marketLevelSentence, NEAR_TOP_NOTE, slightNote, vsMarketsWords, type FitLabel } from "../../app/score";
 import { cityOfLabel } from "../../app/kind";
 import { themeById } from "../../app/themes/artists";
-import { checkResultLine, cleanTitle, fitSummary, lockedLine } from "../../app/text";
+import { dateWithYear, passedCount, seasonEyebrow } from "../../app/dates";
+import { checkHeadline, cleanTitle, fitSummary, localDay, lockedLine } from "../../app/text";
 import { ApiFailure } from "../api";
 import { errorView } from "./errors";
-import { fitChip, syntheticBanner } from "../components";
-import { formatDate, formatDateTime, h, type Child } from "../dom";
+import { fitChip, savedCopyBanner, syntheticBanner } from "../components";
+import { formatDateTime, h, type Child } from "../dom";
 import { recheckTheme, navigate } from "../flow";
 import { bindTilt, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
 import { onCleanup, onMount, route, routeContext } from "../foil/lifecycle";
@@ -31,7 +32,8 @@ function fitList(views: NightView[]): HTMLElement {
     order.flatMap((fit) => {
       const n = views.filter((v) => v.fit === fit).length;
       if (fit === "found" && n === 0) return [];
-      return [h("li", { class: `fl${fit === "leans-away" ? " away" : ""}`, "data-k": fit }, gemChip(fit), h("b", { class: "fl-n" }, String(n)), h("span", { class: "fl-t" }, h("b", null, fitWord(fit)), ` ${fitMeaning(fit, state.kind)}`))];
+      const lean = views.filter((v) => v.fit === fit && v.slight).length;
+      return [h("li", { class: `fl${fit === "leans-away" ? " away" : ""}`, "data-k": fit }, gemChip(fit), h("b", { class: "fl-n" }, String(n)), h("span", { class: "fl-t" }, h("b", null, fitWord(fit)), ` ${fitMeaning(fit, state.kind)}`, lean > 0 ? ` ${lean} of ${n === 1 ? "this" : "these"} only ${lean === 1 ? "leans" : "lean"} that way: the raw gap is tiny.` : ""))];
     }),
   );
 }
@@ -86,6 +88,8 @@ export function checkView(): HTMLElement {
   const notices: HTMLElement[] = [];
   const synth = syntheticBanner();
   if (synth) notices.push(synth);
+  const saved = savedCopyBanner();
+  if (saved) notices.push(saved);
   if (state.kind === "club" && state.sport !== "baseball" && state.sampleId) notices.push(h("div", { class: "notice", role: "note", "data-testid": "sport-note" }, icon("info"), h("span", null, h("strong", null, "A made-up sample. "), `This ${copy().sport} calendar is one we wrote for a sample team. The dates, theme nights and sponsors are invented, and it is not any real team's schedule.`)));
   if (state.kind === "venue") notices.push(h("div", { class: "notice", role: "note", "data-testid": "venue-note" }, icon("info"), h("span", null, h("strong", null, "A made-up sample. "), "This summer concert calendar is one we wrote for a sample amphitheatre. The acts, dates and sponsors are invented, and it is not any real venue's schedule.")));
   if (state.parseErrors.length > 0) {
@@ -105,20 +109,21 @@ export function checkView(): HTMLElement {
   }
 
   const locked = views.filter((v) => v.night.locked);
-  const result = checkResultLine(away, views.length, city(), copy().night, copy().nights);
+  const slightAway = views.filter((v) => v.fit === "leans-away" && v.slight).length;
+  const result = checkHeadline({ clearAway: away - slightAway, slightAway, total: views.length, graded: count("leans-in") + count("average") + away, classic: count("classic"), notScored: count("not-scored") }, city(), copy().night, copy().nights);
 
   const asks = pendingViews.map((v) =>
     h(
       "div",
       { class: "ask", role: "group", "aria-label": `Which theme is "${v.night.theme}"?`, "data-ask": v.night.index },
-      h("div", { class: "q" }, `${formatDate(v.night.date)}: score it as ${v.night.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}?`),
+      h("div", { class: "q" }, `${dateWithYear(v.night.date)}: score it as ${v.night.candidates.map((id) => themeById(id)?.label ?? id).join(" or ")}?`),
       h("p", null, `"${v.night.theme}" fits more than one theme. We never guess.`),
       choiceButtons(v.night),
     ),
   );
   // After a pick the choice stays on screen as one line, with a way back.
   const picked = views.filter((v) => v.night.resolution.kind === "ambiguous" && state.choices[v.night.index] !== undefined).map((v) =>
-    h("p", { class: "picked-line", "data-testid": "picked-line" }, `${formatDate(v.night.date)} scored as ${v.themeLabel}: ${fitWord(v.fit).toLowerCase()}. `,
+    h("p", { class: "picked-line", "data-testid": "picked-line" }, `${dateWithYear(v.night.date)} scored as ${v.themeLabel}: ${fitWord(v.fit).toLowerCase()}. `,
       h("button", { type: "button", class: "linkbtn", onclick: () => { delete state.choices[v.night.index]; window.dispatchEvent(new HashChangeEvent("hashchange")); } }, "Change")),
   );
 
@@ -149,6 +154,7 @@ export function checkView(): HTMLElement {
     tap(c);
   });
 
+  const passed = passedCount(a.nights.map((n) => n.date), localDay());
   const deckL = h(
     "div",
     { class: "deck-l", id: "deckL" },
@@ -157,7 +163,9 @@ export function checkView(): HTMLElement {
       { class: "dl-top" },
       h("div", { class: "eyebrow" }, "Step 1 of 3 \u00b7 Check"),
       h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
+      h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(a.nights.map((n) => n.date), copy().season)),
       h("p", { class: "check-line", "data-testid": "summary" }, result),
+      passed > 0 ? h("p", { class: "small past-note", "data-testid": "past-note" }, `${passed} of these ${copy().nights} ${passed === 1 ? "has" : "have"} already passed.`) : null,
       asks,
       picked,
       pendingViews.length > 0 ? h("p", { class: "small pick-hint" }, `${pendingViews.length} ${pendingViews.length === 1 ? `${copy().night} needs` : `${copy().nights} need`} your pick. Choose one above, or continue and leave ${pendingViews.length === 1 ? "it" : "them"} ungraded.`) : null,
@@ -270,7 +278,7 @@ function backOf(v: NightView): BackSpec {
   const pool = n.pool && n.pool.z !== null ? n.pool : null;
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
   const reason = v.discovered
-    ? `People in ${city()} like ${v.discovered.name} more than people in most towns do.`
+    ? `People in ${city()} like ${v.discovered.name} more than people in most ${copy().markets} do.`
     : v.fit === "classic"
       ? classicReason(state.kind, state.sport)
       : v.needsChoice
@@ -282,12 +290,13 @@ function backOf(v: NightView): BackSpec {
     total: state.analysis!.nights.length,
     city: city(),
     title: v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme,
-    dateLine: `${formatDate(n.date)} · ${n.weekday}`,
+    dateLine: `${dateWithYear(n.date)} · ${n.weekday}`,
     rows: scored ? s.entities.map((e) => ({ name: e.name, type: e.type, affinity: e.affinity })) : pool ? [{ name: pool.name, type: pool.type, affinity: pool.affinity }] : [],
     index: scored ? s.index : pool ? pool.z : null,
     z: scored ? s.z : pool ? pool.zRaw : null,
     themeName: pool ? pool.name : v.themeId ? (themeById(v.themeId)?.label ?? n.theme) : n.theme,
     fit,
+    ...(v.slight ? { slight: true } : {}),
     reason,
     checked: checkedAt && (scored || pool) ? formatDateTime(checkedAt) : null,
   };
@@ -319,9 +328,9 @@ function whyInfo(index: number): Child {
   const title = v.swappedFrom ? swapTitle(n.theme, v.themeLabel) : n.theme;
   const fit: CardFit = v.needsChoice ? "pick" : v.fit;
   const out: Child[] = [
-    h("div", { class: "eyebrow" }, `No. ${String(n.index + 1).padStart(2, "0")} / ${String(a.nights.length).padStart(2, "0")} · ${n.weekday} ${formatDate(n.date)}${n.locked ? " · Locked" : ""}`),
+    h("div", { class: "eyebrow" }, `No. ${String(n.index + 1).padStart(2, "0")} / ${String(a.nights.length).padStart(2, "0")} · ${n.weekday} ${dateWithYear(n.date)}${n.locked ? " · Locked" : ""}`),
     h("h2", { id: "why-title" }, title),
-    h("div", null, fitChip(fit), n.locked ? h("p", { class: "small", style: "margin-top:8px" }, `This ${copy().night} is locked. It will not be swapped.`) : null),
+    h("div", null, fitChip(fit, v.slight), n.locked ? h("p", { class: "small", style: "margin-top:8px" }, `This ${copy().night} is locked. It will not be swapped.`) : null),
   ];
   if (v.swappedFrom) out.push(h("p", { class: "panel-box" }, `Swapped from ${v.swappedFrom}.`));
 
@@ -330,7 +339,7 @@ function whyInfo(index: number): Child {
     return out;
   }
   if (v.discovered) {
-    out.push(h("p", { class: "panel-box" }, `People in ${city()} like ${v.discovered.name} more than people in most towns do. It isn't one of our themes, so it has no fit rating: Homestand found it by comparing ${city()} with 40 other towns.`));
+    out.push(h("p", { class: "panel-box" }, `People in ${city()} like ${v.discovered.name} more than people in most ${copy().markets} do. It isn't one of our themes, so it has no fit rating: Homestand found it by comparing ${city()} with 40 other towns.`));
     return out;
   }
   if (v.needsChoice) {
@@ -354,6 +363,7 @@ function whyInfo(index: number): Child {
     // The card back and this line say the one plain thing: how the town rates it against its own other themes. The comparison with other towns is under "Show the numbers".
     out.push(h("p", { class: "sr-only", "data-testid": "fit-line" }, comparisonSentence(theme.label, s.label, city(), state.kind)));
   }
+  if (v.slight && s.gap !== null && s.gap !== undefined) out.push(h("p", { class: "panel-box", "data-testid": "slight-note" }, slightNote(s.gap)));
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${cleanTitle(e.name)} (${e.type.replace("_", " ")})`)))),
   );
@@ -366,26 +376,27 @@ function whyInfo(index: number): Child {
       h(
         "div",
         { class: "panel-box" },
-        h("p", { class: "small" }, "Raw scores sit near 0.99 everywhere, so we compare the small gaps. ", h("a", { href: "#/study" }, "How this works and how we tested it")),
-        vsOthers ? h("p", { "data-testid": "vs-others" }, vsOthers, bridgeSentence(s.label, s.z, city()) ? ` ${bridgeSentence(s.label, s.z, city())}` : "") : null,
+        h("p", { class: "small" }, s.ref && s.ref.mean >= 0.95 ? `Raw scores for this ${state.kind === "venue" ? "act" : "theme"} sit near ${s.ref.mean.toFixed(2)} everywhere, so we compare the small gaps. ` : `Raw scores differ only a little between ${copy().markets}, so we compare the gaps. `, h("a", { href: "#/study" }, "How this works and how we tested it")),
+        vsOthers ? h("p", { "data-testid": "vs-others" }, vsOthers, bridgeSentence(s.label, s.z, city(), state.kind) ? ` ${bridgeSentence(s.label, s.z, city(), state.kind)}` : "") : null,
         h("p", { class: "small" }, marketLevelSentence(s.marketMeanZ, state.kind)),
         s.score !== null && s.score >= 0.9 && s.ref && s.ref.sd < 0.01 ? h("p", { class: "small", "data-testid": "near-top-note" }, NEAR_TOP_NOTE) : null,
-        Math.abs(s.index ?? 0) > 4 || Math.abs(s.z ?? 0) > 4 ? h("p", { class: "small", "data-testid": "tiny-sd-note" }, "Differences between towns are tiny for this title, so the number looks bigger than it is.") : null,
+        Math.abs(s.index ?? 0) > 4 || Math.abs(s.z ?? 0) > 4 ? h("p", { class: "small", "data-testid": "tiny-sd-note" }, `Differences between ${copy().markets} are tiny for this ${state.kind === "venue" ? "act" : "title"}, so the number looks bigger than it is.`) : null,
         h("p", { class: "small" }, "Taste match here, item by item:"),
         h("dl", { class: "kv" }, s.entities.flatMap((e) => [h("dt", null, cleanTitle(e.name)), h("dd", null, e.affinity === null ? "no reading" : e.affinity.toFixed(4))])),
         h(
           "dl",
           { class: "kv kv--sum" },
-          h("dt", null, "This theme's score here"), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
-          h("dt", null, `Average of ${s.ref?.n ?? "n/a"} other towns`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
-          h("dt", null, "Normal gap between towns"), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
-          h("dt", null, `${city()} vs. other towns`), h("dd", null, gaps(s.z, "other towns")),
-          h("dt", null, `${city()}'s usual`), h("dd", null, gaps(s.marketMeanZ, "other towns")),
+          h("dt", null, `This ${state.kind === "venue" ? "act" : "theme"}'s score here`), h("dd", null, s.score === null ? "n/a" : s.score.toFixed(4)),
+          h("dt", null, `Average of ${s.ref?.n ?? "n/a"} other ${copy().markets}`), h("dd", null, s.ref ? s.ref.mean.toFixed(4) : "n/a"),
+          h("dt", null, `Normal gap between ${copy().markets}`), h("dd", null, s.ref ? s.ref.sd.toFixed(5) : "n/a"),
+          h("dt", null, `${city()} vs. other ${copy().markets}`), h("dd", null, gaps(s.z, `other ${copy().markets}`)),
+          h("dt", null, `${city()}'s usual`), h("dd", null, gaps(s.marketMeanZ, `other ${copy().markets}`)),
           h("dt", null, `${theme.label} vs. ${city()}'s usual`), h("dd", null, gaps(s.index, `${city()}'s usual`)),
+          s.gap !== null && s.gap !== undefined ? h("dt", null, "Raw gap behind the label") : null, s.gap !== null && s.gap !== undefined ? h("dd", { "data-testid": "raw-gap" }, `${s.gap >= 0 ? "+" : "-"}${Math.abs(s.gap).toFixed(4)}`) : null,
         ),
-        h("p", { class: "small" }, `Weak fit: at least 0.5 normal gaps below ${city()}'s usual. Strong fit: at least 0.5 above it.`),
-        h("p", { class: "small" }, `${city()}'s usual is the average over the themes Qloo had data for here.`),
-        a.reference.synthetic ? h("p", { class: "small" }, "The typical-town numbers are a synthetic placeholder until the comparison set is pulled.") : null,
+        h("p", { class: "small" }, `Weak fit: at least 0.5 normal gaps below ${city()}'s usual. Strong fit: at least 0.5 above it. If the raw gap behind that is under 0.01 it reads "Leans weak" or "Leans strong" instead.`),
+        h("p", { class: "small" }, `${city()}'s usual is the average over the ${state.kind === "venue" ? "acts" : "themes"} Qloo had data for here.`),
+        a.reference.synthetic ? h("p", { class: "small" }, `The typical-${copy().place} numbers are a synthetic placeholder until the comparison set is pulled.`) : null,
       ),
     );
   }

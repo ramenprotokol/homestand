@@ -1,9 +1,9 @@
 import type { GeoHit } from "../../app/api-types";
-import { CSV_HEADER, csvField, dateExample, parseCalendar, parseDate, parseLocked, type ParsedCalendar } from "../../app/calendar/csv";
+import { CSV_HEADER, csvField, parseCalendar, parseDate, parseLocked, type ParsedCalendar } from "../../app/calendar/csv";
 import { MAX_CITY } from "../../app/geo";
 import { copyFor, SPORT_WORDS, SPORTS, sportOf, type Sport } from "../../app/kind";
 import { SAMPLE_MARKETS } from "../../app/markets";
-import { csvTemplate, exampleCsv, sampleCsv } from "../../app/samples";
+import { csvTemplate, dateExample, exampleCsv, sampleCsv } from "../../app/samples";
 import { api, ApiFailure } from "../api";
 import { download, h } from "../dom";
 import { heroShell } from "../foil/hero";
@@ -227,7 +227,8 @@ export function ownView(): HTMLElement {
     sportButtons.forEach((b, i) => b.setAttribute("aria-checked", String(SPORTS[i] === sport)));
     sportHint.textContent = `${w.name.replace(/^./, (c) => c.toUpperCase())} seasons usually run ${w.months}. Next, the city your ${w.venue} is in.`;
     themeHelp.textContent = `The theme night's name, like Bluey Night or ${w.promo}.`;
-    dateHelp.textContent = `The game date, like ${dateExample(sport)} or ${usDate(dateExample(sport))}.`;
+    const e = dateExample(sport);
+    dateHelp.textContent = `The game date, like ${e} or ${usDate(e)}.`;
     paste.setAttribute("placeholder", csvTemplate(sport));
   }
   const errors = h("div", { role: "alert", class: "error" });
@@ -238,14 +239,14 @@ export function ownView(): HTMLElement {
   // The editor shows exactly what Check will do: every count and message below comes from parseCalendar, the same reader Check uses.
   interface EdRow { line: number; date: string; theme: string; sponsor: string; locked: string; notes: string }
   let model: EdRow[] = [];
-  let report: ParsedCalendar = parseCalendar("", sport);
+  let report: ParsedCalendar = parseCalendar("", dateExample(sport));
   /** The note element under each row's date cell, so one edit can refresh them all (a date can change how the whole file is read). */
   let notes = new Map<EdRow, HTMLElement>();
   const rowText = (r: EdRow): string => [r.date, r.theme, r.sponsor, r.locked, r.notes].map(csvField).join(",");
   const writeBack = (): void => {
     model.forEach((r, i) => (r.line = i + 2));
     paste.value = [CSV_HEADER, ...model.map(rowText)].join("\n") + "\n";
-    report = parseCalendar(paste.value, sport);
+    report = parseCalendar(paste.value, dateExample(sport));
   };
   /** What Check would say about one row: why it is skipped, or (not blocking) what to double-check. */
   const noteFor = (r: EdRow): { text: string; warn: boolean } | null => {
@@ -307,8 +308,8 @@ export function ownView(): HTMLElement {
   }
   /** Reads the paste box again (it was typed in, uploaded or filled) and redraws. */
   function refresh(): void {
-    if (paste.value.trim() === "") { model = []; report = parseCalendar("", sport); check.replaceChildren(); barCount.textContent = ""; table.replaceChildren(); return; }
-    report = parseCalendar(paste.value, sport);
+    if (paste.value.trim() === "") { model = []; report = parseCalendar("", dateExample(sport)); check.replaceChildren(); barCount.textContent = ""; table.replaceChildren(); return; }
+    report = parseCalendar(paste.value, dateExample(sport));
     model = report.raw.map((r) => ({ ...r }));
     summary();
     drawTable();
@@ -378,7 +379,7 @@ export function ownView(): HTMLElement {
     }
     lastText = paste.value;
     lastChosen = chosen;
-    const { rows, errors: rowErrors } = parseCalendar(paste.value, sport);
+    const { rows, errors: rowErrors } = parseCalendar(paste.value, dateExample(sport));
     if (rows.length === 0) {
       errors.replaceChildren(...rowErrors.map((e) => h("p", null, `Line ${e.line}: ${e.message}`)));
       errors.scrollIntoView({ block: "center" });
@@ -407,6 +408,7 @@ export function ownView(): HTMLElement {
           { class: "field" },
           h("label", { for: "csvtext" }, "2. Your theme nights"),
           h("p", { id: "csvhelp", class: "help" }, "One row per theme night, with a header row on top. Upload a file or paste the rows here."),
+          h("p", { class: "help", "data-testid": "any-dates" }, "Use any dates you like, this season or next. Qloo scores what your town likes, so the dates are yours."),
           h(
             "dl",
             { class: "cols" },

@@ -1,5 +1,3 @@
-import { SPORT_WORDS, type Sport } from "../kind";
-
 export interface CalendarRow {
   /** 1-based line in the uploaded text (the header is line 1). */
   line: number;
@@ -118,15 +116,15 @@ export function prettyDate(iso: string): string {
   return `${MONTH_NAMES[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}, ${iso.slice(0, 4)}`;
 }
 
-/** The one place that says how to write a date: a future example in the sport's own season, in both spellings. */
-export function dateExample(sport: Sport = "baseball"): string {
-  return SPORT_WORDS[sport].dateExample;
-}
-/** "Use 2027-04-10 or 4/10/2027." (or 10/4/2027 once the calendar is read day-first). Every date message in the app ends with this. */
-export function dateHint(sport: Sport = "baseball", dayFirst = false): string {
-  const ex = dateExample(sport);
-  const [y, m, d] = [ex.slice(0, 4), Number(ex.slice(5, 7)), Number(ex.slice(8, 10))];
-  return `Use ${ex} or ${dayFirst ? `${d}/${m}/${y}` : `${m}/${d}/${y}`}.`;
+/**
+ * How to write a date, ending every date message in the app: "Use 2027-04-10 or 4/10/2027." (10/4/2027 once the calendar is read
+ * day-first). The example comes from the caller (samples.ts `dateExample`, the next-season one), so it is never in the past;
+ * with no example the hint names the formats only.
+ */
+export function dateHint(example?: string, dayFirst = false): string {
+  if (!example) return dayFirst ? "Use YYYY-MM-DD or D/M/YYYY." : "Use YYYY-MM-DD or M/D/YYYY.";
+  const [y, m, d] = [example.slice(0, 4), Number(example.slice(5, 7)), Number(example.slice(8, 10))];
+  return `Use ${example} or ${dayFirst ? `${d}/${m}/${y}` : `${m}/${d}/${y}`}.`;
 }
 
 /**
@@ -172,7 +170,7 @@ export const weekdayName = (iso: string): string => WEEKDAYS[weekdayIndex(iso)]!
  * Good rows are returned even when others fail; each failure names its line. This is the one reader for a calendar: Check, the
  * "nights ready" count and the per-row messages in the editor all come from it, so they cannot disagree.
  */
-export function parseCalendar(text: string, sport: Sport = "baseball"): ParsedCalendar {
+export function parseCalendar(text: string, example?: string): ParsedCalendar {
   const rows: CalendarRow[] = [];
   const errors: RowError[] = [];
   const warnings: RowError[] = [];
@@ -201,7 +199,7 @@ export function parseCalendar(text: string, sport: Sport = "baseball"): ParsedCa
     }
     const date = parseDate(get(rec, cDate), order.dayFirst);
     if (!date) {
-      errors.push({ line, message: `"${get(rec, cDate)}" is not a date. ${dateHint(sport, order.dayFirst)}` });
+      errors.push({ line, message: `"${get(rec, cDate)}" is not a date. ${dateHint(example, order.dayFirst)}` });
       continue;
     }
     const theme = get(rec, cTheme);

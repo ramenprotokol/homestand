@@ -1,4 +1,3 @@
-import referenceFile from "./data/acts-reference.json";
 import { discoveryZ, poolOffset, standsOut } from "./discovery";
 import type { Discovered } from "./propose/propose";
 import type { Genre, Tier } from "./themes/library";
@@ -26,7 +25,6 @@ export interface ActsReference {
   stats: Record<string, { n: number; mean: number; sd: number }>;
 }
 
-export const ACTS_REFERENCE: ActsReference = referenceFile as ActsReference;
 
 /** Qloo takes at most 50 entities per request: the pool is asked about in batches of this size (so at most two requests). */
 export const BATCH = 50;

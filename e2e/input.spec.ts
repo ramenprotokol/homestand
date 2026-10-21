@@ -72,14 +72,15 @@ test("day-first dates are read day/month with a one-line note, and a repeated da
 });
 
 test("every date hint says the same future example", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-20T12:00:00"));
   await page.goto("/#/own");
-  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2027-04-10 or 4/10/2027.");
+  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2027-04-02 or 4/2/2027.");
   await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\nsoon,Bluey Day,,no,\n");
-  await expect(page.locator(".rc-inline:not([hidden])")).toHaveText('"soon" is not a date. Use 2027-04-10 or 4/10/2027.');
+  await expect(page.locator(".rc-inline:not([hidden])")).toHaveText('"soon" is not a date. Use 2027-04-02 or 4/2/2027.');
   await pickTulsa(page);
   await page.getByTestId("check-mine").click();
   await expect(page.getByTestId("rc-count")).toBeVisible();
-  await expect(page.getByRole("alert").filter({ hasText: "Line 2" })).toHaveText('Line 2: "soon" is not a date. Use 2027-04-10 or 4/10/2027.');
+  await expect(page.getByRole("alert").filter({ hasText: "Line 2" })).toHaveText('Line 2: "soon" is not a date. Use 2027-04-02 or 4/2/2027.');
 });
 
 for (const width of [360, 390, 430]) {

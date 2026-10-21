@@ -30,7 +30,7 @@ for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) {
     await noSideScroll(page);
     await shot(page, info, `check-${id}`);
     const summary = await page.getByTestId("summary").innerText();
-    await expect(page.getByTestId("summary")).toHaveText(/^(None of the \d+ nights is|\d+ of \d+ nights? (is|are)) a weak fit for .+\.$/);
+    await expect(page.getByTestId("summary")).toHaveText(/^(None of the \d+ nights is|\d+ of \d+ nights? (is|are)) a weak fit for .+\.( \d+ more only leans? weak\.)?$/);
     await page.getByTestId("to-fix").click();
     await expect(page.getByRole("heading", { name: /Fix:/ })).toBeVisible({ timeout: 30_000 }); // the live agent can take a while to propose
     const skip = page.getByTestId("skip-pack");
@@ -56,7 +56,7 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Raw scores sit near 0.99 everywhere/)).toBeVisible();
+  await expect(why.getByText(/Raw scores (for this (theme|act) sit near [\d.]+ everywhere|differ only a little between towns), so we compare the (small )?gaps/)).toBeVisible();
   await expect(why).toContainText(/Compared with other towns, this town scores/);
   await expect(why.getByTestId("why-footer")).toContainText("See how we tested this");
   await expect(why).not.toContainText("coin flip");
@@ -95,12 +95,14 @@ test("real data: full flow on the first sample with swaps", async ({ page }, inf
   await expect(page.getByTestId("verdict")).toHaveCount(0);
   await shot(page, info, "study-call");
   await page.getByTestId("call-not-sure").click();
-  await expect(page.getByTestId("verdict")).toContainText("COIN FLIP");
-  await expect(page.getByTestId("stamp-plain")).toContainText("Local taste did not pick the bigger crowd: 49 times in 100, about a coin flip.");
+  await expect(page.getByTestId("verdict")).toContainText("NOT PROVEN");
+  await expect(page.getByTestId("stamp-plain")).toContainText("Neither local taste (49 times in 100) nor an AI guess (51 in 100, mostly ties) predicted the bigger crowd better than chance in one season.");
+  await expect(page.getByTestId("towns-line")).toContainText("same answer at every club it rated");
+  await expect(page.getByTestId("towns-line")).toContainText("for 5 of 9 themes");
   await expect(page.getByTestId("h1-text")).toContainText("49.1%");
   await expect(page.getByTestId("h1-text")).toContainText("521 pairs");
   await expect(page.getByTestId("results-pending")).toHaveCount(0);
-  await expect(page.getByTestId("stamp-plain")).toHaveText("Local taste did not pick the bigger crowd: 49 times in 100, about a coin flip.");
+  await expect(page.getByTestId("stamp-plain")).toHaveText("Neither local taste (49 times in 100) nor an AI guess (51 in 100, mostly ties) predicted the bigger crowd better than chance in one season.");
   await noSideScroll(page);
   await shot(page, info, "study-result");
 });
@@ -192,7 +194,7 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await expect(page.getByTestId("summary")).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText("Synthetic demo data")).toHaveCount(0);
   await expect(page.getByTestId("venue-note")).toContainText("made-up");
-  await expect(page.getByTestId("summary")).toHaveText(/^(None of the 18 dates is|\d+ of 18 dates? (is|are)) a weak fit for Raleigh\.$/);
+  await expect(page.getByTestId("summary")).toHaveText(/^(None of the 18 dates is|\d+ of 18 dates? (is|are)) a weak fit for Raleigh\.( \d+ more only leans? weak\.)?$/);
   await noSideScroll(page);
   await snap("1-check");
   // A flipped card.
@@ -200,7 +202,7 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   const why = page.getByRole("dialog");
   await expect(why).toContainText("What Qloo looked at");
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why).toContainText(/Compared with other towns, this city scores/);
+  await expect(why).toContainText(/Compared with other cities, this city scores/);
   await expect(why).not.toContainText(/ballpark/i);
   await snap("2-why");
   await page.keyboard.press("Escape");
@@ -215,9 +217,9 @@ test("real data: venue sample Check, Why, Fix and Send", async ({ page }, info) 
   await page.screenshot({ path: `${dir}/${info.project.name}-venue-3b-viewport.png` });
   expect(await page.locator(".slide").count()).toBeGreaterThanOrEqual(1);
   expect(await page.getByTestId("angle").count()).toBe(5);
-  await expect(page.getByTestId("angle").first()).toContainText(/\(.+\) → opener idea: .+/);
+  await expect(page.getByTestId("angle").first()).toContainText(/\(.+\) → support act idea: .+/);
   // On real data every Raleigh headliner gets a real support-act line, not the generic sponsor angle.
-  for (const t of await page.getByTestId("angle").allInnerTexts()) expect(t).toMatch(/\(.+\) → opener idea: (?!a pre-show).+/);
+  for (const t of await page.getByTestId("angle").allInnerTexts()) expect(t).toMatch(/\(.+\) → support act idea: (?!a pre-show).+/);
   await expect(page.getByTestId("ideas")).toContainText(/Acts Raleigh likes more than most cities/);
   await expect(page.getByTestId("disc-badge").first()).toBeVisible(); // at least one swap is an act Qloo found
   if ((page.viewportSize()?.width ?? 0) >= 900) {

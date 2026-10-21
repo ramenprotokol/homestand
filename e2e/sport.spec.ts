@@ -105,11 +105,12 @@ test("a baseball sample after the basketball sample reads as baseball again", as
 });
 
 test("Use your own: pick hockey, the words follow, and the Worker is told", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-20T12:00:00"));
   await page.goto("/#/own");
   // Baseball is the default.
   await expect(page.getByTestId("sport-baseball")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("sport-hint")).toContainText("Baseball seasons usually run April to September. Next, the city your ballpark is in.");
-  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2027-04-10 or 4/10/2027.");
+  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2027-04-02 or 4/2/2027.");
   for (const s of ["baseball", "basketball", "hockey", "soccer"]) await expect(page.getByTestId(`sport-${s}`)).toBeVisible();
   await expect(page.getByTestId("sport-nfl")).toHaveCount(0);
 
@@ -117,7 +118,7 @@ test("Use your own: pick hockey, the words follow, and the Worker is told", asyn
   await expect(page.getByTestId("sport-hockey")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("sport-baseball")).toHaveAttribute("aria-checked", "false");
   await expect(page.getByTestId("sport-hint")).toContainText("Hockey seasons usually run October to April. Next, the city your arena is in.");
-  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2027-10-15 or 10/15/2027.");
+  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2026-11-06 or 11/6/2026.");
   await expect(page.getByLabel("2. Your theme nights")).toHaveAttribute("placeholder", /Teddy Bear Toss/);
   // The choice survives a reload of this page.
   await page.reload();
@@ -167,4 +168,39 @@ test("The Study says it is baseball only", async ({ page }) => {
   await page.goto("/#/study");
   await expect(page.getByTestId("study-baseball-only")).toContainText("The Study is baseball only. It uses real 2025 Minor League Baseball data. We have not tested basketball, hockey or soccer.");
   await noSideScroll(page);
+});
+
+test("Use your own: soccer in Vancouver, October 2026: the example is next season and the year shows", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-20T12:00:00"));
+  await page.goto("/#/own");
+  await expect(page.getByTestId("any-dates")).toContainText("Use any dates you like, this season or next.");
+  await page.getByTestId("sport-soccer").click();
+  // No date shown in the help or the template is ever before today.
+  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2027-03-05 or 3/5/2027.");
+  const placeholder = (await page.getByLabel("2. Your theme nights").getAttribute("placeholder")) ?? "";
+  for (const d of placeholder.match(/\d{4}-\d{2}-\d{2}/g) ?? []) expect(d >= "2026-10-20", d).toBe(true);
+  await page.getByTestId("load-example").click();
+  const csv = await page.getByLabel("2. Your theme nights").inputValue();
+  expect(csv).toContain("\n2027-03-05,");
+  await page.getByLabel("1. Your home city").fill("Vancouver");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Vancouver, BC" }).click();
+  await page.getByTestId("check-mine").click();
+  await expect(page.getByTestId("summary")).toBeVisible();
+  const span = page.getByTestId("season-span");
+  await expect(span).toHaveText(/^2027 season \u00b7 Mar 5 \u2013 Jul \d+$/);
+  await expect(page.getByTestId("past-note")).toHaveCount(0);
+  await noSideScroll(page);
+});
+
+test("a calendar with nights before today gets a small note, and a fixed clock keeps it steady", async ({ page }) => {
+  await page.clock.setFixedTime(new Date("2026-10-20T12:00:00"));
+  await page.goto("/#/own");
+  await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\n2026-04-10,Bluey Day,,no,\n2026-04-17,Star Wars Night,,no,\n2026-11-06,Fireworks Friday,,no,\n");
+  await page.getByLabel("1. Your home city").fill("Tulsa");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("button", { name: "Tulsa, OK" }).click();
+  await page.getByTestId("check-mine").click();
+  await expect(page.getByTestId("past-note")).toHaveText("2 of these nights have already passed.");
+  await expect(page.getByTestId("season-span")).toHaveText("2026 season \u00b7 Apr 10 \u2013 Nov 6");
 });

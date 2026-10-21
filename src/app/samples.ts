@@ -1,7 +1,7 @@
-import { CSV_HEADER, CSV_TEMPLATE, csvField } from "./calendar/csv";
+import { CSV_HEADER, csvField } from "./calendar/csv";
 import { SPORT_WORDS, type Sport } from "./kind";
+import { localDay } from "./text";
 
-export { dateExample, dateHint } from "./calendar/csv";
 
 // Four calendars we wrote for the demo: fictional sponsors, no MLB data. April to September 2027 (each date moved forward 52 weeks, so every night keeps its weekday).
 // Each has a few locked nights, 3 to 4 classic nights, one ambiguous theme (a name that fits two themes) and one unknown.
@@ -204,21 +204,51 @@ const EXAMPLE: N[] = [
 ];
 
 const addDays = (iso: string, days: number): string => new Date(Date.parse(`${iso}T12:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
-/** Days the example moves forward so each night keeps its weekday and lands in the sport's season. Baseball is not moved. */
-const EXAMPLE_SHIFT: Record<Sport, number> = { baseball: 0, basketball: 217, hockey: 203, soccer: 0 };
+const daysBetween = (from: string, to: string): number => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
 
-/** The example calendar. Baseball is the original; another sport moves the dates into its season and uses its own promo and game-time notes. */
-export function exampleCsv(sport: Sport = "baseball"): string {
+/** Is this month (1 to 12) inside the sport's season? A season that wraps over New Year (November to April) counts both ends. */
+const inSeason = (sport: Sport, month: number): boolean => {
+  const [first, last] = SPORT_WORDS[sport].seasonMonths;
+  return first <= last ? month >= first && month <= last : month >= first || month <= last;
+};
+const monthOf = (iso: string): number => Number(iso.slice(5, 7));
+
+/** The example is written for a Friday start (EXAMPLE[0]) and runs this many days to its last night. */
+const EXAMPLE_FIRST = EXAMPLE[0]![0];
+const EXAMPLE_SPAN = daysBetween(EXAMPLE_FIRST, EXAMPLE[EXAMPLE.length - 1]![0]);
+
+/** The first night of the example for a sport: two weeks from today if the whole example fits in the season from there, otherwise the opening of the next season, then the first Friday on or after that. */
+export function exampleStart(sport: Sport, today: string = localDay()): string {
+  let start = addDays(today, 14);
+  if (!inSeason(sport, monthOf(start)) || !inSeason(sport, monthOf(addDays(start, EXAMPLE_SPAN)))) {
+    // Walk forward to the 1st of the next month the season opens in.
+    const [first] = SPORT_WORDS[sport].seasonMonths;
+    let y = Number(start.slice(0, 4));
+    let m = monthOf(start);
+    do {
+      m = m === 12 ? 1 : m + 1;
+      if (m === 1) y++;
+    } while (m !== first);
+    start = `${y}-${String(m).padStart(2, "0")}-01`;
+  }
+  return addDays(start, (((5 - new Date(`${start}T12:00:00Z`).getUTCDay()) % 7) + 7) % 7);
+}
+
+/** The example calendar. Every sport's example starts at its next season (see exampleStart); a sport other than baseball uses its own promo and game-time notes. */
+export function exampleCsv(sport: Sport = "baseball", today: string = localDay()): string {
   const w = SPORT_WORDS[sport];
-  const rows: N[] = sport === "baseball" ? EXAMPLE : EXAMPLE.map(([d, t, sp, l, n]) => [addDays(d, EXAMPLE_SHIFT[sport]), t === "Fireworks Friday" ? w.promo : t, sp, l, n === "Day game" ? w.dayNote : n]);
+  const shift = daysBetween(EXAMPLE_FIRST, exampleStart(sport, today));
+  const rows: N[] = EXAMPLE.map(([d, t, sp, l, n]) => [addDays(d, shift), sport === "baseball" || t !== "Fireworks Friday" ? t : w.promo, sp, l, sport === "baseball" || n !== "Day game" ? n : w.dayNote]);
   const lines = rows.map(([d, t, s = "", l = false, n = ""]) => [d, t, s, l ? "yes" : "no", n].map(csvField).join(","));
   return `${CSV_HEADER}\n${lines.join("\n")}\n`;
 }
 
-/** The header and three starter rows for the paste box and the template download. Baseball is the original text. */
-export function csvTemplate(sport: Sport = "baseball"): string {
+/** The date the date-column help uses: the example's first night. */
+export const dateExample = (sport: Sport = "baseball", today: string = localDay()): string => exampleStart(sport, today);
+
+/** The header and three starter rows for the paste box and the template download. */
+export function csvTemplate(sport: Sport = "baseball", today: string = localDay()): string {
   const w = SPORT_WORDS[sport];
-  if (sport === "baseball") return CSV_TEMPLATE;
-  const a = w.dateExample;
+  const a = exampleStart(sport, today);
   return `${CSV_HEADER}\n${a},Bluey Night,Harbor Credit Union,no,${w.kidsNote}\n${addDays(a, 7)},${w.promo},,no,\n${addDays(a, 28)},Star Wars Night,Gulf Coast Dental,yes,Sponsor contract signed\n`;
 }

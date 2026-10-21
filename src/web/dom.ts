@@ -1,3 +1,4 @@
+import { dateWithYear } from "../app/dates";
 export type Child = Node | string | number | null | undefined | false | Child[];
 
 export interface Props {
@@ -40,7 +41,7 @@ export function formatDate(iso: string): string {
 }
 
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 export function download(filename: string, mime: string, text: string): void {
@@ -56,5 +57,5 @@ export function download(filename: string, mime: string, text: string): void {
 export function localizeDates(text: string): string {
   return text
     .replace(/\b\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z\b/g, (m) => formatDateTime(m))
-    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, (m) => formatDate(m));
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, (m) => dateWithYear(m));
 }

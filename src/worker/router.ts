@@ -1,10 +1,12 @@
 import type { ApiError, GeoResponse, MarketIn, ProposeNightIn } from "../app/api-types";
 import { parseDate, type CalendarRow } from "../app/calendar/csv";
+import { QlooUnavailableError } from "../qloo/client";
 import { analyze, capsOf, CappedError, forKind, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
-import { isSport, kindOf } from "../app/kind";
+import { isSport, kindOf, type Kind, type Sport } from "../app/kind";
 import { exactTries, MAX_CITY, parsePlaceQuery, prefixTries, rankPlaces, TERRITORY_MESSAGE, type PlaceHit, type RawPlace } from "../app/geo";
 import { DAILY_QUOTA, type Limiter, type QuotaKind } from "./limits";
 import { isSampleMarket, marketAllowed, signMarket } from "./sign";
+import { handleMcp, type McpHost } from "./mcp";
 
 export interface RouterDeps {
   agent: Deps;
@@ -26,7 +28,8 @@ function cors(req: Request, allowed: string[]): Record<string, string> {
   if (origin && allowed.includes(origin)) {
     h["access-control-allow-origin"] = origin;
     h["access-control-allow-methods"] = "GET, POST, OPTIONS";
-    h["access-control-allow-headers"] = "content-type";
+    // The MCP endpoint's extra request headers (a browser-based MCP client sends them); the other routes stay as narrow as before.
+    h["access-control-allow-headers"] = new URL(req.url).pathname === "/mcp" ? "content-type, accept, mcp-protocol-version, mcp-method, mcp-name" : "content-type";
     h["access-control-max-age"] = "86400";
   }
   return h;
@@ -91,9 +94,14 @@ function gateFor(deps: RouterDeps, req: Request, m: MarketIn): Gate {
   return gate;
 }
 
+/** The deps for one request: the kind and sport the caller asked for, and this client's daily allowance. Shared by the web API and the MCP tools. */
+export function agentFor(deps: RouterDeps, req: Request, m: MarketIn, kind: Kind, sport?: Sport): Deps {
+  return { ...forKind(deps.agent, kind), ...(kind === "club" && sport !== undefined ? { sport } : {}), gate: gateFor(deps, req, m) };
+}
+
 const QUOTA_MESSAGES: Record<QuotaKind, string> = {
-  pull: "You've looked up as many new cities as are allowed today. The sample clubs still work, and so do cities you've already checked.",
-  recheck: "You've used today's live re-checks. The saved results are still good, and the sample clubs still work.",
+  pull: "You've looked up as many new cities as are allowed today. The sample calendars still work, and so do cities you've already checked.",
+  recheck: "You've used today's live re-checks. The saved results are still good, and the sample calendars still work.",
   model: "",
   taste: "You've used today's live taste-graph lookups. The saved ideas are still good, and the sample calendars still work.",
 };
@@ -148,6 +156,7 @@ const STUB_PLACES: RawPlace[] = [
   { name: "Tulsa", admin1: "Oklahoma", country_code: "US", latitude: 36.15398, longitude: -95.99278, population: 413066, feature_code: "PPLA2" },
   { name: "Boise", admin1: "Idaho", country_code: "US", latitude: 43.6135, longitude: -116.20345, population: 235684, feature_code: "PPLA2" },
   { name: "Columbus", admin1: "Ohio", country_code: "US", latitude: 39.96118, longitude: -83.00207, population: 905748, feature_code: "PPLA2" },
+  { name: "Vancouver", admin1: "British Columbia", country_code: "CA", latitude: 49.24966, longitude: -123.11934, population: 675218, feature_code: "PPL" },
 ];
 
 /**
@@ -165,7 +174,7 @@ async function fetchOnceMore(f: typeof fetch, url: string): Promise<Response> {
   return call(url);
 }
 
-async function geocode(deps: RouterDeps, q: string): Promise<GeoResponse> {
+export async function geocode(deps: RouterDeps, q: string): Promise<GeoResponse> {
   const { hits, message } = await searchPlaces(deps, q);
   // Signed here, so the other endpoints only accept places this search returned.
   const results = await Promise.all(hits.map(async (h) => ({ ...h, sig: deps.signingKey ? await signMarket(deps.signingKey, h) : "" })));
@@ -224,6 +233,21 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
       if (!(await deps.limiter("geocode", await deps.clientId(req)))) return fail(429, "rate-limit", "Too many searches. Wait a minute and try again.", headers);
       return json(await geocode(deps, q), 200, headers);
     }
+    if (url.pathname === "/mcp") {
+      if (req.method !== "POST") {
+        // Stateless server: no event stream to open and no session to end (MCP spec, Streamable HTTP).
+        return json({ name: "homestand", message: "This is the Homestand MCP endpoint. Send JSON-RPC 2.0 messages with POST. See the README section 'Use Homestand from an AI assistant (MCP)'." }, 405, { ...headers, allow: "POST, OPTIONS" });
+      }
+      const host: McpHost = {
+        respond: (body, status, extra = {}) => (body === null ? new Response(null, { status, headers: { ...headers, ...extra } }) : json(body, status, { ...headers, ...extra })),
+        geocode: (q) => geocode(deps, q),
+        agentFor: (m, kind, sport) => agentFor(deps, req, m, kind, sport),
+        limit: async (name) => deps.limiter(name, await deps.clientId(req)),
+        failureText: (err) => failureOf(err).message,
+        signingKey: deps.signingKey,
+      };
+      return handleMcp(req, await readBody(req, MAX_BODY), host);
+    }
     if (req.method !== "POST") return fail(404, "not-found", "No such route.", headers);
     const route = url.pathname.replace(/^\/api\//, "");
     if (!["analyze", "propose", "recheck"].includes(route)) return fail(404, "not-found", "No such route.", headers);
@@ -246,7 +270,7 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
     // `sport` is optional (baseball when absent) and must be one of the four names when present. It is wording only: never part of a cache key.
     if (body.sport !== undefined && !isSport(body.sport)) return fail(400, "bad-request", "The sport must be baseball, basketball, hockey or soccer.", headers);
     const kind = kindOf(body.kind);
-    const agent: Deps = { ...forKind(deps.agent, kind), ...(kind === "club" && body.sport !== undefined ? { sport: body.sport } : {}), gate: gateFor(deps, req, m) };
+    const agent = agentFor(deps, req, m, kind, body.sport);
 
     if (route === "analyze") {
       const rows = rowsOf(body.rows);
@@ -268,15 +292,26 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
     }
     return fail(404, "not-found", "No such route.", headers);
   } catch (err) {
-    if (err instanceof QuotaError) return fail(429, "quota", QUOTA_MESSAGES[err.kind], headers);
-    if (err instanceof CappedError && err.countersDown) {
-      return fail(503, "counters", "Live lookups are paused because the usage counters are unavailable. Recorded results still work; try again shortly.", headers);
-    }
-    if (err instanceof CappedError) {
-      return fail(429, "capped", "Today's live Qloo allowance is used up, and this town has no saved result yet. The sample clubs still work.", headers);
-    }
-    // Qloo or upstream trouble: say so without leaking details.
-    console.error("upstream failure", err instanceof Error ? err.message : String(err));
-    return fail(502, "upstream", "Something upstream failed. Try again in a moment.", headers);
+    const f = failureOf(err);
+    return fail(f.status, f.error, f.message, headers);
   }
+}
+
+/** How a failed lookup is told to the caller: the same words for the web API and the MCP tools. */
+export function failureOf(err: unknown): { status: number; error: string; message: string } {
+  if (err instanceof QuotaError) return { status: 429, error: "quota", message: QUOTA_MESSAGES[err.kind] };
+  if (err instanceof CappedError && err.countersDown) {
+    return { status: 503, error: "counters", message: "Live lookups are paused because the usage counters are unavailable. Recorded results still work; try again shortly." };
+  }
+  if (err instanceof CappedError) {
+    return { status: 429, error: "capped", message: "Today's live Qloo allowance is used up, and this town has no saved result yet. The sample calendars still work, and so does any city already checked. Live lookups reset at midnight UTC." };
+  }
+  if (err instanceof QlooUnavailableError) {
+    console.error("qloo unavailable", err.why, err.message);
+    if (err.why === "auth") return { status: 503, error: "live-ended", message: "Live lookups for new cities have ended with the hackathon. The sample calendars still work, and so does any city already checked." };
+    if (err.why === "busy") return { status: 429, error: "qloo-busy", message: "Qloo is at its own limit right now, so this new city can't be looked up. Try again in a few minutes. The sample calendars and any city already checked still work." };
+  }
+  // Qloo or upstream trouble: say so without leaking details.
+  console.error("upstream failure", err instanceof Error ? err.message : String(err));
+  return { status: 502, error: "upstream", message: "Something upstream failed. Try again in a moment." };
 }
