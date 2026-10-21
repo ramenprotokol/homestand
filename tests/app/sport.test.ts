@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyzeResponse, ProposeResponse } from "../../src/app/api-types";
 import { SPORT_CLASSIC_PHRASES } from "../../src/app/calendar/classic";
-import { parseCalendar } from "../../src/app/calendar/csv";
+import { CSV_TEMPLATE, parseCalendar } from "../../src/app/calendar/csv";
 import { resolveTheme } from "../../src/app/calendar/resolve";
 import { syntheticDiscoveryReference } from "../../src/app/discovery";
 import { buildMemoHtml, memoOpener, type MemoData } from "../../src/app/export/memo";
@@ -159,21 +159,21 @@ describe("the made-up basketball sample", () => {
 
 describe("example and template calendars", () => {
   it("leaves baseball's example and template alone", () => {
-    expect(exampleCsv()).toBe(exampleCsv("baseball"));
-    expect(exampleCsv()).toContain("2027-04-09,Fireworks Friday,Prairie Bank,no,");
-    expect(exampleCsv()).toContain("Day game");
-    expect(csvTemplate()).toContain("Kids run the bases after the game");
+    expect(exampleCsv(undefined, "2027-03-22")).toBe(exampleCsv("baseball", "2027-03-22"));
+    expect(exampleCsv("baseball", "2027-03-22")).toContain("2027-04-09,Fireworks Friday,Prairie Bank,no,");
+    expect(exampleCsv("baseball", "2027-03-22")).toContain("Day game");
+    expect(csvTemplate("baseball", "2027-03-22")).toBe(CSV_TEMPLATE);
   });
   it("moves another sport's example into its season with its own promo and notes", () => {
-    const hockey = parseCalendar(exampleCsv("hockey")).rows;
+    const hockey = parseCalendar(exampleCsv("hockey", "2026-10-20")).rows;
     expect(hockey).toHaveLength(20);
     expect(hockey.some((r) => r.theme === "Teddy Bear Toss")).toBe(true);
     expect(hockey.some((r) => /fireworks/i.test(r.theme))).toBe(false);
-    expect(hockey.every((r) => r.date >= "2027-10-01" && r.date <= "2028-04-30")).toBe(true);
-    const base = parseCalendar(exampleCsv()).rows;
+    expect(hockey.every((r) => r.date >= "2026-11-01" && r.date <= "2027-04-30")).toBe(true);
+    const base = parseCalendar(exampleCsv("baseball", "2027-03-22")).rows;
     hockey.forEach((r, i) => expect(new Date(`${r.date}T12:00:00Z`).getUTCDay()).toBe(new Date(`${base[i]!.date}T12:00:00Z`).getUTCDay()));
-    const hoops = parseCalendar(exampleCsv("basketball")).rows;
-    expect(hoops.every((r) => r.date >= "2027-11-01" && r.date <= "2028-04-30")).toBe(true);
+    const hoops = parseCalendar(exampleCsv("basketball", "2026-10-20")).rows;
+    expect(hoops.every((r) => r.date >= "2026-11-01" && r.date <= "2027-04-30")).toBe(true);
     expect(csvTemplate("soccer")).toContain("Scarf Giveaway Night");
     for (const s of ["basketball", "hockey", "soccer"] as const) expect(parseCalendar(csvTemplate(s)).errors).toEqual([]);
   });

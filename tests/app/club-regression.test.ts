@@ -45,11 +45,14 @@ async function run(marketId: string, csv: string): Promise<unknown> {
   return { hash: createHash("sha256").update(JSON.stringify(full)).digest("hex"), summary };
 }
 
+// The example now starts at the next season, so the snapshot fixes "today" at the date that gives its original Friday, April 9, 2027.
+const EXAMPLE_DAY = "2027-03-22";
+
 async function all(): Promise<Record<string, unknown>> {
   const out: Record<string, unknown> = {};
   for (const id of ["biloxi", "albuquerque", "akron", "portland-me"]) out[id] = await run(id, sampleCsv(id));
-  out["example@biloxi"] = await run("biloxi", exampleCsv());
-  out["example@akron"] = await run("akron", exampleCsv());
+  out["example@biloxi"] = await run("biloxi", exampleCsv("baseball", EXAMPLE_DAY));
+  out["example@akron"] = await run("akron", exampleCsv("baseball", EXAMPLE_DAY));
   return JSON.parse(JSON.stringify(out)) as Record<string, unknown>;
 }
 
