@@ -217,7 +217,7 @@ function unfixedBlock(list: ProposeResponse["unfixed"]): HTMLElement {
   const city = cityOfLabel(state.analysis!.market.label);
   const these = list.length === 1 ? `this ${copy().night}` : `these ${list.length} ${copy().nights}`;
   const c = list.find((u) => u.counts)?.counts;
-  const what = young === list.length ? "a kids' night" : `this ${copy().night}`;
+  const what = young === list.length ? "a kids' night" : list.length === 1 ? `this ${copy().night}` : `these ${copy().nights}`;
   const why = c
     ? `No swap for ${these}. ${noSwapLine(c, city, state.kind === "venue").replace(/^No swap: /, "").replace(`wrong for this ${copy().night}`, `wrong for ${what}`)}`
     : `No swap for ${these}: nothing on our list is a strong fit in ${city} that passes the rules, so ${list.length === 1 ? "it stays" : "they stay"} as planned.`;
