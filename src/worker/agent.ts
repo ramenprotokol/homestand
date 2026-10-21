@@ -432,7 +432,7 @@ async function tasteAngles(d: Deps, m: MarketIn, angles: SponsorAngle[], nights:
 
 interface StoredDiscovery {
   v: 2;
-  /** Every scored pool title (centred z), kept so a night named after one can be scored from it. */
+  /** Every scored pool title (centered z), kept so a night named after one can be scored from it. */
   all: Discovered[];
   fetchedAt: string;
   movies: Discovered[];
@@ -751,7 +751,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
 
   // 1. Resolve: alias table first, then (only for text the table cannot place) one batched model call.
   const resolutions: Resolution[] = input.rows.map((r) => resolveTheme(r.theme, d.library, extraClassic));
-  // A name the whole library knows but the live library cannot score (no Qloo id, or no local signal): recognised, left alone.
+  // A name the whole library knows but the live library cannot score (no Qloo id, or no local signal): recognized, left alone.
   const recognised: Array<string | null> = input.rows.map((r, i) => {
     if (resolutions[i]!.kind === "theme" || resolutions[i]!.kind === "ambiguous") return null;
     const full = resolveTheme(r.theme, known, extraClassic);
@@ -768,12 +768,12 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
   }
   const unknownIdx = resolutions.flatMap((r, i) => (r.kind === "unknown" && recognised[i] === null ? [i] : []));
   if (unknownIdx.length > 0 && d.ai) {
-    // Same unknown names, same answer: the reply is cached by the sorted, normalised texts, so a repeat costs no model call.
+    // Same unknown names, same answer: the reply is cached by the sorted, normalized texts, so a repeat costs no model call.
     const norm1 = (t: string): string => t.toLowerCase().replace(/\s+/g, " ").trim();
     const texts = [...new Set(unknownIdx.map((i) => norm1(input.rows[i]!.theme)))].sort();
     const key = `ai:res:v1:${venue ? "venue:" : ""}${await sha256Hex(texts.join("\n"))}`;
     let reply = await safeGet(d.kv, key);
-    if (reply !== null) trace.push(step(iso(d), "model", "Matching unrecognised theme names: used the saved answer (no model call)."));
+    if (reply !== null) trace.push(step(iso(d), "model", "Matching unrecognized theme names: used the saved answer (no model call)."));
     else {
       const list = d.library.map((t) => `${t.id}: ${t.label}`).join("\n");
       reply = await runModel(
@@ -783,7 +783,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
           : "You match sports-team promotion names to a fixed list of pop-culture themes. Answer with JSON only: an object mapping each number to an array of theme ids. Use an empty array unless the text clearly names that franchise, show, film, game, brand or artist. Never guess. Never invent ids.",
         `Themes:\n${list}\n\nTexts:\n${texts.map((t, n) => `${n}: ${t}`).join("\n")}`,
         trace,
-        "Matching unrecognised theme names",
+        "Matching unrecognized theme names",
         600,
         "those names stay unscored",
       );
@@ -801,7 +801,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
   input.rows.forEach((r, i) => {
     const res = resolutions[i]!;
     const text =
-      recognised[i] ? `"${r.theme}" is a theme we recognise (${recognised[i]}), but we have no Qloo scores for it yet, so it is left alone.`
+      recognised[i] ? `"${r.theme}" is a theme we recognize (${recognised[i]}), but we have no Qloo scores for it yet, so it is left alone.`
       : res.kind === "theme" ? `"${r.theme}" matched ${d.library.find((t) => t.id === res.themeId)?.label ?? res.themeId} (${res.method === "alias" ? "our theme list" : "AI wording"}).`
       : res.kind === "pool" ? `"${r.theme}" is the family title ${res.name}: rated from its own local data, not from one of our themes.`
       : res.kind === "classic" ? `"${r.theme}" is a proven promo, so it is not graded.`

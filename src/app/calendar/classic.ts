@@ -30,9 +30,9 @@ export function normalizeText(s: string): string {
     .trim();
 }
 
-/** Whole-phrase match on already normalised text. */
-export function hasPhrase(normalised: string, phrase: string): boolean {
-  return ` ${normalised} `.includes(` ${normalizeText(phrase)} `);
+/** Whole-phrase match on already normalized text. */
+export function hasPhrase(normalized: string, phrase: string): boolean {
+  return ` ${normalized} `.includes(` ${normalizeText(phrase)} `);
 }
 
 /** `extra` adds phrases that are classic nights only for one kind of run (a concert venue's "battle of the bands"). */

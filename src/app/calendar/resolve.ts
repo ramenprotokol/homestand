@@ -16,8 +16,8 @@ interface Hit {
 }
 
 /** Every alias occurrence in the text; where two overlap, the longer one wins (so "star wars" beats a stray "star"). */
-function aliasHits(normalised: string, library: readonly Pick<Theme, "id" | "aliases">[]): Hit[] {
-  const padded = ` ${normalised} `;
+function aliasHits(normalized: string, library: readonly Pick<Theme, "id" | "aliases">[]): Hit[] {
+  const padded = ` ${normalized} `;
   const hits: Hit[] = [];
   for (const t of library) {
     for (const alias of t.aliases) {

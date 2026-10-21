@@ -178,7 +178,7 @@ export function sampleCsv(marketId: string): string {
 export const SAMPLE_CALENDAR_IDS = Object.keys(CALENDARS);
 
 // "Load an example" on the own-calendar page: 20 nights across kids, family, teen and adult themes, one classic night, one locked
-// and sponsored night, and exactly one recognised-but-unscored name (PAW Patrol) to show that the app says so. Every other
+// and sponsored night, and exactly one recognized-but-unscored name (PAW Patrol) to show that the app says so. Every other
 // theme is scored live.
 const EXAMPLE: N[] = [
   ["2027-04-09", "Fireworks Friday", "Prairie Bank"],

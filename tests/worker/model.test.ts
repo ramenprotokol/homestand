@@ -63,8 +63,8 @@ describe("model reply shapes", () => {
     const visitor = await run({ run: async () => ({ response: TEXT }) }, { gate: { allow: async () => false } });
     expect(visitor.trace[0]!.text).toBe("Asking: your daily limit of model calls is spent, so template text is used.");
     const trace: TraceStep[] = [];
-    await runModel(deps({ run: async () => ({}) }, { aiDailyCap: 0 }), "s", "u", trace, "Matching unrecognised theme names", 100, "those names stay unscored");
-    expect(trace[0]!.text).toBe("Matching unrecognised theme names: today's shared model budget is spent, so those names stay unscored.");
+    await runModel(deps({ run: async () => ({}) }, { aiDailyCap: 0 }), "s", "u", trace, "Matching unrecognized theme names", 100, "those names stay unscored");
+    expect(trace[0]!.text).toBe("Matching unrecognized theme names: today's shared model budget is spent, so those names stay unscored.");
   });
   it("stops at the per-client daily allowance without calling the model", async () => {
     let calls = 0;

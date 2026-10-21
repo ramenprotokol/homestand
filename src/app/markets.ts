@@ -16,7 +16,7 @@ export interface SampleMarket extends Market {
   region: string;
 }
 
-// Coordinates are city-centre points from the Open-Meteo geocoding API (https://geocoding-api.open-meteo.com/v1/search,
+// Coordinates are city-center points from the Open-Meteo geocoding API (https://geocoding-api.open-meteo.com/v1/search,
 // public, no key), checked 2026-10-15 (Raleigh, 2026-10-19; Boise, 2026-10-20). They name places, never teams or real venues: "sample club", "sample team" and "sample amphitheatre" only.
 export const SAMPLE_MARKETS: readonly SampleMarket[] = [
   { id: "biloxi", kind: "club", city: "Biloxi, MS", region: "Gulf Coast", label: "Biloxi, MS sample club", lon: -88.88531, lat: 30.39603 },

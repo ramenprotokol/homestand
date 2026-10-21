@@ -420,7 +420,7 @@ export function ownView(): HTMLElement {
             h("dt", null, "locked"), h("dd", null, "yes if the night can't change (a signed deal), otherwise no."),
             h("dt", null, "notes"), h("dd", null, "Optional. Anything you want to remember."),
           ),
-          h("p", { class: "help" }, "Themes we don't recognise are left alone. They stay on your calendar as planned, marked \"No data\"."),
+          h("p", { class: "help" }, "Themes we don't recognize are left alone. They stay on your calendar as planned, marked \"No data\"."),
           h(
             "div",
             { class: "actions" },

@@ -23,7 +23,7 @@ import { addTrace, copy, state, swapTitle, ui, viewOf, type NightView } from "..
 const studyLinkText = (baseball: string): string => (state.kind === "venue" ? "We tested this on baseball, not concerts." : state.sport !== "baseball" ? `We tested this on baseball, not ${copy().sport}.` : baseball);
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-/** The five (or six) ratings in one list: a colour chip, how many nights, the name and one plain line about what it means. */
+/** The five (or six) ratings in one list: a color chip, how many nights, the name and one plain line about what it means. */
 function fitList(views: NightView[]): HTMLElement {
   const order: FitLabel[] = ["leans-in", "average", "leans-away", "classic", "not-scored", "found"];
   return h(

@@ -181,7 +181,7 @@ const normalQuery = (q: string): string => q.trim().toLowerCase().replace(/\s+/g
 const GEO_CACHE_DAYS = 7;
 
 export async function geocode(deps: RouterDeps, q: string): Promise<GeoResponse> {
-  // Search results are saved for a week in the edge cache (free, outside KV), by the normalised query; only what the geocoder said, never a signature.
+  // Search results are saved for a week in the edge cache (free, outside KV), by the normalized query; only what the geocoder said, never a signature.
   const key = normalQuery(q);
   let found: { hits: PlaceHit[]; message?: string } | null = null;
   if (deps.geoCache && deps.agent.mode !== "synthetic") {

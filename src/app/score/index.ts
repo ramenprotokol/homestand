@@ -93,7 +93,7 @@ export interface Centred {
 }
 
 /**
- * Within-market centring. Some markets sit lower or higher on almost every entity, so plain z against other markets
+ * Within-market centering. Some markets sit lower or higher on almost every entity, so plain z against other markets
  * measures the market's overall level. Subtracting the market's own mean z leaves what stands out inside the market,
  * the same within-club comparison the study's H1 makes.
  */

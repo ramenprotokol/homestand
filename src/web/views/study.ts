@@ -368,7 +368,7 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
       h("li", null, "One season (2025) and nine themes. This is a test of local taste, not a model of attendance."),
       h("li", null, "Several themes rest on one Qloo title or artist (Bluey, Margaritaville, Wrestling, Harry Potter, Marvel). One is a thin stand-in for a whole theme."),
       h("li", null, "Qloo scores for very popular entities sit close to 1 everywhere, so differences between towns can be small. Country is the weakest case."),
-      h("li", null, "Theme nights carry other promotions we could not control. That adds noise; it could also favour local taste if clubs stack promotions on themes their town loves."),
+      h("li", null, "Theme nights carry other promotions we could not control. That adds noise; it could also favor local taste if clubs stack promotions on themes their town loves."),
       h("li", null, "Princess nights are a proxy for children's dress-up nights."),
       h("li", null, "National popularity is the same for every club, so on this design it cannot rank two themes inside one club and scores exactly a coin flip."),
       h("li", null, "Qloo describes its affinity score as the strength of the link between a place and an interest (", h("a", { href: "https://qloo.com/resources/how-qloos-affinity-score-measures-consumer-preferences" }, "Qloo on its affinity score"), "). That is a measure of local taste, not a forecast of what people will do. We tested the forecast question separately, and did not assume it."),
@@ -389,7 +389,7 @@ function results(view: ReturnType<typeof loadStudy>): HTMLElement[] {
       h("h2", null, "First, can the method tell towns apart?"),
       h("p", { "data-testid": "towns-line" }, townsLine(r)),
       distinctChart(r),
-      h("p", { class: "small" }, "Different answers across the 120 clubs, per theme (most possible: 120). A method that gives every town the same answer has nothing local to offer. Qloo's count stops near 100 because 19 clubs got exactly the same readings as a neighbouring club (for example Tampa, Clearwater and Bradenton, or Durham and Greensboro), which fits Qloo treating nearby places as one local area. We did not confirm how Qloo does that. Telling towns apart is not the same as predicting crowds: that is the test below."),
+      h("p", { class: "small" }, "Different answers across the 120 clubs, per theme (most possible: 120). A method that gives every town the same answer has nothing local to offer. Qloo's count stops near 100 because 19 clubs got exactly the same readings as a neighboring club (for example Tampa, Clearwater and Bradenton, or Durham and Greensboro), which fits Qloo treating nearby places as one local area. We did not confirm how Qloo does that. Telling towns apart is not the same as predicting crowds: that is the test below."),
     ),
     h(
       "section", { class: "sect" },

@@ -332,7 +332,7 @@ function lineOf(n: NightOut, d: Deps, a: AnalyzeResponse): NightLine {
     const line = n.label === "not-scored" ? `We have no local reading for ${n.pool.name} here, so it stays as planned.` : `${comparisonSentence(n.pool.name, n.label, city, a.kind)} (a family title, rated from its own local data)`;
     return { ...base, matchedTheme: n.pool.name, fit: FIT_NAME[n.label], reason: line };
   }
-  if (n.recognisedAs) return { ...base, matchedTheme: null, fit: "not scored", reason: `"${n.theme}" is a theme we recognise (${n.recognisedAs}), but we have no scores for it yet, so it stays as planned.` };
+  if (n.recognisedAs) return { ...base, matchedTheme: null, fit: "not scored", reason: `"${n.theme}" is a theme we recognize (${n.recognisedAs}), but we have no scores for it yet, so it stays as planned.` };
   if (!n.themeId) return { ...base, matchedTheme: null, fit: "not scored", reason: `"${n.theme}" is not a theme we can place, so there is no data for it. It stays as planned.` };
   const themeLabel = label(n.themeId);
   const sc = a.themes[n.themeId];

@@ -200,7 +200,7 @@ describe("analyze", () => {
   it("name matching has no template text: when the budget is spent those names stay unscored, and the log says so", async () => {
     const h = harness({ aiDailyCap: 0 }, { run: async () => ({ response: "{}" }) });
     const out = await analyzeOk(h, { market, rows: [{ line: 2, date: "2027-04-10", theme: "Mystery Night", sponsor: "", locked: false, notes: "" }] });
-    expect(out.trace.some((t) => t.text === "Matching unrecognised theme names: today's shared model budget is spent, so those names stay unscored.")).toBe(true);
+    expect(out.trace.some((t) => t.text === "Matching unrecognized theme names: today's shared model budget is spent, so those names stay unscored.")).toBe(true);
     expect(out.nights[0]!.label).toBe("not-scored");
   });
 
@@ -263,8 +263,8 @@ describe("market-centred labels", () => {
   });
 });
 
-describe("recognised names with no live Qloo id", () => {
-  it("says it recognises PAW Patrol but has no scores, and keeps that apart from unknown text", async () => {
+describe("recognized names with no live Qloo id", () => {
+  it("says it recognizes PAW Patrol but has no scores, and keeps that apart from unknown text", async () => {
     const live = activeLibrary(COMMITTED_IDS, false);
     expect(live.some((t) => t.id === "paw-patrol")).toBe(false);
     const h = harness({ library: live });
@@ -277,7 +277,7 @@ describe("recognised names with no live Qloo id", () => {
     expect(out.nights[0]).toMatchObject({ themeId: null, label: "not-scored", recognisedAs: "PAW Patrol" });
     expect(out.nights[1]).toMatchObject({ themeId: null, label: "not-scored", recognisedAs: null });
     expect(out.nights[2]!.recognisedAs).toBeNull();
-    expect(out.trace.some((t) => t.text.includes('"PAW Patrol Day" is a theme we recognise (PAW Patrol), but we have no Qloo scores for it yet, so it is left alone.'))).toBe(true);
+    expect(out.trace.some((t) => t.text.includes('"PAW Patrol Day" is a theme we recognize (PAW Patrol), but we have no Qloo scores for it yet, so it is left alone.'))).toBe(true);
     expect(out.trace.some((t) => t.text.includes('"Rubber Duck Regatta" is not a theme we can place'))).toBe(true);
   });
 });

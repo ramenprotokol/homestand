@@ -2,7 +2,7 @@ import { COMMITTED_IDS } from "../app/themes/ids";
 import { mulberry32 } from "../study/stats";
 
 // Local test data in Qloo's response shape. Nothing here comes from Qloo: it is a deterministic made-up function so the
-// whole app, the Worker and the tests run offline. Every response using it is labelled "synthetic".
+// whole app, the Worker and the tests run offline. Every response using it is labeled "synthetic".
 
 function hash(s: string): number {
   let h = 2166136261;
@@ -41,7 +41,7 @@ const DISCOVER_YOUNG = ["Glitter Garage", "Nova Nook", "Skatepark Sparrow", "The
 export const syntheticQlooFetch: typeof fetch = async (input) => {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
   if (url.searchParams.get("filter.tags")) {
-    // Discovery: made-up family titles, clearly labelled, in a fixed order.
+    // Discovery: made-up family titles, clearly labeled, in a fixed order.
     const type = (url.searchParams.get("filter.type") ?? "").replace("urn:entity:", "");
     const young = url.searchParams.has("signal.demographics.age");
     const names = young ? DISCOVER_YOUNG : type === "movie" ? DISCOVER_MOVIES : DISCOVER_SHOWS;

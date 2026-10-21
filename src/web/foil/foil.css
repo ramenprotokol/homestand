@@ -137,7 +137,7 @@ a{color:inherit}
 .card.flips.lab-leans-in:hover .foil,.card.flips.lab-leans-in.tilting .foil{opacity:.3}
 .fine{position:absolute;left:5.2cqw;right:5.2cqw;top:5.2cqw;bottom:21cqw;border-radius:2.4cqw;pointer-events:none;box-shadow:inset 0 0 0 .4cqw rgba(255,255,255,.18);z-index:2}
 
-/* label colours (gem + panel) */
+/* label colors (gem + panel) */
 .lab-leans-in{--pn:radial-gradient(circle at 50% 46%,#2fb384,#13745a 55%,#093d38);--rim:#e6b445;--e1:#fff6d6;--e2:#f6c453;--e3:#0a3a34;--glow:rgba(240,185,74,.55)}
 .lab-average{--pn:radial-gradient(circle at 50% 46%,#9aa6c6,#5c678a 55%,#2d3554);--rim:#cfd7ee;--e1:#f4f6ff;--e2:#bcc6e4;--e3:#262d4a;--glow:rgba(190,205,240,.5)}
 .lab-leans-away{--pn:radial-gradient(circle at 50% 46%,#c23654,#7a1a36 55%,#34091f);--rim:#ff6a7e;--e1:#ffe4e8;--e2:#ff7488;--e3:#3a0c1d;--glow:rgba(255,74,92,.65);--gb:1.6cqw}

@@ -38,7 +38,7 @@ export interface Copy {
   memoTitle: string;
   /** The word under a card's name when the name has no "Night" or "Day" ending. */
   slab: string;
-  /** "club" / "team": what the organisation is called. */
+  /** "club" / "team": what the organization is called. */
   team: string;
   /** "ballpark" / "arena" / "stadium". */
   venueWord: string;

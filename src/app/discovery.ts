@@ -47,12 +47,12 @@ export function discoveryZ(affinity: number | null, stat: { n: number; mean: num
   return (affinity - stat.mean) / stat.sd;
 }
 
-/** Fewer scored pool titles than this and the market's own average over the pool is too thin to centre on (the library's rule is the same). */
+/** Fewer scored pool titles than this and the market's own average over the pool is too thin to center on (the library's rule is the same). */
 export const MIN_POOL_FOR_CENTRE = 5;
 
 /**
  * How far this market sits above or below the other markets on the whole pool: the mean z of every pool entry that has a reading here.
- * Subtracting it centres each z on the market's own average, the way the library index is centred, so a market that scores high on
+ * Subtracting it centers each z on the market's own average, the way the library index is centered, so a market that scores high on
  * everything does not show most of the pool as standing out. Zero when too few entries were scored.
  */
 export function poolOffset(readings: ReadonlyMap<string, number | null>, pool: ReadonlyArray<{ entityId: string }>, stats: DiscoveryReference["stats"]): number {
@@ -63,7 +63,7 @@ export function poolOffset(readings: ReadonlyMap<string, number | null>, pool: R
   return zs.length < MIN_POOL_FOR_CENTRE ? 0 : zs.reduce((s, z) => s + z, 0) / zs.length;
 }
 
-/** Every pool title with a reading here, ranked by its z centred on this market's own average over the pool (`offset`), best first. */
+/** Every pool title with a reading here, ranked by its z centered on this market's own average over the pool (`offset`), best first. */
 export function rankPool(readings: ReadonlyMap<string, number | null>, ref: DiscoveryReference, type: PoolTitle["type"], offset = 0): Discovered[] {
   const out: Discovered[] = [];
   for (const p of ref.pool) {

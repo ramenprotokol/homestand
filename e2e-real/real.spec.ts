@@ -166,7 +166,7 @@ test("real data: Boise with the example calendar gets discovered family-title sw
   await expect(page.getByRole("dialog")).toContainText(/Asked Qloo about \d+ family-friendly animated movies near Boise|Used the saved family-title scores near Boise/);
 });
 
-test("real data: a recognised theme with no Qloo scores is not called unknown", async ({ page }) => {
+test("real data: a recognized theme with no Qloo scores is not called unknown", async ({ page }) => {
   await page.goto("/#/own");
   await page.getByLabel("1. Your home city").fill("Fresno");
   await page.getByRole("button", { name: "Search" }).click();
@@ -181,7 +181,7 @@ test("real data: a recognised theme with no Qloo scores is not called unknown", 
   await page.getByRole("button", { name: /Rubber Duck Regatta/ }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("dialog")).toContainText(/We have no data for Rubber Duck Regatta, so it stays as planned\./);
-  await expect(page.getByRole("dialog")).not.toContainText("We recognise");
+  await expect(page.getByRole("dialog")).not.toContainText("We recognize");
 });
 
 // Venue mode on real Qloo data: the made-up Raleigh amphitheatre calendar. Cold, it costs one library request, two act-pool requests and one

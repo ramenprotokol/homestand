@@ -19,7 +19,7 @@ export function memoryLimiter(scale = 1, now: () => number = Date.now): Limiter 
 
 /**
  * The part of an IP that identifies a household. An IPv6 user can change the low 64 bits at will, so only the /64 counts.
- * IPv4 and anything unrecognised are returned as they are.
+ * IPv4 and anything unrecognized are returned as they are.
  */
 export function ipBucket(ip: string): string {
   if (!ip.includes(":")) return ip;

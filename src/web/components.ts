@@ -12,7 +12,7 @@ const FIT_ICON: Record<FitLabel, IconName> = {
   found: "star",
 };
 
-/** The fit in words, with an icon: colour is never the only signal. */
+/** The fit in words, with an icon: color is never the only signal. */
 export function fitChip(fit: FitLabel | "pick", slight?: boolean): HTMLElement {
   return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWordFor(fit, slight));
 }

@@ -1,4 +1,4 @@
-// Phosphor icons (MIT), imported as raw SVG so they take the text colour.
+// Phosphor icons (MIT), imported as raw SVG so they take the text color.
 import arrowLeft from "@phosphor-icons/core/assets/regular/arrow-left.svg?raw";
 import arrowRight from "@phosphor-icons/core/assets/regular/arrow-right.svg?raw";
 import swap from "@phosphor-icons/core/assets/regular/arrows-left-right.svg?raw";

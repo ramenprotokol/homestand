@@ -35,9 +35,9 @@ export interface Discovered {
   /** Acts only: our declared booking tier. */
   tier?: Tier;
   affinity: number | null;
-  /** How far this title's reading here sits above or below its spread over the 40 reference markets, centred on this market's own average over the pool. */
+  /** How far this title's reading here sits above or below its spread over the 40 reference markets, centered on this market's own average over the pool. */
   z?: number | null;
-  /** The same z before centring (against the 40 markets only). */
+  /** The same z before centering (against the 40 markets only). */
   zRaw?: number | null;
   /** National popularity of the title, 0 to 1. */
   popularity?: number;

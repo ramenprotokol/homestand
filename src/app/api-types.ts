@@ -75,7 +75,7 @@ export interface NightOut {
   slight?: boolean;
   /** The theme's index (see ThemeScoreOut). */
   z: number | null;
-  /** Set when the name is a library theme we recognise but have no live Qloo scores for. The night is left alone. */
+  /** Set when the name is a library theme we recognize but have no live Qloo scores for. The night is left alone. */
   recognisedAs: string | null;
   /** Set when the name is a family-title pool entry: scored from that title's own reading near the ballpark. It is never swapped. */
   pool?: { entityId: string; name: string; type: "movie" | "tv_show"; z: number | null; zRaw: number | null; affinity: number | null };

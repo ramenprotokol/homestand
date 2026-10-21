@@ -285,7 +285,7 @@ export function bindTilt(root: HTMLElement): () => void {
   };
 }
 
-/** The little coloured gem plus a number, for tallies and legends. */
+/** The little colored gem plus a number, for tallies and legends. */
 export function gemChip(fit: CardFit, cls = ""): HTMLElement {
   const s = h("span", { class: `gemchip ${cls}`, "aria-hidden": "true" });
   s.innerHTML = gemSVG(fit, "");

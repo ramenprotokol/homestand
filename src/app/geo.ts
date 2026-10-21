@@ -126,7 +126,7 @@ export function parsePlaceQuery(q: string): ParsedQuery {
 
 // ---------- matching ----------
 
-/** Edit distance counting a swap of two neighbouring letters as one typo. */
+/** Edit distance counting a swap of two neighboring letters as one typo. */
 export function typoDistance(a: string, b: string): number {
   const m = a.length, n = b.length;
   const d: number[][] = Array.from({ length: m + 1 }, (_, i) => Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));

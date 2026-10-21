@@ -296,7 +296,7 @@ test("own club: city search, pasted calendar with a bad row", async ({ page }, i
 
 test("own club: Load an example fills the rows and explains the columns", async ({ page }) => {
   await page.goto("/#/own");
-  await expect(page.getByText("Themes we don't recognise are left alone.")).toBeVisible();
+  await expect(page.getByText("Themes we don't recognize are left alone.")).toBeVisible();
   await expect(page.locator(".cols dt")).toHaveText(["date", "theme", "sponsor", "locked", "notes"]);
   await page.getByTestId("load-example").click();
   await expect(page.getByLabel("2. Your theme nights")).toHaveValue(/Bluey Day,Sunrise Dental Group,no,Day game/);
