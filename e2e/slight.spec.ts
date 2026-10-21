@@ -65,6 +65,8 @@ for (const id of ["biloxi", "albuquerque", "akron", "portland-me", "boise", "ral
     const total = await page.locator(".grid--final .slot").count();
     const sum = [...caption.matchAll(/(\d+) /g)].reduce((n, m) => n + Number(m[1]), 0);
     expect(sum, `"${caption}" should add up to ${total} nights`).toBe(total);
+    // A night whose name fits two themes and has not been picked is counted on its own, not as "no data".
+    if (id === "biloxi") expect(caption).toContain("1 needs your pick");
     // The finished deck says which season it covers, with the year.
     await expect(page.getByTestId("final-span")).toHaveText(/^\d{4}(–\d{2})? (season|summer series) · [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+$/);
   });

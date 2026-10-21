@@ -114,5 +114,7 @@ describe("the tally of every night", () => {
     const c = { strong: 11, leansStrong: 0, average: 5, weak: 2, leansWeak: 1, classic: 3, notScored: 0, found: 0 };
     expect(fitTally(c)).toBe("11 strong \u00b7 5 average \u00b7 2 weak \u00b7 1 leans weak \u00b7 3 proven promos");
     expect(fitTally({ ...c, classic: 1, notScored: 2, leansStrong: 2, found: 1 })).toBe("11 strong \u00b7 2 leans strong \u00b7 5 average \u00b7 2 weak \u00b7 1 leans weak \u00b7 1 local favorite \u00b7 1 proven promo \u00b7 2 no data");
+    expect(fitTally({ ...c, needsPick: 1, notScored: 2 })).toContain("3 proven promos \u00b7 1 needs your pick \u00b7 2 no data");
+    expect(fitTally({ ...c, needsPick: 2 })).toContain("2 need your pick");
   });
 });

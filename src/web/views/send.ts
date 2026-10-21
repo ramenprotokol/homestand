@@ -97,7 +97,9 @@ export function sendView(): HTMLElement {
     fan.append(w);
   });
   const counts = (f: string, slight = false): number => views.filter((v) => v.fit === f && (f !== "leans-in" && f !== "leans-away" ? true : v.slight === slight)).length;
-  const caption = swaps.length === 0 ? "The deck stands as planned" : fitTally({ strong: counts("leans-in"), leansStrong: counts("leans-in", true), average: counts("average"), weak: counts("leans-away"), leansWeak: counts("leans-away", true), classic: counts("classic"), notScored: counts("not-scored"), found: counts("found") });
+  // A night whose name fits two themes and has not been picked is counted on its own, not as "no data".
+  const needsPick = views.filter((v) => v.needsChoice).length;
+  const caption = swaps.length === 0 ? "The deck stands as planned" : fitTally({ strong: counts("leans-in"), leansStrong: counts("leans-in", true), average: counts("average"), weak: counts("leans-away"), leansWeak: counts("leans-away", true), classic: counts("classic"), notScored: counts("not-scored") - needsPick, needsPick, found: counts("found") });
 
   const canvas = h("canvas", { id: "fx3", "aria-hidden": "true" });
   const final = h(

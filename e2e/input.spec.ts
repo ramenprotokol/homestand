@@ -179,6 +179,8 @@ test("a request that hangs stops after 45 seconds with a clear message, and Retr
 
 test("a server error offers Retry too, and a sample club can retry", async ({ page }) => {
   let fail = true;
+  // The saved copy of a sample (public/snapshots, built at deploy time) must not stand in for the server here, whether or not the folder exists.
+  await page.route("**/snapshots/*", (route) => route.fulfill({ status: 404, contentType: "text/plain", body: "not found" }));
   await page.route("**/api/analyze", (route) => (fail ? route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "upstream", message: "Something upstream failed. Try again in a moment." }) }) : route.continue()));
   await page.goto("/#/check/biloxi");
   await expect(page.getByTestId("error-text")).toHaveText("Something upstream failed. Try again in a moment.");
