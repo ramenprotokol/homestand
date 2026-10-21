@@ -4,7 +4,7 @@ import { syntheticDiscoveryReference } from "../../src/app/discovery";
 import { activeLibrary } from "../../src/app/themes/ids";
 import { VENUE_LIBRARY } from "../../src/app/themes/artists";
 import { syntheticActsReference } from "../../src/app/acts";
-import type { Deps } from "../../src/worker/agent";
+import { countersOf, type Deps } from "../../src/worker/agent";
 import { memoryKv } from "../../src/worker/ports";
 import { DAILY_QUOTA, LIMITS, memoryLimiter } from "../../src/worker/limits";
 import { route, type RouterDeps } from "../../src/worker/router";
@@ -316,7 +316,7 @@ describe("MCP tool errors", () => {
 
   it("maps an exhausted daily quota to a friendly tool error, like the web API", async () => {
     const h = harness();
-    await h.kv.put("q:v1:pull:a:2026-10-15", String(DAILY_QUOTA.pull));
+    await countersOf({ kv: h.kv } as never).take("q:pull:a:2026-10-15", DAILY_QUOTA.pull, DAILY_QUOTA.pull, 3600);
     const { body } = await send(h, call("check_calendar", { city: "Fresno, CA", nights }));
     expect(body.error).toBeUndefined();
     expect(body.result!.isError).toBe(true);

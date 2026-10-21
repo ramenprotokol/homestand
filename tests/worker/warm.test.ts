@@ -7,16 +7,18 @@ import { memoryKv, type KvPort } from "../../src/worker/ports";
 import { SYNTHETIC_REFERENCE } from "../../src/worker/reference";
 import { syntheticQlooFetch } from "../../src/worker/synthetic";
 import { runWarm, warmFetch } from "../../src/worker/warm";
+import { spyCounters } from "./counters";
 
 function setup(over: Partial<Deps> = {}) {
   const inner = memoryKv();
   const puts: string[] = [];
   const kv: KvPort & { data: Map<string, string> } = { data: inner.data, get: inner.get, put: async (k, v, o) => (puts.push(k), inner.put(k, v, o)) };
+  const counters = spyCounters();
   const d: Deps = {
-    kv, ai: null, mode: "live", qlooFetch: syntheticQlooFetch, qlooBase: "https://qloo.test", qlooKey: "k", library: activeLibrary({}, true), reference: SYNTHETIC_REFERENCE,
+    kv, counters, ai: null, mode: "live", qlooFetch: syntheticQlooFetch, qlooBase: "https://qloo.test", qlooKey: "k", library: activeLibrary({}, true), reference: SYNTHETIC_REFERENCE,
     now: () => new Date("2026-10-25T03:00:00.000Z"), qlooDailyCap: 1500, aiDailyCap: 0, qlooDelayMs: 0, discoveryRef: syntheticDiscoveryReference(), ...over,
   };
-  return { d, puts };
+  return { d, puts, counters };
 }
 
 describe("the pre-warm", () => {
@@ -31,20 +33,20 @@ describe("the pre-warm", () => {
     }
   });
 
-  it("saves a few towns a run for 3 KV writes each, and does nothing for a town already saved", async () => {
-    const { d, puts } = setup();
+  it("saves a few towns a run for 2 KV writes each, and does nothing for a town already saved", async () => {
+    const { d, puts, counters } = setup();
     const first = await runWarm(d, { max: 3 });
     expect(first).toMatchObject({ warmed: 3, alreadySaved: 0, stoppedBecause: "per-run limit" });
     expect(first.towns).toEqual(METROS.slice(0, 3).map((m) => m.label));
     const content = puts.filter((k) => !k.startsWith("cap:"));
     expect(content.filter((k) => k.startsWith("lib:"))).toHaveLength(3);
     expect(content.filter((k) => k.startsWith("disc:"))).toHaveLength(3);
-    expect(puts.filter((k) => k.startsWith("cap:"))).toHaveLength(3); // one counter write per town, not two
+    expect(counters.takes.filter((t) => t.key.startsWith("cap:qloo:"))).toHaveLength(3); // one counter step per town, not two
     const writesBefore = puts.length;
     const second = await runWarm(d, { max: 3 });
     expect(second.alreadySaved).toBe(3);
     expect(second.towns).toEqual(METROS.slice(3, 6).map((m) => m.label));
-    expect(puts.length - writesBefore).toBe(9);
+    expect(puts.length - writesBefore).toBe(6); // two saved results per new town, and no counter in KV
   });
 
   it("stops at its share of the day's Qloo allowance so visitors keep headroom", async () => {

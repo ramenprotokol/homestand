@@ -4,6 +4,7 @@ import { syntheticDiscoveryReference } from "../../src/app/discovery";
 import { parseCalendar } from "../../src/app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { sampleCsv } from "../../src/app/samples";
+import { spyCounters } from "./counters";
 import { SYNTHETIC_REFERENCE } from "../../src/worker/reference";
 import { VENUE_LIBRARY } from "../../src/app/themes/artists";
 import { activeLibrary } from "../../src/app/themes/ids";
@@ -95,11 +96,7 @@ describe("the taste graph is bounded", () => {
     const { d, urls } = setup();
     const nights = await plan(d); // records the scores
     urls.length = 0;
-    const put = d.kv.put.bind(d.kv);
-    d.kv.put = async (k, v, o) => {
-      if (k.startsWith("cap:")) throw new Error("KV put() limit exceeded for the day");
-      return put(k, v, o);
-    };
+    d.counters = spyCounters({ failKeys: (k) => k.startsWith("cap:") });
     const out = await proposeSwaps(d, { market, nights, allowDuplicates: false });
     expect(urls).toHaveLength(0);
     expect(out.trace.some((t) => /usage counters are unavailable/.test(t.text))).toBe(true);

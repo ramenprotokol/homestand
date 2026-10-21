@@ -10,6 +10,7 @@ import type { Deps } from "../../src/worker/agent";
 import { memoryKv, type AiPort } from "../../src/worker/ports";
 import { memoryLimiter } from "../../src/worker/limits";
 import { route, type RouterDeps } from "../../src/worker/router";
+import { spyCounters } from "./counters";
 import { signMarket } from "../../src/worker/sign";
 import { syntheticQlooFetch } from "../../src/worker/synthetic";
 
@@ -61,10 +62,11 @@ async function analyzeOk(h: Harness, body: unknown = analyzeBody): Promise<Analy
 }
 
 describe("health and CORS", () => {
-  it("reports mode and caps", async () => {
+  it("reports mode and a coarse status, never the budget", async () => {
     const h = harness();
     const res = await route(new Request("https://api.test/api/health"), h.deps);
-    expect(await res.json()).toMatchObject({ ok: true, mode: "live", caps: { qlooCap: 400, qlooRemaining: 400 } });
+    expect(await res.json()).toMatchObject({ ok: true, mode: "live", live: "ok" });
+    expect(JSON.stringify(await (await route(new Request("https://api.test/api/health"), h.deps)).json())).not.toMatch(/400|remaining|caps/);
   });
   it("allows listed origins only", async () => {
     const h = harness();
@@ -503,8 +505,6 @@ describe("recheck", () => {
     const res = await route(post("/api/recheck", { market, themeId: "bluey" }), h.deps);
     expect(res.status).toBe(429);
     expect(((await res.json()) as ApiError).message).toContain("switched off");
-    const health = (await (await route(new Request("https://api.test/api/health"), h.deps)).json()) as { caps: { recheckDisabled: boolean } };
-    expect(health.caps.recheckDisabled).toBe(true);
   });
   it("rejects an unknown theme", async () => {
     expect((await route(post("/api/recheck", { market, themeId: "nope" }), harness().deps)).status).toBe(400);
@@ -937,14 +937,13 @@ describe("recheck once a day per market and theme", () => {
   it("returns the saved answer within a day, with no Qloo call, and writes the marker with a 24 hour life", async () => {
     const h = harness();
     await analyzeOk(h);
-    const puts: Array<[string, number | undefined]> = [];
-    const put = h.deps.agent.kv.put.bind(h.deps.agent.kv);
-    h.deps.agent.kv.put = async (k, v, o) => (puts.push([k, o?.expirationTtl]), put(k, v, o));
+    const spy = spyCounters();
+    h.deps.agent.counters = spy;
     h.qlooUrls.length = 0;
     const first = (await (await route(post("/api/recheck", { market, themeId: "bluey" }), h.deps)).json()) as RecheckResponse;
     expect(first.withinDay).toBeUndefined();
     expect(h.qlooUrls.length).toBeGreaterThan(0);
-    expect(puts.find(([k]) => k.startsWith("rc:v1:"))![1]).toBe(86400);
+    expect(spy.marks.find((m) => m.key.startsWith("rc:v1:"))!.ttl).toBe(86400);
     h.qlooUrls.length = 0;
     const again = (await (await route(post("/api/recheck", { market, themeId: "bluey" }), h.deps)).json()) as RecheckResponse;
     expect(again.withinDay).toBe(true);
@@ -1008,23 +1007,17 @@ describe("closed doors", () => {
     expect(text).toContain("were not available right now");
   });
 
-  it("fails closed when the usage counters cannot be written: no live Qloo call, and an honest answer", async () => {
+  it("a sample still opens when the counters cannot be reached: it is a bounded cost, and the cache has it anyway", async () => {
     const h = harness();
-    h.deps.agent.kv.put = async () => {
-      throw new Error("KV put() limit exceeded for the day");
-    };
+    h.deps.agent.counters = spyCounters({ failAll: true });
     const res = await route(post("/api/analyze", analyzeBody), h.deps);
-    expect(res.status).toBe(503);
-    expect(((await res.json()) as ApiError).error).toBe("counters");
-    expect(h.qlooUrls).toHaveLength(0);
+    expect(res.status).toBe(200);
   });
 
-  it("says the counters are unavailable (not that the new-city allowance is used up) when a new city's counter cannot be written", async () => {
+  it("fails closed for a NEW city when the counters cannot be reached: no live Qloo call, and an honest answer", async () => {
     const h = harness();
     const geo = { label: "Fresno, CA", lon: -119.78707, lat: 36.74773, sig: await signMarket(SIGNING_KEY, { label: "Fresno, CA", lon: -119.78707, lat: 36.74773 }) };
-    h.deps.agent.kv.put = async () => {
-      throw new Error("KV put() limit exceeded for the day");
-    };
+    h.deps.agent.counters = spyCounters({ failAll: true });
     const res = await route(post("/api/analyze", { market: geo, rows }), h.deps);
     expect(res.status).toBe(503);
     const body = (await res.json()) as ApiError;
@@ -1033,22 +1026,24 @@ describe("closed doors", () => {
     expect(h.qlooUrls).toHaveLength(0);
   });
 
-  it("fails closed when the counters cannot be read, and still serves what is recorded", async () => {
+  it("serves what is recorded without touching the counters at all, even when they are down", async () => {
     const h = harness();
     await analyzeOk(h); // records the scores
-    const get = h.deps.agent.kv.get.bind(h.deps.agent.kv);
-    h.deps.agent.kv.get = async (k: string) => {
-      if (k.startsWith("cap:") || k.startsWith("q:v1:")) throw new Error("KV get failed");
-      return get(k);
-    };
+    const spy = spyCounters({ failAll: true });
+    h.deps.agent.counters = spy;
     h.qlooUrls.length = 0;
-    const out = await analyzeOk(h); // served from the recorded scores, no live call
-    expect(out.caps.qlooRemaining).toBe(0);
+    const out = await analyzeOk(h); // a cache hit: no live call, no counter work
     expect(h.qlooUrls).toHaveLength(0);
-    // A market with nothing recorded gets no live call either.
-    const cold = await route(post("/api/analyze", akronBody), h.deps);
-    expect(cold.status).toBe(503);
-    expect(h.qlooUrls).toHaveLength(0);
+    expect(spy.takes).toHaveLength(0);
+    expect(out.caps.qlooCap).toBe(400);
+  });
+
+  it("a client's own daily gate fails OPEN when the counters are down; the shared cap, which fails closed, is what stops a new lookup", async () => {
+    const h = harness();
+    const geo = { label: "Fresno, CA", lon: -119.78707, lat: 36.74773, sig: await signMarket(SIGNING_KEY, { label: "Fresno, CA", lon: -119.78707, lat: 36.74773 }) };
+    // Only the per-client keys fail: the lookup goes ahead.
+    h.deps.agent.counters = spyCounters({ failKeys: (k) => k.startsWith("q:") });
+    expect((await route(post("/api/analyze", { market: geo, rows }), h.deps)).status).toBe(200);
   });
 });
 
@@ -1206,23 +1201,5 @@ describe("Qloo stops answering", () => {
     expect(body.error).toBe("qloo-busy");
     expect(body.message).toContain("sample calendars");
     expect(body.message).not.toMatch(/HTTP|429|Qloo \//);
-  });
-});
-
-describe("the shared counters survive a refused write", () => {
-  it("writes the usage counter to another key when one is refused, instead of failing closed", async () => {
-    const h = harness();
-    const put = h.deps.agent.kv.put.bind(h.deps.agent.kv);
-    let refused = 0;
-    h.deps.agent.kv.put = async (k, v, o) => {
-      if (k.startsWith("cap:") && refused < 1) {
-        refused++;
-        throw new Error("KV PUT failed: 429 Too Many Requests");
-      }
-      return put(k, v, o);
-    };
-    expect((await analyzeWith(h, await signed({ label: "Fresno, CA", lon: -119.78707, lat: 36.74773 }))).status).toBe(200);
-    expect(refused).toBe(1);
-    expect([...h.kv.data.keys()].some((k) => k.startsWith("cap:qloo:"))).toBe(true);
   });
 });

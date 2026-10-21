@@ -1,6 +1,8 @@
 /** Bindings and vars for the Worker. Secrets come from .dev.vars locally and `wrangler secret` in production; never printed. */
 export interface Env {
   CACHE: KVNamespace;
+  /** The counter Durable Object (SQLite-backed, wrangler.toml). Absent: counters live in memory (tests, plain local runs). */
+  COUNTERS?: DurableObjectNamespace<import("./counters-do").Counters>;
   AI?: { run(model: string, input: unknown): Promise<unknown> };
   QLOO_API_KEY?: string;
   QLOO_API_URL?: string;
@@ -20,4 +22,9 @@ export interface Env {
   LIMIT_ANALYZE?: RateLimit;
   LIMIT_PROPOSE?: RateLimit;
   LIMIT_RECHECK?: RateLimit;
+  LIMIT_HEALTH?: RateLimit;
+  LIMIT_MCP?: RateLimit;
+  /** One constant key each: a ceiling on live new-city pulls and on model calls for everyone together, per minute. */
+  LIMIT_GLOBAL_PULL?: RateLimit;
+  LIMIT_GLOBAL_MODEL?: RateLimit;
 }

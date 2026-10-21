@@ -126,8 +126,8 @@ A pre-registered test of one question: **at the same ballpark, did the theme wit
 npm ci
 npm run worker:dev                                  # Worker with synthetic Qloo answers and template text (no keys, no network)
 VITE_API_BASE=http://127.0.0.1:8788 npm run dev     # front end
-npm test && npm run typecheck && npm run lint && npm run build   # 455 unit tests (453 and 2 skipped on a clean clone, where the real reference data is absent)
-npm run e2e                                         # Playwright against the local Worker (74 checks: 37 at desktop width, 37 at phone width)
+npm test && npm run typecheck && npm run lint && npm run build   # 550 unit tests (548 and 2 skipped on a clean clone, where the real reference data is absent)
+npm run e2e                                         # Playwright against the local Worker (104 checks: 52 at desktop width, 52 at phone width)
 ```
 
 A clean clone needs no keys and no Qloo data: the real reference data is not in the repository, so the Worker bundles made-up stand-ins (`src/app/data/*.synthetic.json`) and says so ("Synthetic demo data"). To use real Qloo data, put your own `QLOO_API_KEY`, `QLOO_API_URL` and a random `MARKET_SIGNING_KEY` (16+ characters; it signs the cities the search returns, and the API only accepts searched cities and the sample clubs) in `.dev.vars` (gitignored). Re-running the Study needs the 2025 schedules fetched locally (`npm run study:fetch`, see [`DATA_RIGHTS.md`](DATA_RIGHTS.md)).
@@ -153,7 +153,17 @@ The Worker is deployed from a machine that has the real reference files, because
 
 ## Abuse limits
 
-The public API is limited per client: a Cloudflare Rate Limiting binding per route (per minute, an IPv6 caller counted as its /64), per-client daily quotas (30 new-city lookups, 20 live re-checks, 60 model calls, 40 live taste-graph lookups, which sample markets do not skip), one live re-check per market and theme per day, at most 5 live taste-graph lookups in one request, and shared daily caps on Qloo (1,500 calls) and model calls. The quotas are sized so a team of judges behind one office address is not blocked; the shared caps, not the quotas, bound the total. The counters fail closed: if one cannot be read or written, no further live Qloo or model call is made for that request, and the answer comes from recorded results or template text, with a line in the step log. Each counter is split across a few KV keys so a burst of visitors does not trip KV's one-write-a-second limit on a single key. Saved results live 120 days. One new city costs 5 KV writes (8 with the model's wording), well inside the free plan's 1,000 a day. A visit to a warm sample club writes nothing to KV.
+The public API is limited three ways, all inside Cloudflare's free plans.
+
+- **Per client, per minute** (Cloudflare Rate Limiting bindings, an IPv6 caller counted as its /64): 20 searches, 30 analyses, 40 swap requests, 15 re-checks, 30 health checks and 60 MCP calls.
+- **For everyone together, per minute:** at most 20 live new-city pulls and 30 model calls a minute, so a few addresses need hours, not minutes, to use up the daily caps.
+- **Per day:** each client gets 30 new cities, 20 re-checks, 60 model calls and 40 taste-graph lookups (sample markets do not count), and the whole site shares a daily cap of 1,500 Qloo calls and 400 model calls. A re-check is allowed once a day per market and theme.
+
+The quotas are sized so a team of judges behind one office address is not blocked; the shared caps, not the quotas, bound the total.
+
+**Where the counters live.** Every counter and gate is one row in a SQLite-backed Durable Object (`src/worker/counters-do.ts`): an atomic "add unless over the cap", so two visitors can never both take the last unit. KV keeps only saved results (120 days). If the counter object cannot be reached, the shared caps fail closed for NEW lookups only, a client's own daily gate fails open (the per-minute limits still apply), and a saved city or a sample never touches the counters at all: it keeps working. `/api/health` is rate limited, remembers its answer for 45 seconds and says only `ok`, `low` or `paused`, never how much is left. City searches are saved for a week in the edge cache and make at most three geocoder calls.
+
+**Cost of a visit (free-plan limits in brackets).** A new city (Check and Fix) writes 2 saved results to KV (3 with the model's wording) and makes 3 to 5 counter steps; a visit to a saved sample writes nothing and makes no counter step. KV allows 1,000 writes and 100,000 reads a day; the counter object allows 100,000 requests and 100,000 rows written a day.
 
 ## Data rights
 

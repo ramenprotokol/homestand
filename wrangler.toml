@@ -2,9 +2,22 @@ name = "homestand-api"
 main = "src/worker/index.ts"
 compatibility_date = "2026-10-01"
 
+# Never upload source maps with the Worker.
+upload_source_maps = false
+
 # Picks the real (private) or synthetic reference data before wrangler bundles the Worker. Runs on `wrangler deploy` and `wrangler dev`.
 [build]
 command = "node scripts/prepare-data.mjs"
+
+# Counters and per-client gates live in one SQLite-backed Durable Object (src/worker/counters-do.ts): atomic increments, and none of KV's
+# 1,000-writes-a-day free limit. The first deploy applies the migration below on its own. KV keeps only saved results.
+[[durable_objects.bindings]]
+name = "COUNTERS"
+class_name = "Counters"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Counters"]
 
 [ai]
 binding = "AI"
@@ -25,7 +38,7 @@ id = "4447d78d27ae4134966ec9bac7984b85"
 [[ratelimits]]
 name = "LIMIT_GEOCODE"
 namespace_id = "41001"
-simple = { limit = 60, period = 60 }
+simple = { limit = 20, period = 60 }
 
 [[ratelimits]]
 name = "LIMIT_ANALYZE"
@@ -41,6 +54,28 @@ simple = { limit = 40, period = 60 }
 name = "LIMIT_RECHECK"
 namespace_id = "41004"
 simple = { limit = 15, period = 60 }
+
+[[ratelimits]]
+name = "LIMIT_HEALTH"
+namespace_id = "41005"
+simple = { limit = 30, period = 60 }
+
+[[ratelimits]]
+name = "LIMIT_MCP"
+namespace_id = "41006"
+simple = { limit = 60, period = 60 }
+
+# One constant key each (src/worker/index.ts): a ceiling on live new-city pulls and on model calls for everyone together, per minute, so a few
+# addresses cannot drain the daily Qloo and model caps in minutes.
+[[ratelimits]]
+name = "LIMIT_GLOBAL_PULL"
+namespace_id = "41007"
+simple = { limit = 20, period = 60 }
+
+[[ratelimits]]
+name = "LIMIT_GLOBAL_MODEL"
+namespace_id = "41008"
+simple = { limit = 30, period = 60 }
 
 # Production. Secrets (not here): QLOO_API_KEY and MARKET_SIGNING_KEY (any random string of 16+ characters; without it only the
 # sample clubs work). Non-secret values only.
@@ -87,3 +122,17 @@ simple = { limit = 600, period = 60 }
 name = "LIMIT_RECHECK"
 namespace_id = "41014"
 simple = { limit = 600, period = 60 }
+
+[[env.check.ratelimits]]
+name = "LIMIT_HEALTH"
+namespace_id = "41015"
+simple = { limit = 600, period = 60 }
+
+[[env.check.ratelimits]]
+name = "LIMIT_MCP"
+namespace_id = "41016"
+simple = { limit = 600, period = 60 }
+
+[[env.check.durable_objects.bindings]]
+name = "COUNTERS"
+class_name = "Counters"

@@ -4,7 +4,7 @@ import { METROS } from "./metros";
 
 // Pre-warm: saves the ratings for the largest US and Canadian metros so a judge's first search is instant and costs no live Qloo call.
 // Runs from a cron trigger (wrangler.toml) a few towns at a time, and on demand through POST /api/warm with a secret token.
-// Budget (Cloudflare free plan): a new town is 3 KV writes, so 8 a run x 8 runs a day is about 190 writes of the 1,000 allowed, and about 7 Qloo
+// Budget (Cloudflare free plan): a new town is 2 KV writes (and one counter step), so 8 a run x 8 runs a day is about 130 writes of the 1,000 allowed, and about 7 Qloo
 // calls per town. Towns already saved cost only reads, so once the list is warm a run does nothing.
 
 /** Most towns warmed in one run. */

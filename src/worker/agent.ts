@@ -21,10 +21,14 @@ import { TIER_RANK, type Genre, type Tier } from "../app/themes/library";
 import { IDEA_POPULARITY, poolOffset, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
 import { step, type TraceStep } from "../app/trace";
 import { createQlooClient, type QlooType } from "../qloo/client";
-import { AI_MODEL, type AiPort, type KvPort } from "./ports";
+import { AI_MODEL, memoryCounters, type AiPort, type CounterPort, type KvPort } from "./ports";
 
 export interface Deps {
   kv: KvPort;
+  /** Shared counters and per-client gates (the Durable Object). Left out: an in-memory stand-in (tests, plain local runs). */
+  counters?: CounterPort;
+  /** A global per-minute limit on live new-city pulls and model calls, for everyone together. Left out: none. */
+  globalLimit?: (kind: "pull" | "model") => Promise<boolean>;
   ai: AiPort | null;
   mode: "live" | "synthetic";
   qlooFetch: typeof fetch;
@@ -53,6 +57,8 @@ export interface Deps {
   actsRef?: ActsReference;
   /** Per-client daily allowance, set per request by the router. Unset means no per-client limit (tests). */
   gate?: Gate;
+  /** This run is for one of the fixed sample markets (set by the router). */
+  sampleMarket?: boolean;
   /** The caller has already reserved its live Qloo calls in one counter write (the cron pre-warm), so this run does not count them again. */
   prepaid?: boolean;
 }
@@ -91,68 +97,85 @@ const today = (d: Deps): string => iso(d).slice(0, 10);
 
 // ---------- daily counters ----------
 
-/** A usage counter could not be read or written (KV outage, or the daily write limit on a free plan). */
+/** A shared counter could not be read or written (the counter Durable Object is unreachable). */
 export class CounterError extends Error {}
 
-// A KV key takes about one write a second, so a burst of judges bumping one hot counter would trip the limit and fail closed for everyone.
-// Each counter is split over a few keys: a bump writes one at random, a read adds them up (plus the single key older versions wrote).
-const SHARDS = 4;
-const shardKey = (d: Deps, name: string, shard: number | null): string => `cap:${name}:${today(d)}${shard === null ? "" : `:${shard}`}`;
-const asCount = (raw: string | null): number => {
-  const n = raw === null ? 0 : Number(raw);
-  return Number.isFinite(n) ? n : 0;
+/** Thrown when too many new lookups arrived in the same minute from everyone together (a global per-minute limit, see router.ts). */
+export class BusyError extends Error {
+  constructor() {
+    super("Too many live lookups in the last minute.");
+  }
+}
+
+const DAY_TTL = 2 * 24 * 3600;
+const fallbackCounters = new WeakMap<object, CounterPort>();
+/** The counters for these deps: the Durable Object in production, or an in-memory stand-in tied to this deps' KV (tests and plain local runs). */
+export function countersOf(d: Deps): CounterPort {
+  if (d.counters) return d.counters;
+  let c = fallbackCounters.get(d.kv);
+  if (!c) fallbackCounters.set(d.kv, (c = memoryCounters()));
+  return c;
+}
+
+const capKey = (d: Deps, name: "qloo" | "ai"): string => `cap:${name}:${today(d)}`;
+
+// What the isolate last saw of the two shared caps, for 45 seconds, so a visit never reads the counters just to say how much is left.
+// Every successful take refreshes its own half, so the numbers stay right without another read.
+const CAPS_MEMO_MS = 45_000;
+interface CapsMemo {
+  day: string;
+  at: number;
+  qlooUsed: number | null;
+  aiUsed: number | null;
+}
+const capsMemo = new WeakMap<CounterPort, CapsMemo>();
+
+function noteUsed(d: Deps, name: "qloo" | "ai", used: number): void {
+  const port = countersOf(d);
+  const m = capsMemo.get(port);
+  if (m && m.day === today(d)) m[name === "qloo" ? "qlooUsed" : "aiUsed"] = used;
+  else capsMemo.set(port, { day: today(d), at: 0, qlooUsed: name === "qloo" ? used : null, aiUsed: name === "ai" ? used : null });
+}
+
+const capsFrom = (d: Deps, qlooUsed: number | null, aiUsed: number | null): Caps => {
+  const qlooRemaining = Math.max(0, d.qlooDailyCap - (qlooUsed ?? 0));
+  return { qlooRemaining, qlooCap: d.qlooDailyCap, recheckDisabled: d.mode === "live" && qlooRemaining < 3, aiRemaining: d.ai ? Math.max(0, d.aiDailyCap - (aiUsed ?? 0)) : 0 };
 };
 
 /**
- * The counters are what keep the shared Qloo and model caps honest, so they fail CLOSED: when one cannot be read or written, no further live
- * Qloo or model call is made for the request, and the answer comes from recorded results or template text. (Content caches stay fail-open.)
+ * How much of today's shared allowance is left. Read at most once every 45 seconds per isolate. With `read: false` (the answer to a visit that made
+ * no live call) it never touches the counters: it reports what the isolate last saw, or the whole allowance when it has seen nothing yet.
+ * When the counters cannot be read the answer is "none left", so a new lookup is refused while saved results keep working.
  */
-async function counter(d: Deps, name: string): Promise<number> {
+export async function capsOf(d: Deps, opts: { read?: boolean } = {}): Promise<Caps> {
+  const port = countersOf(d);
+  const m = capsMemo.get(port);
+  const fresh = m !== undefined && m.day === today(d) && m.at > 0 && Date.now() - m.at < CAPS_MEMO_MS;
+  if (fresh || opts.read === false) return capsFrom(d, m && m.day === today(d) ? m.qlooUsed : null, m && m.day === today(d) ? m.aiUsed : null);
   try {
-    const raws = await Promise.all([null, ...Array.from({ length: SHARDS }, (_, i) => i)].map((s) => d.kv.get(shardKey(d, name, s))));
-    return raws.reduce((sum, raw) => sum + asCount(raw), 0);
+    const [qlooUsed, aiUsed] = await port.read([capKey(d, "qloo"), capKey(d, "ai")]);
+    capsMemo.set(port, { day: today(d), at: Date.now(), qlooUsed: qlooUsed ?? 0, aiUsed: aiUsed ?? 0 });
+    return capsFrom(d, qlooUsed ?? 0, aiUsed ?? 0);
   } catch (err) {
-    console.error("counter read failed", name, err instanceof Error ? err.message : String(err));
-    throw new CounterError();
-  }
-}
-
-async function bump(d: Deps, name: string, by: number): Promise<void> {
-  const first = Math.floor(Math.random() * SHARDS);
-  // One retry on another shard: a write refused for being too close to the previous one usually works on a different key.
-  for (const shard of [first, (first + 1) % SHARDS]) {
-    try {
-      const key = shardKey(d, name, shard);
-      await d.kv.put(key, String(asCount(await d.kv.get(key)) + by), { expirationTtl: 2 * 24 * 3600 });
-      return;
-    } catch (err) {
-      console.error("counter write failed", name, err instanceof Error ? err.message : String(err));
-    }
-  }
-  throw new CounterError();
-}
-
-export async function capsOf(d: Deps): Promise<Caps> {
-  try {
-    const used = await counter(d, "qloo");
-    const qlooRemaining = Math.max(0, d.qlooDailyCap - used);
-    const aiUsed = await counter(d, "ai");
-    return { qlooRemaining, qlooCap: d.qlooDailyCap, recheckDisabled: d.mode === "live" && qlooRemaining < 3, aiRemaining: d.ai ? Math.max(0, d.aiDailyCap - aiUsed) : 0 };
-  } catch (err) {
-    if (!(err instanceof CounterError)) throw err;
+    console.error("counter read failed", err instanceof Error ? err.message : String(err));
     return { qlooRemaining: 0, qlooCap: d.qlooDailyCap, recheckDisabled: d.mode === "live", aiRemaining: 0 };
   }
 }
 
-/** Reserves `n` live Qloo calls against the shared cap. False when the cap is spent or when the counters cannot be trusted (then `d.countersDown` is set). */
+/**
+ * Reserves `n` live Qloo calls against the shared daily cap in one atomic step. False when the cap is spent, or when the counters cannot be reached
+ * (then `d.countersDown` is set): the shared caps fail CLOSED for new lookups, and a saved result never gets here.
+ */
 async function reserveQloo(d: Deps, n: number, trace?: TraceStep[]): Promise<boolean> {
   if (d.mode === "synthetic" || d.prepaid) return true;
   try {
-    if ((await counter(d, "qloo")) + n > d.qlooDailyCap) return false;
-    await bump(d, "qloo", n);
-    return true;
+    const r = await countersOf(d).take(capKey(d, "qloo"), n, d.qlooDailyCap, DAY_TTL);
+    noteUsed(d, "qloo", r.used);
+    return r.ok;
   } catch (err) {
-    if (!(err instanceof CounterError)) throw err;
+    console.error("counter failed", err instanceof Error ? err.message : String(err));
+    // The six fixed samples are a bounded cost and must keep opening when the counters are down; every other new lookup waits.
+    if (d.sampleMarket) return true;
     d.countersDown = true;
     trace?.push(step(iso(d), "qloo", "The usage counters are unavailable right now, so no live Qloo request is made. Saved results are used where there are any."));
     return false;
@@ -235,7 +258,8 @@ export async function getScores(d: Deps, m: MarketIn, trace: TraceStep[]): Promi
     }
   }
   const need = new Set(d.library.flatMap((t) => t.entities.map((e) => e.type))).size;
-  if (d.gate && !(await d.gate.allow("pull"))) throw d.gate.broken ? new CappedError(true) : new QuotaError("pull");
+  if (d.gate && !(await d.gate.allow("pull"))) throw new QuotaError("pull");
+  if (d.globalLimit && !(await d.globalLimit("pull"))) throw new BusyError();
   if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
   const themes = await askQloo(d, m, d.library, trace);
   const stored: StoredLibrary = { v: 1, fetchedAt: iso(d), themes };
@@ -654,24 +678,24 @@ export async function runModel(d: Deps, system: string, user: string, trace: Tra
     trace.push(step(iso(d), "model", `${what}: no model attached here, so ${fallback}.`));
     return null;
   }
-  try {
-    if ((await counter(d, "ai")) >= d.aiDailyCap) {
-      trace.push(step(iso(d), "model", `${what}: today's shared model budget is spent, so ${fallback}.`));
-      return null;
-    }
-  } catch (err) {
-    if (!(err instanceof CounterError)) throw err;
-    trace.push(step(iso(d), "model", `${what}: the usage counters are unavailable, so ${fallback}.`));
-    return null;
-  }
+  // This client's own allowance first (it fails open: the per-minute limits still apply), then the minute limit for everyone, then the shared daily budget.
   if (d.gate && !(await d.gate.allow("model"))) {
     trace.push(step(iso(d), "model", `${what}: your daily limit of model calls is spent, so ${fallback}.`));
     return null;
   }
+  if (d.globalLimit && !(await d.globalLimit("model"))) {
+    trace.push(step(iso(d), "model", `${what}: the model is busy for the moment, so ${fallback}.`));
+    return null;
+  }
   try {
-    await bump(d, "ai", 1);
+    const r = await countersOf(d).take(capKey(d, "ai"), 1, d.aiDailyCap, DAY_TTL);
+    noteUsed(d, "ai", r.used);
+    if (!r.ok) {
+      trace.push(step(iso(d), "model", `${what}: today's shared model budget is spent, so ${fallback}.`));
+      return null;
+    }
   } catch (err) {
-    if (!(err instanceof CounterError)) throw err;
+    console.error("counter failed", err instanceof Error ? err.message : String(err));
     trace.push(step(iso(d), "model", `${what}: the usage counters are unavailable, so ${fallback}.`));
     return null;
   }
@@ -822,7 +846,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
 
   return {
     market: input.market, ...(venue ? { kind: "venue" as const } : {}), mode: d.mode, recordedOn: scores.source === "cache" ? scores.stored.fetchedAt.slice(0, 10) : null, recordedAt: scores.stored.fetchedAt, themes, nights,
-    reference: { markets: d.reference.markets, synthetic: d.reference.synthetic, pulledAt: d.reference.pulledAt }, caps: await capsOf(d), trace,
+    reference: { markets: d.reference.markets, synthetic: d.reference.synthetic, pulledAt: d.reference.pulledAt }, caps: await capsOf(d, { read: false }), trace,
   };
 }
 
@@ -838,7 +862,7 @@ function fitsOf(themes: Record<string, ThemeScoreOut>): Record<string, ThemeFit>
  */
 export function whyShapeOk(text: string, planned: string, proposed: string, town: string): boolean {
   const t = text.toLowerCase();
-  return t.includes(planned.toLowerCase()) && t.includes(proposed.toLowerCase()) && t.includes(town.toLowerCase()) && /\blikes?\b/.test(t) && !/\b(lean|leans|leaning|market|markets|fans|fan)\b/.test(t);
+  return t.includes(planned.toLowerCase()) && t.includes(proposed.toLowerCase()) && t.includes(town.toLowerCase()) && /\blikes?\b/.test(t) && !/\b(lean|leans|leaning|market|markets|fans|fan)\b/.test(t) && !/<|https?:|www\./i.test(t);
 }
 
 /** The model words only the taste comparison. These words mean it wandered off the facts it was given. */
@@ -918,7 +942,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   }
   return {
     proposals: res.proposals.map((p) => ({ ...p, why: whys.get(p.id) ?? p.why, whySource: whys.has(p.id) ? "model" : "template" })),
-    discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: pickAngles(venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace), new Set(res.proposals.map((p) => p.toThemeId))), unfixed: res.unfixed, trace, caps: await capsOf(d),
+    discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: pickAngles(venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace), new Set(res.proposals.map((p) => p.toThemeId))), unfixed: res.unfixed, trace, caps: await capsOf(d, { read: false }),
   };
 }
 
@@ -926,7 +950,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
 
 /**
  * Saves a town's ratings and its family-title scores ahead of any visitor (the cron in warm.ts). The live Qloo calls are reserved with ONE
- * counter write for both, so a new town costs three KV writes instead of four. "cached" when both were already saved.
+ * counter step for both, so a new town costs two KV writes (the saved results) and one counter step. "cached" when both were already saved.
  */
 export async function warmMarket(d: Deps, m: MarketIn): Promise<"warmed" | "cached"> {
   const trace: TraceStep[] = [];
@@ -949,13 +973,13 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   if (!theme) throw new Error(`Unknown theme ${input.themeId}`);
   // One live re-check per market and theme per day: a repeat returns the answer already on file.
   const rcKey = `rc:v1:${d.kind === "venue" ? "venue:" : ""}${marketKey(input.market)}:${theme.id}`;
-  if ((await safeGet(d.kv, rcKey)) !== null) {
+  if (await countersOf(d).marked(rcKey).catch(() => false)) {
     const scores = await getScores(d, input.market, trace);
     const all = allOut(d, scores);
     trace.push(step(iso(d), "note", `Fresh data for ${theme.label}: checked with Qloo within the last day, so the saved answer is returned.`));
-    return { theme: all[theme.id]!, themes: all, trace, caps: await capsOf(d), withinDay: true };
+    return { theme: all[theme.id]!, themes: all, trace, caps: await capsOf(d, { read: false }), withinDay: true };
   }
-  if (d.gate && !(await d.gate.allow("recheck"))) throw d.gate.broken ? new CappedError(true) : new QuotaError("recheck");
+  if (d.gate && !(await d.gate.allow("recheck"))) throw new QuotaError("recheck");
   const need = new Set(theme.entities.map((e) => e.type)).size;
   if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
   trace.push(step(iso(d), "note", `Getting fresh data for ${theme.label}, ignoring the saved result.`));
@@ -964,9 +988,9 @@ export async function recheck(d: Deps, input: { market: MarketIn; themeId: strin
   const scores = await getScores(d, input.market, trace);
   scores.stored.themes[theme.id] = fresh;
   await safePut(d.kv, cacheKey(d, input.market), JSON.stringify(scores.stored), { expirationTtl: TTL });
-  await safePut(d.kv, rcKey, iso(d), { expirationTtl: 86400 });
+  await countersOf(d).mark(rcKey, 86400).catch((err: unknown) => console.error("marker failed", err instanceof Error ? err.message : String(err)));
   const all = allOut(d, scores);
   const out = all[theme.id]!;
   if (d.mode !== "synthetic") out.source = "live";
-  return { theme: out, themes: all, trace, caps: await capsOf(d) };
+  return { theme: out, themes: all, trace, caps: await capsOf(d, { read: false }) };
 }

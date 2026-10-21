@@ -6,6 +6,7 @@ import type { Deps } from "./agent";
 import type { Env } from "./env";
 import { syntheticDiscoveryReference } from "../app/discovery";
 import { memoryLimiter, ipBucket, type Limiter } from "./limits";
+import type { CounterPort } from "./ports";
 import { route, type RouterDeps } from "./router";
 import { syntheticQlooFetch } from "./synthetic";
 import { runWarm, warmFetch } from "./warm";
@@ -20,7 +21,7 @@ let fallback: { scale: number; limiter: Limiter } | null = null;
 
 /** Cloudflare's Rate Limiting binding per route; the in-memory counter when a binding is absent. A binding error lets the request through. */
 function limiterFor(env: Env, scale: number): Limiter {
-  const bound: Record<string, RateLimit | undefined> = { geocode: env.LIMIT_GEOCODE, analyze: env.LIMIT_ANALYZE, propose: env.LIMIT_PROPOSE, recheck: env.LIMIT_RECHECK };
+  const bound: Record<string, RateLimit | undefined> = { geocode: env.LIMIT_GEOCODE, analyze: env.LIMIT_ANALYZE, propose: env.LIMIT_PROPOSE, recheck: env.LIMIT_RECHECK, health: env.LIMIT_HEALTH, mcp: env.LIMIT_MCP };
   if (!fallback || fallback.scale !== scale) fallback = { scale, limiter: memoryLimiter(scale) };
   const mem = fallback.limiter;
   return async (route, id) => {
@@ -35,6 +36,49 @@ function limiterFor(env: Env, scale: number): Limiter {
   };
 }
 
+/** The global per-minute ceilings: one constant key in a Rate Limiting binding. Without a binding (tests, plain local runs) there is no ceiling. A binding error lets the call through. */
+function globalLimitFor(env: Env): (kind: "pull" | "model") => Promise<boolean> {
+  const bound = { pull: env.LIMIT_GLOBAL_PULL, model: env.LIMIT_GLOBAL_MODEL };
+  return async (kind) => {
+    const b = bound[kind];
+    if (!b) return true;
+    try {
+      return (await b.limit({ key: `global:${kind}` })).success;
+    } catch (err) {
+      console.error("global rate limit binding failed", err instanceof Error ? err.message : String(err));
+      return true;
+    }
+  };
+}
+
+/** The counter Durable Object as a CounterPort. One wrapper per isolate, so the caps memo in agent.ts survives between requests. */
+let doPort: { ns: unknown; port: CounterPort } | null = null;
+function countersFor(env: Env): CounterPort | undefined {
+  const ns = env.COUNTERS;
+  if (!ns) return undefined;
+  if (doPort && doPort.ns === ns) return doPort.port;
+  const stub = (): ReturnType<typeof ns.get> => ns.get(ns.idFromName("global"));
+  const port: CounterPort = {
+    take: (key, by, cap, ttl) => stub().take(key, by, cap, ttl),
+    read: (keys) => stub().read(keys),
+    mark: (key, ttl) => stub().mark(key, ttl),
+    marked: (key) => stub().marked(key),
+  };
+  doPort = { ns, port };
+  return port;
+}
+
+/** Search results saved for a week in the edge cache (the Cache API: free, and not KV). */
+const geoCache = {
+  async get(key: string): Promise<string | null> {
+    const hit = await caches.default.match(new Request(`https://geocode-cache.invalid/v1?q=${encodeURIComponent(key)}`));
+    return hit ? hit.text() : null;
+  },
+  async put(key: string, value: string, ttlSec: number): Promise<void> {
+    await caches.default.put(new Request(`https://geocode-cache.invalid/v1?q=${encodeURIComponent(key)}`), new Response(value, { headers: { "cache-control": `public, max-age=${ttlSec}` } }));
+  },
+};
+
 const num = (v: string | undefined, fallback: number): number => {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -44,6 +88,7 @@ function depsFor(env: Env): RouterDeps {
   const synthetic = env.QLOO_MODE === "synthetic";
   const agent: Deps = {
     kv: env.CACHE,
+    ...(countersFor(env) ? { counters: countersFor(env)! } : {}),
     ai: env.AI ?? null,
     mode: synthetic ? "synthetic" : "live",
     qlooFetch: synthetic ? syntheticQlooFetch : (input, init) => fetch(input, init),
@@ -66,9 +111,14 @@ function depsFor(env: Env): RouterDeps {
     geocodeFetch: (input, init) => fetch(input, init),
     clientId,
     limiter: limiterFor(env, num(env.RATE_LIMIT_SCALE, 1)),
+    globalLimit: globalLimitFor(env),
+    geoCache,
     signingKey: env.MARKET_SIGNING_KEY && env.MARKET_SIGNING_KEY.length >= 16 ? env.MARKET_SIGNING_KEY : null,
   };
 }
+
+// The counter Durable Object class must be exported from the Worker entry.
+export { Counters } from "./counters-do";
 
 export default {
   fetch: (request: Request, env: Env) => (new URL(request.url).pathname === "/api/warm" ? warmFetch(request, env, depsFor(env).agent) : route(request, depsFor(env))),

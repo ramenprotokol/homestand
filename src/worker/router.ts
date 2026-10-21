@@ -1,7 +1,7 @@
 import type { ApiError, GeoResponse, MarketIn, ProposeNightIn } from "../app/api-types";
 import { parseDate, type CalendarRow } from "../app/calendar/csv";
 import { QlooUnavailableError } from "../qloo/client";
-import { analyze, capsOf, CappedError, forKind, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
+import { analyze, BusyError, capsOf, CappedError, countersOf, forKind, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
 import { isSport, kindOf, type Kind, type Sport } from "../app/kind";
 import { exactTries, MAX_CITY, parsePlaceQuery, prefixTries, rankPlaces, TERRITORY_MESSAGE, type PlaceHit, type RawPlace } from "../app/geo";
 import { DAILY_QUOTA, type Limiter, type QuotaKind } from "./limits";
@@ -16,6 +16,10 @@ export interface RouterDeps {
   clientId: (req: Request) => Promise<string>;
   /** Per-minute request limit (Cloudflare's Rate Limiting binding in production). */
   limiter: Limiter;
+  /** A per-minute limit on live new-city pulls and on model calls for everyone together (a constant-key rate limit in production). Left out: none. */
+  globalLimit?: (kind: "pull" | "model") => Promise<boolean>;
+  /** Saved search results (the Cache API in production). Left out: none. */
+  geoCache?: { get(key: string): Promise<string | null>; put(key: string, value: string, ttlSec: number): Promise<void> };
   /** Secret that signs searched places. Null means only the sample clubs are accepted. */
   signingKey: string | null;
 }
@@ -38,7 +42,7 @@ function cors(req: Request, allowed: string[]): Record<string, string> {
 function json(body: unknown, status: number, extra: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; frame-ancestors 'none'", ...extra },
+    headers: { "content-type": "application/json", "cache-control": "no-store", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; frame-ancestors 'none'", "strict-transport-security": "max-age=31536000; includeSubDomains", ...extra },
   });
 }
 
@@ -71,32 +75,30 @@ export async function readBody(req: Request, max: number): Promise<string | null
   return new TextDecoder().decode(all);
 }
 
-/** One count against this client's allowance for today (UTC). Sample clubs never count against new-city pulls. */
+/**
+ * One count against this client's allowance for today (UTC), in the counter Durable Object. Sample clubs never count against new-city pulls.
+ * A client's own gate fails OPEN: if the counter cannot be reached the lookup goes ahead, because the per-minute rate limits still apply and the
+ * shared daily caps (which fail closed) still bound the total.
+ */
 function gateFor(deps: RouterDeps, req: Request, m: MarketIn): Gate {
-  const gate: Gate = {
+  return {
     async allow(kind: QuotaKind): Promise<boolean> {
       if (kind === "pull" && isSampleMarket(m)) return true;
       const id = await deps.clientId(req);
-      const key = `q:v1:${kind}:${id}:${deps.agent.now().toISOString().slice(0, 10)}`;
-      // Fail closed: if this client's counter cannot be read or written, the live call is refused (recorded results are still served).
       try {
-        const n = Number((await deps.agent.kv.get(key)) ?? "0") || 0;
-        if (n >= DAILY_QUOTA[kind]) return false;
-        await deps.agent.kv.put(key, String(n + 1), { expirationTtl: 2 * 24 * 3600 });
-        return true;
+        const r = await countersOf(deps.agent).take(`q:${kind}:${id}:${deps.agent.now().toISOString().slice(0, 10)}`, 1, DAILY_QUOTA[kind], 2 * 24 * 3600);
+        return r.ok;
       } catch (err) {
-        console.error("quota counter failed", kind, err instanceof Error ? err.message : String(err));
-        gate.broken = true;
-        return false;
+        console.error("quota counter failed (letting the lookup through)", kind, err instanceof Error ? err.message : String(err));
+        return true;
       }
     },
   };
-  return gate;
 }
 
 /** The deps for one request: the kind and sport the caller asked for, and this client's daily allowance. Shared by the web API and the MCP tools. */
 export function agentFor(deps: RouterDeps, req: Request, m: MarketIn, kind: Kind, sport?: Sport): Deps {
-  return { ...forKind(deps.agent, kind), ...(kind === "club" && sport !== undefined ? { sport } : {}), gate: gateFor(deps, req, m) };
+  return { ...forKind(deps.agent, kind), ...(kind === "club" && sport !== undefined ? { sport } : {}), gate: gateFor(deps, req, m), ...(isSampleMarket(m) ? { sampleMarket: true } : {}), ...(deps.globalLimit ? { globalLimit: deps.globalLimit } : {}) };
 }
 
 const QUOTA_MESSAGES: Record<QuotaKind, string> = {
@@ -174,15 +176,34 @@ async function fetchOnceMore(f: typeof fetch, url: string): Promise<Response> {
   return call(url);
 }
 
+/** The query as the cache sees it: lower case, single spaces. */
+const normalQuery = (q: string): string => q.trim().toLowerCase().replace(/\s+/g, " ");
+const GEO_CACHE_DAYS = 7;
+
 export async function geocode(deps: RouterDeps, q: string): Promise<GeoResponse> {
-  const { hits, message } = await searchPlaces(deps, q);
+  // Search results are saved for a week in the edge cache (free, outside KV), by the normalised query; only what the geocoder said, never a signature.
+  const key = normalQuery(q);
+  let found: { hits: PlaceHit[]; message?: string } | null = null;
+  if (deps.geoCache && deps.agent.mode !== "synthetic") {
+    try {
+      const raw = await deps.geoCache.get(key);
+      if (raw) found = JSON.parse(raw) as { hits: PlaceHit[]; message?: string };
+    } catch {
+      /* a cache problem is never a search problem */
+    }
+  }
+  if (!found) {
+    found = await searchPlaces(deps, q);
+    if (deps.geoCache && deps.agent.mode !== "synthetic") await deps.geoCache.put(key, JSON.stringify(found), GEO_CACHE_DAYS * 86400).catch(() => undefined);
+  }
+  const { hits, message } = found;
   // Signed here, so the other endpoints only accept places this search returned.
   const results = await Promise.all(hits.map(async (h) => ({ ...h, sig: deps.signingKey ? await signMarket(deps.signingKey, h) : "" })));
   return message ? { results, message } : { results };
 }
 
 /** How many times one search may call the geocoder: the name as typed, a spelling or two, then shorter starts for a typo. */
-const MAX_LOOKUPS = 5;
+const MAX_LOOKUPS = 3;
 
 async function searchPlaces(deps: RouterDeps, q: string): Promise<{ hits: PlaceHit[]; message?: string }> {
   const parsed = parsePlaceQuery(q);
@@ -192,7 +213,10 @@ async function searchPlaces(deps: RouterDeps, q: string): Promise<{ hits: PlaceH
   if (deps.agent.mode === "synthetic") return rankPlaces(STUB_PLACES, parsed);
   // Open-Meteo geocoding: public, no key (https://open-meteo.com/en/docs/geocoding-api). It matches the start of a name and also
   // alternate names, so we ask for plenty and keep only the places whose own name matches what was typed.
-  const tries = [...exactTries(parsed), ...prefixTries(parsed)].slice(0, MAX_LOOKUPS);
+  // With only a few lookups allowed, the shorter starts a typo most needs come first: about 60% of the name, then the shortest start, then the rest.
+  const starts = prefixTries(parsed);
+  const wanted = [starts[1], starts[starts.length - 1], starts[0], ...starts.slice(2, -1)].filter((t, i, all): t is string => t !== undefined && all.indexOf(t) === i);
+  const tries = [...exactTries(parsed), ...wanted].slice(0, MAX_LOOKUPS);
   const raw: RawPlace[] = [];
   let best: { hits: PlaceHit[]; message?: string; miss?: boolean } = { hits: [] };
   for (const [i, name] of tries.entries()) {
@@ -224,7 +248,11 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
 
   try {
     if (req.method === "GET" && url.pathname === "/api/health") {
-      return json({ ok: true, mode: deps.agent.mode, library: deps.agent.library.length, ai: deps.agent.ai !== null, caps: await capsOf(deps.agent) }, 200, headers);
+      // Rate limited, answered from the isolate's 45-second memory of the caps, and coarse: it never says how much of the allowance is left.
+      if (!(await deps.limiter("health", await deps.clientId(req)))) return fail(429, "rate-limit", "Too many requests from here. Wait a minute and try again.", headers);
+      const caps = await capsOf(deps.agent);
+      const live = deps.agent.mode === "synthetic" ? "ok" : caps.qlooRemaining === 0 ? "paused" : caps.qlooRemaining < deps.agent.qlooDailyCap * 0.1 ? "low" : "ok";
+      return json({ ok: true, mode: deps.agent.mode, library: deps.agent.library.length, ai: deps.agent.ai !== null, live }, 200, headers);
     }
     if (req.method === "GET" && url.pathname === "/api/geocode") {
       const q = (url.searchParams.get("q") ?? "").trim();
@@ -238,6 +266,8 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
         // Stateless server: no event stream to open and no session to end (MCP spec, Streamable HTTP).
         return json({ name: "homestand", message: "This is the Homestand MCP endpoint. Send JSON-RPC 2.0 messages with POST. See the README section 'Use Homestand from an AI assistant (MCP)'." }, 405, { ...headers, allow: "POST, OPTIONS" });
       }
+      // The same per-minute guard as the other routes, before the body is read.
+      if (!(await deps.limiter("mcp", await deps.clientId(req)))) return fail(429, "rate-limit", "Too many requests from here. Wait a minute and try again.", headers);
       const host: McpHost = {
         respond: (body, status, extra = {}) => (body === null ? new Response(null, { status, headers: { ...headers, ...extra } }) : json(body, status, { ...headers, ...extra })),
         geocode: (q) => geocode(deps, q),
@@ -300,6 +330,7 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
 /** How a failed lookup is told to the caller: the same words for the web API and the MCP tools. */
 export function failureOf(err: unknown): { status: number; error: string; message: string } {
   if (err instanceof QuotaError) return { status: 429, error: "quota", message: QUOTA_MESSAGES[err.kind] };
+  if (err instanceof BusyError) return { status: 429, error: "busy", message: "A lot of people are looking up new cities right now. Try again in a minute. The sample calendars and any city already checked still work." };
   if (err instanceof CappedError && err.countersDown) {
     return { status: 503, error: "counters", message: "Live lookups are paused because the usage counters are unavailable. Recorded results still work; try again shortly." };
   }
