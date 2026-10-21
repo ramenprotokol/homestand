@@ -160,7 +160,7 @@ export function checkView(): HTMLElement {
       { class: "dl-top" },
       h("div", { class: "eyebrow" }, "Step 1 of 3 \u00b7 Check"),
       h("h1", { class: "h2", tabindex: "-1" }, "Check: ", h("em", null, a.market.label)),
-      h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(a.nights.map((n) => n.date))),
+      h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(a.nights.map((n) => n.date), copy().season)),
       h("p", { class: "check-line", "data-testid": "summary" }, result),
       passed > 0 ? h("p", { class: "small past-note", "data-testid": "past-note" }, `${passed} of these ${copy().nights} ${passed === 1 ? "has" : "have"} already passed.`) : null,
       asks,

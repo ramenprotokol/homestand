@@ -123,7 +123,7 @@ export function fixView(): HTMLElement {
     h(
       "div",
       { class: "wrap" },
-      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `the weak ${copy().nights}`)), h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(state.analysis!.nights.map((n) => n.date))), h("p", { class: "lede" }, lead))),
+      h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `the weak ${copy().nights}`)), h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(state.analysis!.nights.map((n) => n.date), copy().season)), h("p", { class: "lede" }, lead))),
       synth,
       savedCopyBanner(),
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,

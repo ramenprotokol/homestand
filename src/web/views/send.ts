@@ -122,7 +122,7 @@ export function sendView(): HTMLElement {
           { class: "send-l" },
           h("div", { class: "eyebrow" }, "Step 3 of 3 \u00b7 Send"),
           h("h1", { class: "h2", tabindex: "-1" }, "Send: ", h("em", null, "your revised calendar")),
-          h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(a.nights.map((n) => n.date))),
+          h("div", { class: "eyebrow season-line", "data-testid": "season-span" }, seasonEyebrow(a.nights.map((n) => n.date), copy().season)),
           h("p", { class: "sum", "data-testid": "send-summary" }, summary),
           syntheticBanner(),
           savedCopyBanner(),
