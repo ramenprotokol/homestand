@@ -1,10 +1,10 @@
 import { activeLibrary, COMMITTED_IDS } from "../app/themes/ids";
 import { VENUE_LIBRARY } from "../app/themes/artists";
-import { ACTS_REFERENCE, syntheticActsReference } from "../app/acts";
-import { REFERENCE, SYNTHETIC_REFERENCE } from "../app/score";
+import { syntheticActsReference } from "../app/acts";
+import { ACTS_REFERENCE, DISCOVERY_REFERENCE, REFERENCE, SYNTHETIC_REFERENCE } from "./reference";
 import type { Deps } from "./agent";
 import type { Env } from "./env";
-import { DISCOVERY_REFERENCE, syntheticDiscoveryReference } from "../app/discovery";
+import { syntheticDiscoveryReference } from "../app/discovery";
 import { memoryLimiter, ipBucket, type Limiter } from "./limits";
 import { route, type RouterDeps } from "./router";
 import { syntheticQlooFetch } from "./synthetic";

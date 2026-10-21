@@ -1,5 +1,3 @@
-import statsFile from "../data/reference-stats.json";
-import syntheticFile from "../data/reference-stats.synthetic.json";
 import { copyFor, type Kind, type Sport } from "../kind";
 
 export type FitLabel = "leans-in" | "average" | "leans-away" | "not-scored" | "classic" | "found";
@@ -46,9 +44,6 @@ export interface ReferenceStats {
   themes: Record<string, RefStat>;
 }
 
-export const REFERENCE: ReferenceStats = statsFile as ReferenceStats;
-/** Made-up aggregates for the offline synthetic mode (local runs and tests only). */
-export const SYNTHETIC_REFERENCE: ReferenceStats = syntheticFile as ReferenceStats;
 
 /** Below this a reference SD is treated as flat: there is nothing to compare against. */
 const MIN_SD = 1e-6;

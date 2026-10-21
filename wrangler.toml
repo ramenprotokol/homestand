@@ -2,6 +2,10 @@ name = "homestand-api"
 main = "src/worker/index.ts"
 compatibility_date = "2026-10-01"
 
+# Picks the real (private) or synthetic reference data before wrangler bundles the Worker. Runs on `wrangler deploy` and `wrangler dev`.
+[build]
+command = "node scripts/prepare-data.mjs"
+
 [ai]
 binding = "AI"
 

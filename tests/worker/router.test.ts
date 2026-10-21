@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AnalyzeResponse, ApiError, ProposeResponse, RecheckResponse } from "../../src/app/api-types";
 import { parseCalendar } from "../../src/app/calendar/csv";
-import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE as REFERENCE } from "../../src/worker/reference";
 import { sampleCsv } from "../../src/app/samples";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { syntheticDiscoveryReference } from "../../src/app/discovery";

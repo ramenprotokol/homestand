@@ -4,7 +4,7 @@
 import { parseCalendar } from "../src/app/calendar/csv";
 import { SAMPLE_MARKETS } from "../src/app/markets";
 import { sampleCsv } from "../src/app/samples";
-import { REFERENCE } from "../src/app/score";
+import { REFERENCE } from "../src/worker/reference";
 import { analyze, proposeSwaps, recheck, type Deps } from "../src/worker/agent";
 import { memoryKv } from "../src/worker/ports";
 import { announce, dry, liveLibrary, typesOf } from "./lib";

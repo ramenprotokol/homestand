@@ -19,7 +19,7 @@ Popularity was **constant across clubs for every kept entity** (min = max at eve
 
 | Star Wars | Princess | Bluey | Harry Potter | Margaritaville | Dinosaur | Country | Marvel | Wrestling |
 |---|---|---|---|---|---|---|---|---|
-| 0.99892 | 0.99694 | 0.91962 | 0.99925 | 0.98888 | 0.99771 | 0.98158 | 0.99910 | 0.99941 |
+| [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] | [redacted under Qloo data terms] |
 
 ## LLM baseline (Amendment 5 parsing)
 

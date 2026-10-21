@@ -9,7 +9,8 @@ import { cityOfLabel, copyFor, isSport, shortLabel, SPORTS, sportOf } from "../.
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { angleText } from "../../src/app/propose/propose";
 import { exampleCsv, sampleCsv, csvTemplate } from "../../src/app/samples";
-import { CLASSIC_REASON, classicReason, SYNTHETIC_REFERENCE } from "../../src/app/score";
+import { CLASSIC_REASON, classicReason } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE } from "../../src/worker/reference";
 import { activeLibrary } from "../../src/app/themes/ids";
 import { THEME_LIBRARY } from "../../src/app/themes/library";
 import { analyze, proposeSwaps, type Deps } from "../../src/worker/agent";

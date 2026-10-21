@@ -5,7 +5,7 @@ import { parseCalendar } from "../../src/app/calendar/csv";
 import { syntheticDiscoveryReference } from "../../src/app/discovery";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { exampleCsv, sampleCsv } from "../../src/app/samples";
-import { SYNTHETIC_REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE } from "../../src/worker/reference";
 import { activeLibrary } from "../../src/app/themes/ids";
 import { analyze, proposeSwaps, type Deps } from "../../src/worker/agent";
 import { memoryKv } from "../../src/worker/ports";

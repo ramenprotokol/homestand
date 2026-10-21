@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DISCOVERY_REFERENCE, discoveryZ, IDEA_POPULARITY, rankPool, standsOut, SWAP_POPULARITY, syntheticDiscoveryReference, worthAnIdea, worthASwap } from "../../src/app/discovery";
+import { discoveryZ, IDEA_POPULARITY, rankPool, standsOut, SWAP_POPULARITY, syntheticDiscoveryReference, worthAnIdea, worthASwap } from "../../src/app/discovery";
+import { DISCOVERY_REFERENCE } from "../../src/worker/reference";
 import { COMMITTED_IDS } from "../../src/app/themes/ids";
 import { THEME_LIBRARY } from "../../src/app/themes/library";
 import { libraryTitleMatcher } from "../../src/app/themes/match";
@@ -55,7 +56,8 @@ describe("recognisable titles only", () => {
   });
 });
 
-describe("the committed discovery reference", () => {
+// The real pool is Qloo-derived and kept out of the public repository; a clean clone checks the synthetic stand-in instead.
+describe.skipIf(DISCOVERY_REFERENCE.synthetic)("the real discovery reference (only where it has been pulled)", () => {
   const ref = DISCOVERY_REFERENCE;
   it("is a pool plus per-title aggregates over the same 40 reference markets, and nothing market-level", () => {
     expect(ref.synthetic).toBe(false);

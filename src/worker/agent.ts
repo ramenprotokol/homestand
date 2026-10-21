@@ -14,10 +14,11 @@ import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceSt
 import { idsOfType, type LiveTheme } from "../app/themes/ids";
 import { THEME_LIBRARY } from "../app/themes/library";
 import { VENUE_CLASSIC_PHRASES, VENUE_LIBRARY } from "../app/themes/artists";
-import { ACT_POPULARITY, ACTS_REFERENCE, actBatches, rankActs, worthABooking, type ActsReference } from "../app/acts";
+import { ACTS_REFERENCE, DISCOVERY_REFERENCE } from "./reference";
+import { ACT_POPULARITY, actBatches, rankActs, worthABooking, type ActsReference } from "../app/acts";
 import { cityOfLabel, copyFor, type Kind, type Sport } from "../app/kind";
 import { TIER_RANK, type Genre, type Tier } from "../app/themes/library";
-import { DISCOVERY_REFERENCE, IDEA_POPULARITY, poolOffset, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
+import { IDEA_POPULARITY, poolOffset, rankPool, standsOut, SWAP_POPULARITY, type DiscoveryReference } from "../app/discovery";
 import { step, type TraceStep } from "../app/trace";
 import { createQlooClient, type QlooType } from "../qloo/client";
 import { AI_MODEL, type AiPort, type KvPort } from "./ports";

@@ -4,7 +4,7 @@ import { syntheticDiscoveryReference } from "../../src/app/discovery";
 import { parseCalendar } from "../../src/app/calendar/csv";
 import { SAMPLE_MARKETS } from "../../src/app/markets";
 import { sampleCsv } from "../../src/app/samples";
-import { SYNTHETIC_REFERENCE } from "../../src/app/score";
+import { SYNTHETIC_REFERENCE } from "../../src/worker/reference";
 import { VENUE_LIBRARY } from "../../src/app/themes/artists";
 import { activeLibrary } from "../../src/app/themes/ids";
 import { analyze, forKind, MAX_LIVE_TASTE, proposeSwaps, type Deps } from "../../src/worker/agent";
