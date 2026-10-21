@@ -135,7 +135,7 @@ test("a club sample after a venue sample reads as a club again", async ({ page }
   await page.getByTestId("market-akron").click();
   await expect(page.getByRole("heading", { name: /Check: Akron, OH sample club/ })).toBeVisible();
   await expect(page.getByTestId("venue-note")).toHaveCount(0);
-  await expect(page.getByTestId("summary")).toHaveText(/weak fit for Akron\.$/);
+  await expect(page.getByTestId("summary")).toHaveText(/weak fit for Akron\.( \d+ more only leans? weak\.)?$/);
   await expect(page.locator(".fitword:has-text('Proven promo')").first()).toBeVisible();
   await expect(page.locator(".locks")).toContainText(/locked nights? stay/);
 });

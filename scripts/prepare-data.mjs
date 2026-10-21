@@ -2,7 +2,7 @@
 // Picks the reference data the Worker bundles: the real files (gitignored, Qloo-derived, present only on a machine that pulled them with its own
 // key) or, when they are absent, the committed made-up synthetic files. Writes src/worker/data/*.active.json (gitignored).
 // Runs before every test, build and `wrangler deploy` / `wrangler dev` (see package.json and wrangler.toml). No network, no secrets.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 
 const data = new URL("../src/app/data/", import.meta.url);
 const out = new URL("../src/worker/data/", import.meta.url);
@@ -14,7 +14,12 @@ for (const name of ["reference-stats", "acts-reference", "discovery-reference"])
   const want = readFileSync(useReal ? real : new URL(`${name}.synthetic.json`, data));
   const target = new URL(`${name}.active.json`, out);
   // Only written when it changed: `wrangler dev` watches these files and restarts (mid-request) on any write.
-  if (!existsSync(target) || !readFileSync(target).equals(want)) writeFileSync(target, want);
+  // Written to a temporary file and renamed into place, so a parallel run (another test, a build, wrangler) never reads a half-written file.
+  if (!existsSync(target) || !readFileSync(target).equals(want)) {
+    const tmp = new URL(`${name}.active.json.${process.pid}.tmp`, out);
+    writeFileSync(tmp, want);
+    renameSync(tmp, target);
+  }
   picks.push(`${name}: ${useReal ? "real" : "synthetic"}`);
 }
 console.log(`prepare-data: ${picks.join(", ")}`);

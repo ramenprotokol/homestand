@@ -7,6 +7,7 @@ import { activeLibrary } from "../src/app/themes/ids";
 import { populationSd, mean, mulberry32 } from "../src/study/stats";
 import { syntheticActsReference } from "../src/app/acts";
 import { syntheticDiscoveryReference } from "../src/app/discovery";
+import { SAMPLE_MARKETS } from "../src/app/markets";
 import { syntheticAffinity } from "../src/worker/synthetic";
 
 const rand = mulberry32(20261015);
@@ -18,6 +19,13 @@ for (const t of activeLibrary({}, true, ALL_THEMES)) {
     return s === null ? [] : [s];
   });
   themes[t.id] = { n: scores.length, mean: Number(mean(scores).toFixed(5)), sd: Number(populationSd(scores).toFixed(5)) };
+}
+// Pin the two compressed themes so the first sample (Biloxi) rates them weak, but only slightly: its reading sits 1.4 spreads below the pinned typical value.
+const biloxi = SAMPLE_MARKETS[0]!;
+for (const id of ["super-mario", "taylor-swift"]) {
+  const t = activeLibrary({}, true, ALL_THEMES).find((x) => x.id === id)!;
+  const score = bundleScore(t.entities.map((e) => syntheticAffinity(e.id, biloxi.lon, biloxi.lat)))!;
+  themes[id] = { ...themes[id]!, mean: Number((score + 1.4 * themes[id]!.sd).toFixed(5)) };
 }
 const out = {
   synthetic: true,

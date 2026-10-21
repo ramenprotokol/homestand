@@ -11,7 +11,7 @@ export function errorView(): HTMLElement {
   const own = state.sampleId === null && state.rows.length > 0;
   const samples = SAMPLE_MARKETS.length;
   const links = [
-    h("a", { class: "btn pri", href: "#/sample", "data-testid": "error-samples" }, `Open one of the ${samples} sample clubs`, icon("arrowRight")),
+    h("a", { class: "btn pri", href: "#/sample", "data-testid": "error-samples" }, `Open one of the ${samples} sample calendars`, icon("arrowRight")),
     own ? h("a", { class: "btn ghost", href: "#/own", "data-testid": "back-to-rows" }, "Back to my rows") : null,
   ];
 
@@ -21,7 +21,7 @@ export function errorView(): HTMLElement {
       "new cities",
       [
         h("p", { class: "lede", "data-testid": "limit-text" }, `Each visitor can look up ${DAILY_QUOTA.pull} new cities a day, and you've reached that today. The count starts over tomorrow (UTC).`),
-        h("p", { class: "lede" }, `Your calendar is still here. The ${samples} sample clubs work as many times as you like, and so do cities you've already checked.`),
+        h("p", { class: "lede" }, `Your calendar is still here. The ${samples} sample calendars work as many times as you like, and so do cities you've already checked.`),
       ],
       links,
     );

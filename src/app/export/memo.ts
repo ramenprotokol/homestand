@@ -47,6 +47,8 @@ export interface MemoData {
   ideas?: { city: string; titles: string[]; scored: number; poolSize: number };
   /** Clear weak nights Homestand found no swap for. */
   stillWeak?: string[];
+  /** The sentence naming unlocked Weak nights that are only a slight lean and got no swap (left as planned). */
+  slightLine?: string;
   /** Nights with a swap offered that is neither approved nor rejected, each with what was offered. */
   offered?: string[];
   /** Swaps the user turned down. */
@@ -122,6 +124,7 @@ ${d.swaps.length ? `<h2>Approved ${venue ? "offers" : "swaps"}</h2>
 ${d.rejected?.length ? `<h2>Rejected</h2><p>${d.rejected.map(escapeHtml).join("; ")}.</p>` : ""}
 ${d.offered?.length ? `<h2>${venue ? "Offer proposed" : "Swap offered"}, not approved</h2><p>${d.offered.map(escapeHtml).join("; ")}.</p>` : ""}
 ${d.stillWeak?.length ? `<h2>No ${venue ? "offer" : "swap"} available</h2><p>${d.stillWeak.map(escapeHtml).join("; ")}.</p>` : ""}
+${d.slightLine ? `<p>${escapeHtml(d.slightLine)}</p>` : ""}
 ${venue ? acts : ideas}
 ${d.angles.length ? `<h2>${venue ? "Locked headliners: a support act idea" : "Locked nights: an idea for the sponsor"}</h2><ul>${angles}</ul>` : ""}
 <h2>How to read this</h2>

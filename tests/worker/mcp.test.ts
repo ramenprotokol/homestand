@@ -202,7 +202,7 @@ describe("MCP tools", () => {
     const out = body.result!.structuredContent;
     expect(out.market).toBe("Fresno, CA");
     expect(out.nights).toHaveLength(5);
-    for (const n of out.nights) expect(["strong", "average", "weak", "classic", "not scored", "ambiguous"]).toContain(n.fit);
+    for (const n of out.nights) expect(["strong", "average", "weak", "leans strong", "leans weak", "classic", "not scored", "ambiguous"]).toContain(n.fit);
     expect(out.nights[2].fit).toBe("classic");
     expect(out.nights[4].fit).toBe("not scored");
     expect(out.nights[1]).toMatchObject({ locked: true, sponsor: "Bayou Bright Energy" });
@@ -233,11 +233,15 @@ describe("MCP tools", () => {
     expect(body.result!.isError).toBeUndefined();
     const out = body.result!.structuredContent;
     const checked = (await send(h, call("check_calendar", { sample: "biloxi" }))).body.result!.structuredContent.nights as Array<{ date: string; locked: boolean; fit: string; sponsor?: string }>;
-    expect(out.swaps.length + out.notFixed.length).toBe(checked.filter((n) => n.fit === "weak" && !n.locked).length);
+    // Every unlocked Weak night is a swap, a "could not fix", or (when it only leans weak) a swap that is optional or a night left as planned.
+    expect(out.swaps.length + out.notFixed.length + out.slight.length).toBe(checked.filter((n) => (n.fit === "weak" || n.fit === "leans weak") && !n.locked).length);
+    expect(out.slight.length).toBeGreaterThan(0);
+    expect(text(body)).toContain("only leans weak (raw gap under 0.01), so no swap is pushed. Left as planned.");
+    expect(out.swaps.some((s: { optional?: boolean }) => s.optional === true)).toBe(true);
     for (const s of out.swaps) {
       const night = checked.find((n) => n.date === s.date)!;
       expect(night.locked).toBe(false);
-      expect(night.fit).toBe("weak");
+      expect(["weak", "leans weak"]).toContain(night.fit);
       expect(s.sponsor).toBe(night.sponsor);
       expect(s.reason.length).toBeGreaterThan(10);
       expect(s.planned).not.toBe(s.proposed);
@@ -255,7 +259,7 @@ describe("MCP tools", () => {
   it("explain_night says why in plain words", async () => {
     const { body } = await send(harness(), call("explain_night", { sample: "biloxi", theme: "Taylor Swift Night" }));
     expect(body.result!.isError).toBeUndefined();
-    expect(["strong", "average", "weak"]).toContain(body.result!.structuredContent.fit);
+    expect(["strong", "average", "weak", "leans strong", "leans weak"]).toContain(body.result!.structuredContent.fit);
     expect(text(body)).toMatch(/other themes/);
     noRawNumbers(body.result);
     const classic = await send(harness(), call("explain_night", { sample: "biloxi", theme: "Fireworks Friday" }));

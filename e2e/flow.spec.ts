@@ -55,7 +55,12 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.locator(".rings")).toHaveCount(0); // no stray ring glyph beside the board
   // The result line comes from the cards themselves.
   const awayCards = await page.locator('.card.tile[data-fit="leans-away"]').count();
-  await expect(page.getByTestId("summary")).toHaveText(awayCards === 0 ? /^None of the 24 nights is a weak fit for Akron\.$/ : new RegExp(`^${awayCards} of 24 nights? (is|are) a weak fit for Akron\\.$`));
+  // Clear Weak cards are counted in the line; a card that only leans weak is counted after it ("2 more only lean weak").
+  const summaryText = (await page.getByTestId("summary").innerText()).trim();
+  const clearAway = Number(/^(?:None|(\d+)) of (?:the )?24 nights?/.exec(summaryText)?.[1] ?? 0);
+  const slightAway = Number(/(\d+) more only leans? weak\.$/.exec(summaryText)?.[1] ?? 0);
+  expect(clearAway + slightAway).toBe(awayCards);
+  expect(summaryText).toMatch(/^(None of the 24 nights is|\d+ of 24 nights? (is|are)) a weak fit for Akron\.( \d+ more only leans? weak\.)?$/);
   // Sponsor and locks are in words under the cards.
   expect(await page.locator(".slot-note").count()).toBeGreaterThan(5);
   expect(await page.locator('.slot-note[data-locked="1"]').count()).toBe(await page.locator(".grids .card .lk").count());
@@ -192,7 +197,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(page.locator("#steps .st .k", { hasText: "Taste lookup" })).toHaveCount(2);
   await expect(page.locator("#steps .st .k", { hasText: "Rules" })).toHaveCount(1);
   await expect(page.locator("#steps .st .k", { hasText: "Approved" })).toHaveCount(1);
-  await expect(page.locator(".slide.cur .face.alt")).toContainText(toName.split(" ")[0]!);
+  await expect(page.locator(".slide.cur .face.alt")).toContainText(toName.split(":")[0]!.split(" ")[0]!);
   await expect.poll(() => flipAngle(page, ".slide.cur .flipper")).toBeLessThan(-0.99);
   expect(await page.locator(".pinbar").innerText()).toBe(pinned);
   await shot(page, info, "08-approved");

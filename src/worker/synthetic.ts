@@ -1,3 +1,4 @@
+import { COMMITTED_IDS } from "../app/themes/ids";
 import { mulberry32 } from "../study/stats";
 
 // Local test data in Qloo's response shape. Nothing here comes from Qloo: it is a deterministic made-up function so the
@@ -12,12 +13,23 @@ function hash(s: string): number {
   return h >>> 0;
 }
 
+/**
+ * Two made-up entities whose readings barely differ between towns (within 0.006 of 0.9), the way a very popular title's real readings do. They exist
+ * so the offline app and its tests show a "Leans weak" night with an optional swap (Super Mario) and one with no swap at all (Taylor Swift).
+ */
+const COMPRESSED_KEYS = ["super-mario:film", "taylor-swift:artist"];
+/** Entity id (the made-up SYN id, or the committed Qloo id the Worker uses offline) to its key. The reading is made from the key, so both ids agree. */
+const COMPRESSED_BY_ID: ReadonlyMap<string, string> = new Map(COMPRESSED_KEYS.flatMap((k) => [[`SYN-${k}`, k], [COMMITTED_IDS[k]?.id ?? "", k]] as Array<[string, string]>).filter(([id]) => id !== ""));
+export const COMPRESSED_ENTITIES: ReadonlySet<string> = new Set(COMPRESSED_BY_ID.keys());
+
 /** A made-up affinity in 0.42 to 0.99 for an entity at a point; varies with both. */
 export function syntheticAffinity(entityId: string, lon: number, lat: number): number | null {
   // One test entity has no reading in far-northern markets, so the "Not scored" path is exercised offline.
   if (entityId === "SYN-minecraft:film" && lat > 43) return null;
   const base = 0.5 + 0.35 * mulberry32(hash(entityId))();
   const swing = (mulberry32(hash(`${entityId}|${lon.toFixed(1)}|${lat.toFixed(1)}`))() - 0.5) * 0.3;
+  const ck = COMPRESSED_BY_ID.get(entityId);
+  if (ck) return Number((0.9 + ((mulberry32(hash(`${ck}|${lon.toFixed(1)}|${lat.toFixed(1)}`))() - 0.5) / 0.5) * 0.003).toFixed(5));
   return Math.min(0.99, Math.max(0.42, base + swing));
 }
 

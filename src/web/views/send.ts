@@ -5,7 +5,7 @@ import { buildMemoHtml, memoDocument, type MemoData } from "../../app/export/mem
 import { themeById } from "../../app/themes/artists";
 import { savedCopyBanner, syntheticBanner } from "../components";
 import { makeCard, specOf } from "../foil/cards";
-import { actIdeas, clubAngleParts, ideaTitles, openerLine } from "./fix";
+import { actIdeas, clubAngleParts, ideaTitles, openerLine, slightLine } from "./fix";
 import { cityOfLabel } from "../../app/kind";
 import { fitWordFor } from "../../app/score";
 import { dateWithYear, seasonEyebrow } from "../../app/dates";
@@ -58,7 +58,7 @@ function memoData(): MemoData {
   const offered = props.filter((p) => !state.decisions[p.id]).map((p) => `${dateWithYear(p.date)} ${a.nights[p.index]!.theme} (offered: ${p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId}${p.optional ? ", optional: only a slight lean" : ""})`);
   const rejected = (state.propose?.proposals ?? []).filter((p) => state.decisions[p.id] === "rejected").map((p) => `${a.nights[p.index]!.theme} \u2192 ${p.discovered?.name ?? themeById(p.toThemeId)?.label ?? p.toThemeId} (${dateWithYear(p.date)})`);
   return {
-    stillWeak, offered, rejected,
+    stillWeak, offered, rejected, ...((state.propose?.slight ?? []).length > 0 ? { slightLine: slightLine(state.propose!.slight) } : {}),
     ...(state.kind === "venue" ? { kind: "venue" as const, sample: state.sampleId !== null } : state.sport !== "baseball" ? { sport: state.sport, sample: state.sampleId !== null } : {}), club: a.market.label, city: cityOfLabel(a.market.label), generatedOn: localDay(), swaps,
     angles: shownAngles().map((x) => state.kind === "venue" ? openerLine(x) : (([h1, b1, e1]) => [`${h1}.`, b1, e1].filter(Boolean).join(" "))(clubAngleParts(x, cityOfLabel(a.market.label), state.sport))), nights: a.nights.length, suggested: props.filter((p) => !p.optional).length, classic: a.nights.filter((n) => n.resolution.kind === "classic").length,
     ideas: ideasOf(a.market.label),

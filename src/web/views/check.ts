@@ -363,7 +363,7 @@ function whyInfo(index: number): Child {
     // The card back and this line say the one plain thing: how the town rates it against its own other themes. The comparison with other towns is under "Show the numbers".
     out.push(h("p", { class: "sr-only", "data-testid": "fit-line" }, comparisonSentence(theme.label, s.label, city(), state.kind)));
   }
-  if (v.slight && s.gap !== null && s.gap !== undefined) out.push(h("p", { class: "panel-box", "data-testid": "slight-note" }, slightNote(s.gap)));
+  if (v.slight && s.gap !== null && s.gap !== undefined) out.push(h("p", { class: "panel-box", "data-testid": "slight-note" }, slightNote(s.gap, state.kind)));
   out.push(
     h("div", { class: "panel-box" }, h("h3", null, "What Qloo looked at"), h("ul", { class: "entity-list" }, s.entities.map((e) => h("li", null, `${cleanTitle(e.name)} (${e.type.replace("_", " ")})`)))),
   );

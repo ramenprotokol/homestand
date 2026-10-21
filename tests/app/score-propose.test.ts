@@ -387,7 +387,9 @@ describe("plain-words copy", () => {
   it("keeps the audit line in step with the published study", () => {
     const r = JSON.parse(readFileSync("study/results.json", "utf8")) as { counts: { nightsInput: number }; h1: { accuracy: { estimate: number } } };
     expect(AUDIT_LINE).toContain(`${r.counts.nightsInput} real 2025 nights`);
-    expect(AUDIT_LINE).toContain(`${Math.round(r.h1.accuracy.estimate * 100)} times in 100`);
+    expect(AUDIT_LINE).toContain(`${Math.round(r.h1.accuracy.estimate * 100)} in 100`);
+    expect(AUDIT_LINE).toContain("not proven");
+    expect(AUDIT_LINE).not.toMatch(/coin flip/);
     expect(AUDIT_LINE).not.toMatch(/H1|found no link/);
   });
 });

@@ -154,14 +154,17 @@ export const strengthOf = (index: number | null, sd: number | null | undefined):
 export const fitWordFor = (fit: FitLabel, slight?: boolean): string => (slight && fit === "leans-in" ? "Leans strong" : slight && fit === "leans-away" ? "Leans weak" : fitWord(fit));
 
 /** The Why-panel line for a slight lean, with the real gap. */
-export const slightNote = (gap: number): string => `Slight: only ${Math.abs(gap).toFixed(3)} from this town's usual. Qloo says gaps this small usually mean similar relevance, so treat it as a lean, not a verdict.`;
+export const slightNote = (gap: number, kind?: Kind): string => `Slight: only ${Math.abs(gap).toFixed(3)} from this ${copyFor(kind).place}'s usual. Qloo says gaps this small usually mean similar relevance, so treat it as a lean, not a verdict.`;
 
 /** How the method works, in plain words. Shown only under "Show the numbers". */
-export const methodWords = (kind?: Kind): string =>
-  `We ask Qloo how strongly people near this ${copyFor(kind).place} like each thing in a theme, and compare that with 40 other ${copyFor(kind).markets}. ` +
-  "Then we compare each theme with this town's own average. A theme clearly above that average (by at least half the usual gap between towns) is a Strong fit. Clearly below is a Weak fit. In between is an Average fit. " +
-  `When the raw gap behind a Strong or Weak label is under ${RAW_FLOOR}, it is marked "Leans strong" or "Leans weak" instead: Qloo says gaps that small usually mean similar relevance, so no swap is pushed for it. ` +
-  "It describes local taste. It does not say a theme will raise attendance.";
+export const methodWords = (kind?: Kind): string => {
+  const C = copyFor(kind);
+  const thing = kind === "venue" ? "act" : "theme";
+  return `We ask Qloo how strongly people near this ${C.place} like each thing in ${kind === "venue" ? "an act" : "a theme"}, and compare that with 40 other ${C.markets}. ` +
+    `Then we compare each ${thing} with this ${C.place}'s own average. ${kind === "venue" ? "An act" : "A theme"} clearly above that average (by at least half the usual gap between ${C.markets}) is a Strong fit. Clearly below is a Weak fit. In between is an Average fit. ` +
+    `When the raw gap behind a Strong or Weak label is under ${RAW_FLOOR}, it is marked "Leans strong" or "Leans weak" instead: Qloo says gaps that small usually mean similar relevance, so no ${kind === "venue" ? "offer" : "swap"} is pushed for it. ` +
+    `It describes local taste. It does not say ${kind === "venue" ? "an act" : "a theme"} will raise attendance.`;
+};
 
 export const METHOD_WORDS = methodWords("club");
 
@@ -194,7 +197,7 @@ export const classicReason = (kind?: Kind, sport?: Sport): string =>
  * What the study found, in plain words. Shown on the landing page, the Why panel, The Study and the memo.
  * The numbers are the published ones (study/results.json); tests/app/score.test.ts keeps them in step.
  */
-export const AUDIT_LINE = "It doesn't predict ticket sales. We tested that on 385 real 2025 nights: local taste picked the bigger crowd 49 times in 100, about a coin flip.";
+export const AUDIT_LINE = "It doesn't predict ticket sales. We tested that on 385 real 2025 nights and could not show that local taste picked the bigger crowd (49 in 100; not proven at that sample size).";
 
 /** How a score compares with the 40 other towns, from its z, in plain words (only under "Show the numbers"). */
 export function vsMarketsWords(z: number | null, kind?: Kind): string {

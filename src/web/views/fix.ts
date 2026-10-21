@@ -1,5 +1,5 @@
 import type { TraceStep } from "../../app/trace";
-import { seasonEyebrow, shortDateYear } from "../../app/dates";
+import { dateWithYear, seasonEyebrow, shortDateYear } from "../../app/dates";
 import { cleanTitle } from "../../app/text";
 import { fitWord, fitWordFor, pullBand, type FitLabel } from "../../app/score";
 import { themeById } from "../../app/themes/artists";
@@ -120,7 +120,12 @@ export function fixView(): HTMLElement {
 
   const clearCount = swaps.length - optionalCount;
   const optionalLine = optionalCount > 0 ? ` ${optionalCount} more ${optionalCount === 1 ? "is" : "are"} optional: the planned ${state.kind === "venue" ? "date is" : "night is"} only a slight lean, so ${optionalCount === 1 ? "it is" : "they are"} offered but not pushed.` : "";
-  const lead = swaps.length > 0 && state.kind === "venue" ? `${clearCount} offer${clearCount === 1 ? "" : "s"} ready: here is who to send an offer to instead of each weak date. Nothing changes until you approve it. Locked dates are never touched, and every date keeps its sponsor.${optionalLine}` : swaps.length > 0 ? `${clearCount} swap${clearCount === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.${optionalLine}` : "Nothing needs swapping.";
+  const venueRun = state.kind === "venue";
+  const allOptional = clearCount === 0 && optionalCount > 0;
+  const unit = venueRun ? "offer" : "swap";
+  const lead = allOptional
+    ? `No clear weak ${copy().night} needs ${venueRun ? "an offer" : "a swap"}. ${optionalCount === 1 ? `1 optional ${unit} is offered: the planned ${copy().night} only leans weak.` : `${optionalCount} optional ${unit}s are offered: the planned ${copy().nights} only lean weak.`}`
+    : swaps.length > 0 && state.kind === "venue" ? `${clearCount} offer${clearCount === 1 ? "" : "s"} ready: here is who to send an offer to instead of each weak date. Nothing changes until you approve it. Locked dates are never touched, and every date keeps its sponsor.${optionalLine}` : swaps.length > 0 ? `${clearCount} swap${clearCount === 1 ? "" : "s"} proposed. Nothing changes until you approve it. Locked ${copy().nights} are never swapped. Every swap keeps its date and sponsor.${optionalLine}` : "Nothing needs swapping.";
   const section = h(
     "section",
     { class: "fix", id: "fix" },
@@ -136,6 +141,7 @@ export function fixView(): HTMLElement {
       settings,
       shownAngles().length > 0 ? anglesSection() : null,
       p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
+      (p.slight ?? []).length > 0 ? slightBlock(p.slight) : null,
     ),
   );
 
@@ -217,6 +223,17 @@ function actsPanel(d: ActsOut | null | undefined, marketLabel: string): HTMLElem
 }
 
 /** One compact block for every night that could not be fixed, with one shared explanation (worded for the case) instead of a card each. */
+/** The unlocked Weak nights that are only a slight lean and have no swap: left as planned, and said so, so they never just disappear. */
+export function slightLine(list: Array<{ index: number; date: string }>): string {
+  const names = list.map((u) => `${state.analysis!.nights[u.index]!.theme} (${dateWithYear(u.date)})`);
+  const joined = names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return `Only a slight lean, left as planned: ${joined} only ${list.length === 1 ? "leans" : "lean"} weak (raw gap under 0.01), so no ${state.kind === "venue" ? "offer" : "swap"} is pushed.`;
+}
+
+function slightBlock(list: ProposeResponse["slight"]): HTMLElement {
+  return h("section", { class: "sect nofix", "data-testid": "slight-block" }, h("p", { class: "nofix-why" }, slightLine(list)));
+}
+
 function unfixedBlock(list: ProposeResponse["unfixed"]): HTMLElement {
   const young = list.filter((u) => u.reason.startsWith("No family theme")).length;
   const city = cityOfLabel(state.analysis!.market.label);

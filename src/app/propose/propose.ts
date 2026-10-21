@@ -155,6 +155,8 @@ export interface ProposeResult {
   /** Leans-away nights that could not be fixed, with the reason. */
   /** `counts` explain the miss: strong themes, how many are already used, how many are wrong for the night. */
   unfixed: Array<{ index: number; date: string; reason: string; counts?: { strong: number; used: number; wrong: number } }>;
+  /** Unlocked Weak nights that are only a slight lean and got no swap: left as planned, said plainly rather than listed as "could not fix". */
+  slight: Array<{ index: number; date: string }>;
   trace: TraceStep[];
 }
 
@@ -530,5 +532,6 @@ export function propose(input: ProposeInput): ProposeResult {
   }
   for (const p of proposals) if (fits[p.fromThemeId]?.slight === true) p.optional = true;
   proposals.sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index);
-  return { proposals, angles, unfixed, trace };
+  const slight = away.filter((n) => !n.locked && isSlightNight(n) && !proposals.some((p) => p.index === n.index)).map((n) => ({ index: n.index, date: n.date })).sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index);
+  return { proposals, angles, unfixed, slight, trace };
 }

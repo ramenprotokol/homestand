@@ -406,15 +406,18 @@ async function proposeTool(args: Record<string, unknown>, host: McpHost): Promis
     alternatives: p.alternates.map((x) => label(x.toThemeId)),
   }));
   const notFixed = res.unfixed.map((u) => ({ date: u.date, reason: u.reason }));
+  // Unlocked Weak nights that only lean weak and got no swap: left as planned, and said so.
+  const slight = res.slight.map((u) => ({ date: u.date, theme: a.nights[u.index]!.theme }));
   const ideas = res.angles.map((g) => ({ date: g.date, sponsor: g.sponsor, text: g.text }));
   const city = cityOfLabel(a.market.label);
   const summary = swaps.length === 0 && notFixed.length === 0 ? `No weak nights to fix for ${city}.${demoNote(a.mode)}` : `${plural(swaps.length, "swap", "swaps")} suggested for ${a.market.label}${notFixed.length ? `, ${plural(notFixed.length, "night", "nights")} could not be fixed` : ""}.${demoNote(a.mode)}`;
   const lines = [
     ...swaps.map((s) => `${s.date} ${s.weekday.slice(0, 3)}${s.optional ? " [optional: only a slight lean]" : ""}: ${s.planned} (${s.plannedFit}) -> ${s.proposed} (${s.proposedFit}). ${s.reason}${s.alternatives.length ? ` Other options: ${s.alternatives.join(", ")}.` : ""}`),
     ...notFixed.map((u) => `${u.date}: not fixed. ${u.reason}`),
-    ...(ideas.length ? ["", "Ideas for locked nights:", ...ideas.map((i) => `${i.date}: ${i.text}`)] : []),
+    ...slight.map((u) => `${u.date}: ${u.theme} only leans weak (raw gap under 0.01), so no swap is pushed. Left as planned.`),
+    ...(ideas.length ? ["", a.kind === "venue" ? "Support act ideas for locked dates:" : "Ideas for locked nights:", ...ideas.map((i) => `${i.date}: ${i.text}`)] : []),
   ];
-  return succeeded(`${summary}\n\nThese are suggestions only; nothing has been changed. Locked nights, dates and sponsors stay as they are.\n\n${lines.join("\n")}`, { market: a.market.label, mode: a.mode, summary, swaps, notFixed, ideas });
+  return succeeded(`${summary}\n\nThese are suggestions only; nothing has been changed. ${a.kind === "venue" ? "Locked dates, acts and sponsors" : "Locked nights, dates and sponsors"} stay as they are.\n\n${lines.join("\n")}`, { market: a.market.label, mode: a.mode, summary, swaps, notFixed, slight, ideas });
 }
 
 // ---------- explain_night ----------
@@ -427,7 +430,7 @@ async function explainNight(args: Record<string, unknown>, host: McpHost): Promi
   const row: CalendarRow = { line: 2, date: "2027-06-19", theme, sponsor: "", locked: false, notes: "" };
   const { a, d } = await analyseFor([row], t, host);
   const n = lineOf(a.nights[0]!, d, a);
-  const label: FitLabel | null = n.fit === "strong" ? "leans-in" : n.fit === "weak" ? "leans-away" : n.fit === "average" ? "average" : null;
+  const label: FitLabel | null = n.fit === "strong" || n.fit === "leans strong" ? "leans-in" : n.fit === "weak" || n.fit === "leans weak" ? "leans-away" : n.fit === "average" ? "average" : null;
   const parts = [`${theme} in ${a.market.label}: ${n.fit}.`, n.reason, label ? methodWords(a.kind) : "", label ? AUDIT_LINE : ""].filter(Boolean);
   const data = { market: a.market.label, mode: a.mode, theme, matchedTheme: n.matchedTheme, fit: n.fit, reason: n.reason, ...(n.choices ? { choices: n.choices } : {}) };
   return succeeded(`${parts.join(" ")}${demoNote(a.mode)}`, data);
@@ -437,6 +440,6 @@ async function explainNight(args: Record<string, unknown>, host: McpHost): Promi
 
 function sampleTeams(): ToolResult {
   const samples = SAMPLE_MARKETS.map((m) => ({ id: m.id, city: m.city, sport: m.kind === "venue" ? "venue" : (m.sport ?? "baseball"), kind: m.kind, nights: parseCalendar(sampleCsv(m.id)).rows.length }));
-  const lines = samples.map((s) => `${s.id}: ${s.city}, ${s.kind === "venue" ? "a concert venue" : `a ${s.sport} club`} (${plural(s.nights, "night", "nights")})`);
+  const lines = samples.map((s) => `${s.id}: ${s.city}, ${s.kind === "venue" ? "a concert venue" : s.sport === "baseball" ? "a baseball club" : `a ${s.sport} team`} (${plural(s.nights, "night", "nights")})`);
   return succeeded(`Built-in samples. They are made up: the cities are real places, the teams, venues and sponsors are not.\n\n${lines.join("\n")}\n\nTry check_calendar with sample set to one of these ids.`, { samples });
 }

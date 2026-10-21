@@ -135,7 +135,7 @@ test("the new-city limit page is friendly, keeps the calendar, and links to the 
   await expect(page.getByTestId("limit-text")).toContainText(/Each visitor can look up \d+ new cities a day/);
   await expect(page.getByText("That did not work")).toHaveCount(0);
   await expect(page.getByText("The four sample clubs")).toHaveCount(0);
-  await expect(page.getByTestId("error-samples")).toHaveText(/Open one of the 6 sample clubs/);
+  await expect(page.getByTestId("error-samples")).toHaveText(/Open one of the 6 sample calendars/);
   await expect(page.getByTestId("retry")).toHaveCount(0);
   await shot(page, `limit-page-${info.project.name}`);
   await page.getByTestId("back-to-rows").click();

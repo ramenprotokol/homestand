@@ -942,7 +942,7 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
   }
   return {
     proposals: res.proposals.map((p) => ({ ...p, why: whys.get(p.id) ?? p.why, whySource: whys.has(p.id) ? "model" : "template" })),
-    discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: pickAngles(venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace), new Set(res.proposals.map((p) => p.toThemeId))), unfixed: res.unfixed, trace, caps: await capsOf(d, { read: false }),
+    discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: pickAngles(venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace), new Set(res.proposals.map((p) => p.toThemeId))), unfixed: res.unfixed, slight: res.slight, trace, caps: await capsOf(d, { read: false }),
   };
 }
 

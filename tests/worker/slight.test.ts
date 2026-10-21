@@ -29,7 +29,8 @@ const rows = parseCalendar(sampleCsv(m.id)).rows;
 describe("the Worker marks slight leans", () => {
   it("marks no lean slight when the gaps are large, and every lean slight when they are tiny", async () => {
     const big = await analyze(deps(), { market, rows });
-    expect(Object.values(big.themes).some((t) => t.slight)).toBe(false);
+    // Only the two offline themes whose readings barely differ between towns (COMPRESSED_ENTITIES) can be a slight lean in the ordinary data.
+    expect(Object.values(big.themes).filter((t) => t.slight).every((t) => t.themeId === "super-mario" || t.themeId === "taylor-swift")).toBe(true);
     const a = await analyze(deps(tiny, squeezed), { market, rows });
     const leaning = Object.values(a.themes).filter((t) => t.label === "leans-in" || t.label === "leans-away");
     expect(leaning.length).toBeGreaterThan(0);

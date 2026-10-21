@@ -137,6 +137,8 @@ export interface ProposeResponse {
   acts?: ActsOut | null;
   angles: SponsorAngle[];
   unfixed: Array<{ index: number; date: string; reason: string; counts?: { strong: number; used: number; wrong: number } }>;
+  /** Unlocked Weak nights that are only a slight lean and have no swap: left as planned, and said so. */
+  slight: Array<{ index: number; date: string }>;
   trace: TraceStep[];
   caps: Caps;
 }
