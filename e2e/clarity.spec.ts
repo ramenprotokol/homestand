@@ -16,15 +16,15 @@ test("Use your own checks the rows on the same screen and edits them in a table"
   await page.goto("/#/own");
   await page.getByLabel("2. Your theme nights").fill("date,theme,sponsor,locked,notes\n2026-04-11,Bluey Day,Prairie Bank,no,\nsoon,Star Wars Night,,no,\n2026-04-18,Fireworks Friday,,no,\n");
   await expect(page.getByTestId("rowcheck")).toContainText("2 nights ready. 1 needs a fix");
-  await expect(page.locator(".rc-inline:not([hidden])")).toHaveText("Not a date. Use 2027-04-10.");
+  await expect(page.locator(".rc-inline:not([hidden])")).toHaveText(`"soon" is not a date. Use 2027-04-10 or 4/10/2027.`);
   expect(await page.locator(".rows-ed tbody tr").count()).toBe(3);
   await page.getByTestId("add-row").click();
   await expect(page.getByTestId("rowcheck")).toContainText("3 nights ready.");
   await page.getByRole("button", { name: /Delete row/ }).first().click();
   await expect(page.getByTestId("rowcheck")).toContainText("2 nights ready.");
-  await page.getByLabel("1. Your home city").fill("Tusla");
+  await page.getByLabel("1. Your home city").fill("Zzxqv");
   await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByText(/No city called "Tusla"\. Check the spelling, for example "Tulsa, OK"\./)).toBeVisible();
+  await expect(page.getByText(/No city called "Zzxqv"\. Check the spelling, for example "Tulsa, OK"\./)).toBeVisible();
 });
 
 test("editing three cells in a row keeps all three", async ({ page }) => {

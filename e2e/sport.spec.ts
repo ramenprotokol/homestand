@@ -109,7 +109,7 @@ test("Use your own: pick hockey, the words follow, and the Worker is told", asyn
   // Baseball is the default.
   await expect(page.getByTestId("sport-baseball")).toHaveAttribute("aria-checked", "true");
   await expect(page.getByTestId("sport-hint")).toContainText("Baseball seasons usually run April to September. Next, the city your ballpark is in.");
-  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2026-04-10 or 4/10/2026.");
+  await expect(page.locator(".cols dd").first()).toHaveText("The game date, like 2027-04-10 or 4/10/2027.");
   for (const s of ["baseball", "basketball", "hockey", "soccer"]) await expect(page.getByTestId(`sport-${s}`)).toBeVisible();
   await expect(page.getByTestId("sport-nfl")).toHaveCount(0);
 
