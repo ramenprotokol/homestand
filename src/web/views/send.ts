@@ -15,7 +15,7 @@ import { gsap, reduced } from "../foil/motion";
 import { crowdBar } from "../foil/scenery";
 import { download, formatDateTime, h } from "../dom";
 import { navigate } from "../flow";
-import { cleanTitle, localDay, longDate } from "../../app/text";
+import { cleanTitle, fitTally, localDay, longDate } from "../../app/text";
 import { icon } from "../icons";
 import { approvedSwaps, copy, shownAngles, state, swapTitle, viewOf } from "../store";
 
@@ -80,7 +80,9 @@ export function sendView(): HTMLElement {
   const data = memoData();
 
   const weakLeft = views.filter((v) => v.fit === "leans-away" && !v.slight).length;
-  const summary = swaps.length === 0 ? `No ${state.kind === "venue" ? "offers" : "swaps"} made, so the calendar is unchanged. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left. You can still download the memo.` : `${swaps.length} ${state.kind === "venue" ? "offer" : "swap"}${swaps.length === 1 ? "" : "s"} made. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left.`;
+  const leanLeft = views.filter((v) => v.fit === "leans-away" && v.slight).length;
+  const leanWords = leanLeft > 0 ? ` ${leanLeft} more only ${leanLeft === 1 ? "leans" : "lean"} weak.` : "";
+  const summary = swaps.length === 0 ? `No ${state.kind === "venue" ? "offers" : "swaps"} made, so the calendar is unchanged. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left.${leanWords} You can still download the memo.` : `${swaps.length} ${state.kind === "venue" ? "offer" : "swap"}${swaps.length === 1 ? "" : "s"} made. ${weakLeft} weak ${weakLeft === 1 ? copy().night : copy().nights} left.${leanWords}`;
 
   // The fan: every approved swap, landed, in the glowing frame.
   const fan = h("div", { class: "fan" });
@@ -94,14 +96,15 @@ export function sendView(): HTMLElement {
     w.style.transform = `rotate(${rots[k]}deg) translateY(${Math.abs(rots[k]!) * 0.7}px)`;
     fan.append(w);
   });
-  const counts = (f: string): number => views.filter((v) => v.fit === f).length;
-  const caption = swaps.length === 0 ? "The deck stands as planned" : `${counts("leans-in")} strong \u00b7 ${counts("average")} average \u00b7 ${counts("leans-away")} weak${counts("found") > 0 ? ` \u00b7 ${counts("found")} local favorite` : ""}`;
+  const counts = (f: string, slight = false): number => views.filter((v) => v.fit === f && (f !== "leans-in" && f !== "leans-away" ? true : v.slight === slight)).length;
+  const caption = swaps.length === 0 ? "The deck stands as planned" : fitTally({ strong: counts("leans-in"), leansStrong: counts("leans-in", true), average: counts("average"), weak: counts("leans-away"), leansWeak: counts("leans-away", true), classic: counts("classic"), notScored: counts("not-scored"), found: counts("found") });
 
   const canvas = h("canvas", { id: "fx3", "aria-hidden": "true" });
   const final = h(
     "div",
     { class: "final" },
     h("h2", { class: "final-h" }, "The finished deck"),
+    h("p", { class: "eyebrow", "data-testid": "final-span" }, seasonEyebrow(a.nights.map((n) => n.date), copy().season)),
     h("div", { class: "grid grid--final" }, views.map((v) => {
       const c = makeCard(specOf(v), { inert: true, extra: v.swappedFrom ? [h("div", { class: "stamp stamp--swap" }, state.kind === "venue" ? "OFFER" : "SWAPPED")] : [] });
       c.dataset.notilt = "1";

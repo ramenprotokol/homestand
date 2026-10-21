@@ -25,6 +25,18 @@ export function checkHeadline(c: { clearAway: number; slightAway: number; total:
   return c.slightAway > 0 ? `${base} ${c.slightAway} more ${c.slightAway === 1 ? "only leans" : "only lean"} weak.` : base;
 }
 
+/**
+ * Every night, counted once, short: "11 strong · 5 average · 2 weak · 1 leans weak · 3 proven promos". A Strong or Weak night whose raw gap is under
+ * 0.01 is counted as "leans strong" / "leans weak" instead of strong / weak, so the numbers always add up to the number of nights. Zero counts are left out.
+ */
+export function fitTally(c: { strong: number; leansStrong: number; average: number; weak: number; leansWeak: number; classic: number; notScored: number; found: number }): string {
+  const parts: Array<[number, string]> = [
+    [c.strong, "strong"], [c.leansStrong, "leans strong"], [c.average, "average"], [c.weak, "weak"], [c.leansWeak, "leans weak"],
+    [c.found, "local favorite"], [c.classic, c.classic === 1 ? "proven promo" : "proven promos"], [c.notScored, "no data"],
+  ];
+  return parts.filter(([n]) => n > 0).map(([n, w]) => `${n} ${w}`).join(" \u00b7 ");
+}
+
 export function fitSummary(c: { in: number; average: number; away: number; notScored: number; classic: number; found?: number }): string {
   const found = c.found ? `, ${c.found} local favorite` : "";
   return `${c.in} strong fit, ${c.average} average fit, ${c.away} weak fit, ${c.notScored} no data, ${c.classic} proven promo${found}.`;

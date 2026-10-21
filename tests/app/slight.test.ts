@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildMemoHtml, type MemoData } from "../../src/app/export/memo";
 import { propose, type PlanNight, type ThemeFit } from "../../src/app/propose/propose";
 import { fitMeaning, fitWordFor, rawGap, RAW_FLOOR, slightNote, strengthOf } from "../../src/app/score";
-import { checkHeadline, swapName, titleCase } from "../../src/app/text";
+import { checkHeadline, fitTally, swapName, titleCase } from "../../src/app/text";
 import { THEME_LIBRARY } from "../../src/app/themes/library";
 
 describe("slight lean", () => {
@@ -106,5 +106,13 @@ describe("the memo uses the same slight words as the screen", () => {
   it("writes Leans strong or Leans weak in the fit column", () => {
     const d: MemoData = { club: "Fresno, CA", generatedOn: "2026-10-20", swaps: [{ date: "2027-07-10", weekday: "Saturday", from: "Elvis Night", to: "The Beatles Night", sponsor: "", fromZ: -1.2, toZ: 0.9, fromSlight: false, toSlight: true, fromScore: 0.9, toScore: 0.9, why: "x" }], angles: [], nights: 20, suggested: 1, classic: 0, synthetic: false, recordedLabel: null };
     expect(buildMemoHtml(d)).toContain("Weak fit → Leans strong");
+  });
+});
+
+describe("the tally of every night", () => {
+  it("counts each night once and leaves out zeros", () => {
+    const c = { strong: 11, leansStrong: 0, average: 5, weak: 2, leansWeak: 1, classic: 3, notScored: 0, found: 0 };
+    expect(fitTally(c)).toBe("11 strong \u00b7 5 average \u00b7 2 weak \u00b7 1 leans weak \u00b7 3 proven promos");
+    expect(fitTally({ ...c, classic: 1, notScored: 2, leansStrong: 2, found: 1 })).toBe("11 strong \u00b7 2 leans strong \u00b7 5 average \u00b7 2 weak \u00b7 1 leans weak \u00b7 1 local favorite \u00b7 1 proven promo \u00b7 2 no data");
   });
 });

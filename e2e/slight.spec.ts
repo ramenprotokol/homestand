@@ -51,3 +51,21 @@ test("when every swap is optional, the lede says so instead of '0 swaps proposed
   await expect(page.locator(".fix-head .lede")).toContainText("No clear weak night needs a swap. 1 optional swap is offered: the planned night only leans weak.");
   await expect(page.locator(".fix-head .lede")).not.toContainText("0 swaps proposed");
 });
+
+for (const id of ["biloxi", "albuquerque", "akron", "portland-me", "boise", "raleigh"]) {
+  test(`Send accounts for every night: ${id}`, async ({ page }) => {
+    await page.goto(`/#/check/${id}`);
+    await expect(page.getByTestId("summary")).toBeVisible();
+    await page.getByTestId("to-fix").click();
+    await expect(page.getByTestId("fix-status")).toBeVisible();
+    await page.getByTestId("skip-pack").click({ timeout: 4000 }).catch(() => undefined);
+    await page.getByTestId("approve").click();
+    await page.getByTestId("to-send").click();
+    const caption = await page.locator(".fcap").innerText();
+    const total = await page.locator(".grid--final .slot").count();
+    const sum = [...caption.matchAll(/(\d+) /g)].reduce((n, m) => n + Number(m[1]), 0);
+    expect(sum, `"${caption}" should add up to ${total} nights`).toBe(total);
+    // The finished deck says which season it covers, with the year.
+    await expect(page.getByTestId("final-span")).toHaveText(/^\d{4}(–\d{2})? (season|summer series) · [A-Z][a-z]{2} \d+ – [A-Z][a-z]{2} \d+$/);
+  });
+}
