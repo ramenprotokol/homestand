@@ -73,7 +73,7 @@ describe("the taste graph is bounded", () => {
   });
 
   it("counts against the client's daily taste quota even on a sample market, and a recorded answer does not count", async () => {
-    expect(DAILY_QUOTA.taste).toBe(20);
+    expect(DAILY_QUOTA.taste).toBe(40);
     const asked: string[] = [];
     const { d, urls } = setup({ gate: { allow: async (k) => (asked.push(k), k !== "taste") } });
     const nights = await plan(d);

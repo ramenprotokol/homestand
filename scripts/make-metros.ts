@@ -1,0 +1,46 @@
+// Writes src/worker/metros.ts: the ~150 largest US and Canadian metros, with the coordinates the city search (Open-Meteo geocoding) returns for
+// each, so the cron pre-warm and a visitor's search land on the same cache key. Names and coordinates only: no Qloo data.
+// Run once (network, no key): npx tsx scripts/make-metros.ts
+import { writeFileSync } from "node:fs";
+import { placeLabel } from "../src/app/geo";
+
+const NAMES = `New York, NY; Los Angeles, CA; Chicago, IL; Houston, TX; Phoenix, AZ; Philadelphia, PA; San Antonio, TX; San Diego, CA; Dallas, TX; Jacksonville, FL;
+Fort Worth, TX; San Jose, CA; Austin, TX; Charlotte, NC; Columbus, OH; Indianapolis, IN; San Francisco, CA; Seattle, WA; Denver, CO; Washington, DC;
+Nashville, TN; Oklahoma City, OK; El Paso, TX; Boston, MA; Portland, OR; Las Vegas, NV; Detroit, MI; Memphis, TN; Louisville, KY; Baltimore, MD;
+Milwaukee, WI; Albuquerque, NM; Tucson, AZ; Fresno, CA; Sacramento, CA; Mesa, AZ; Atlanta, GA; Kansas City, MO; Colorado Springs, CO; Omaha, NE;
+Raleigh, NC; Miami, FL; Virginia Beach, VA; Long Beach, CA; Oakland, CA; Minneapolis, MN; Tulsa, OK; Bakersfield, CA; Wichita, KS; Arlington, TX;
+Aurora, CO; Tampa, FL; New Orleans, LA; Cleveland, OH; Honolulu, HI; Anaheim, CA; Lexington, KY; Stockton, CA; Corpus Christi, TX; Henderson, NV;
+Riverside, CA; Newark, NJ; Saint Paul, MN; Santa Ana, CA; Cincinnati, OH; Irvine, CA; Orlando, FL; Pittsburgh, PA; St. Louis, MO; Greensboro, NC;
+Jersey City, NJ; Anchorage, AK; Lincoln, NE; Plano, TX; Durham, NC; Buffalo, NY; Chandler, AZ; Chula Vista, CA; Toledo, OH; Madison, WI;
+Gilbert, AZ; Reno, NV; Fort Wayne, IN; North Las Vegas, NV; St. Petersburg, FL; Lubbock, TX; Irving, TX; Laredo, TX; Winston-Salem, NC; Chesapeake, VA;
+Glendale, AZ; Garland, TX; Scottsdale, AZ; Norfolk, VA; Boise, ID; Fremont, CA; Spokane, WA; Santa Clarita, CA; Baton Rouge, LA; Richmond, VA;
+Hialeah, FL; San Bernardino, CA; Tacoma, WA; Modesto, CA; Huntsville, AL; Des Moines, IA; Yonkers, NY; Rochester, NY; Moreno Valley, CA; Fayetteville, NC;
+Fontana, CA; Columbus, GA; Worcester, MA; Port St. Lucie, FL; Little Rock, AR; Augusta, GA; Oxnard, CA; Birmingham, AL; Montgomery, AL; Frisco, TX;
+Amarillo, TX; Salt Lake City, UT; Grand Rapids, MI; Huntington Beach, CA; Overland Park, KS; Glendale, CA; Tallahassee, FL; Grand Prairie, TX; McKinney, TX; Cape Coral, FL;
+Sioux Falls, SD; Peoria, AZ; Providence, RI; Vancouver, WA; Knoxville, TN; Akron, OH; Shreveport, LA; Mobile, AL; Brownsville, TX; Fort Lauderdale, FL;
+Chattanooga, TN; Tempe, AZ; Oceanside, CA; Garden Grove, CA; Rancho Cucamonga, CA; Santa Rosa, CA; Fort Collins, CO; Springfield, MO; Savannah, GA; Eugene, OR;
+Toronto, ON; Montréal, QC; Vancouver, BC; Calgary, AB; Edmonton, AB; Ottawa, ON; Winnipeg, MB; Quebec City, QC; Hamilton, ON; Kitchener, ON;
+London, ON; Victoria, BC; Halifax, NS; Oshawa, ON; Windsor, ON; Saskatoon, SK; Regina, SK; St. John's, NL; Kelowna, BC; Barrie, ON;
+Sherbrooke, QC; Abbotsford, BC; Kingston, ON; Moncton, NB; Fredericton, NB; Charlottetown, PE`.split(/;\s*/).map((s) => s.trim()).filter(Boolean);
+
+// Places the search spells differently from the usual name: the query to send instead. The label is whatever the search returns (it is what a visitor picks).
+const ALT: Record<string, string> = { "Washington, DC": "Washington", "St. Louis, MO": "St. Louis", "Port St. Lucie, FL": "Port Saint Lucie", "Montréal, QC": "Montreal", "Quebec City, QC": "Québec", "Abbotsford, BC": "Abbotsford" };
+const out: Array<{ label: string; lon: number; lat: number }> = [];
+const missed: string[] = [];
+for (const name of NAMES) {
+  const city = ALT[name] ?? name.split(", ")[0]!;
+  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=30&language=en&format=json`;
+  const body = (await (await fetch(url)).json()) as { results?: Array<{ name: string; admin1?: string; country_code?: string; latitude: number; longitude: number; feature_code?: string }> };
+  const places = (body.results ?? []).filter((r) => !r.feature_code || r.feature_code.startsWith("PPL") || r.feature_code.startsWith("ADM"));
+  const hit = ALT[name] ? places.find((r) => placeLabel(r.name, r.admin1, r.country_code) !== null) : places.find((r) => placeLabel(r.name, r.admin1, r.country_code) === name);
+  const label = hit ? placeLabel(hit.name, hit.admin1, hit.country_code) : null;
+  if (hit && label) out.push({ label, lon: hit.longitude, lat: hit.latitude });
+  else missed.push(name);
+  await new Promise((r) => setTimeout(r, 120));
+}
+const lines = out.map((m) => `  { label: ${JSON.stringify(m.label)}, lon: ${m.lon}, lat: ${m.lat} },`).join("\n");
+writeFileSync(
+  new URL("../src/worker/metros.ts", import.meta.url),
+  `// The largest US and Canadian metros, roughly by population, for the cron pre-warm (src/worker/warm.ts). Names and the coordinates the city search returns\n// (so a visitor's search lands on the same cache key): no Qloo data. Generated by scripts/make-metros.ts.\nexport const METROS: ReadonlyArray<{ label: string; lon: number; lat: number }> = [\n${lines}\n];\n`,
+);
+console.log(`wrote ${out.length} metros; not found: ${missed.join("; ") || "none"}`);

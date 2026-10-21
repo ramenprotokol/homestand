@@ -34,5 +34,8 @@ export function ipBucket(ip: string): string {
 }
 
 export type QuotaKind = "pull" | "recheck" | "model" | "taste";
-/** Per client, per UTC day. Generous enough for a judge exploring; far too small to drain the shared caps. */
-export const DAILY_QUOTA: Record<QuotaKind, number> = { pull: 6, recheck: 10, model: 30, taste: 20 };
+/**
+ * Per client, per UTC day. A client is one IP (or one IPv6 /64), and during judging a whole office of judges can share one, so the new-city
+ * allowance is 30 (the rules ask that nothing restricts a judge). The shared daily caps in agent.ts, not these, keep the total bounded.
+ */
+export const DAILY_QUOTA: Record<QuotaKind, number> = { pull: 30, recheck: 20, model: 60, taste: 40 };

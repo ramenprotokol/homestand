@@ -53,6 +53,8 @@ export interface Deps {
   actsRef?: ActsReference;
   /** Per-client daily allowance, set per request by the router. Unset means no per-client limit (tests). */
   gate?: Gate;
+  /** The caller has already reserved its live Qloo calls in one counter write (the cron pre-warm), so this run does not count them again. */
+  prepaid?: boolean;
 }
 
 /** Counts one use of a per-client daily allowance and says whether it was still available. */
@@ -82,7 +84,8 @@ export function forKind(d: Deps, kind: Kind): Deps {
 }
 
 const RADIUS_M = 80_000;
-const TTL = 60 * 24 * 3600;
+/** How long saved results live: 120 days, so a city checked during judging (Nov 2 to 16, 2026) is still saved well into next year. */
+const TTL = 120 * 24 * 3600;
 const iso = (d: Deps): string => d.now().toISOString();
 const today = (d: Deps): string => iso(d).slice(0, 10);
 
@@ -91,30 +94,42 @@ const today = (d: Deps): string => iso(d).slice(0, 10);
 /** A usage counter could not be read or written (KV outage, or the daily write limit on a free plan). */
 export class CounterError extends Error {}
 
+// A KV key takes about one write a second, so a burst of judges bumping one hot counter would trip the limit and fail closed for everyone.
+// Each counter is split over a few keys: a bump writes one at random, a read adds them up (plus the single key older versions wrote).
+const SHARDS = 4;
+const shardKey = (d: Deps, name: string, shard: number | null): string => `cap:${name}:${today(d)}${shard === null ? "" : `:${shard}`}`;
+const asCount = (raw: string | null): number => {
+  const n = raw === null ? 0 : Number(raw);
+  return Number.isFinite(n) ? n : 0;
+};
+
 /**
  * The counters are what keep the shared Qloo and model caps honest, so they fail CLOSED: when one cannot be read or written, no further live
  * Qloo or model call is made for the request, and the answer comes from recorded results or template text. (Content caches stay fail-open.)
  */
 async function counter(d: Deps, name: string): Promise<number> {
-  let raw: string | null;
   try {
-    raw = await d.kv.get(`cap:${name}:${today(d)}`);
+    const raws = await Promise.all([null, ...Array.from({ length: SHARDS }, (_, i) => i)].map((s) => d.kv.get(shardKey(d, name, s))));
+    return raws.reduce((sum, raw) => sum + asCount(raw), 0);
   } catch (err) {
     console.error("counter read failed", name, err instanceof Error ? err.message : String(err));
     throw new CounterError();
   }
-  const n = raw === null ? 0 : Number(raw);
-  return Number.isFinite(n) ? n : 0;
 }
 
 async function bump(d: Deps, name: string, by: number): Promise<void> {
-  const next = String((await counter(d, name)) + by);
-  try {
-    await d.kv.put(`cap:${name}:${today(d)}`, next, { expirationTtl: 2 * 24 * 3600 });
-  } catch (err) {
-    console.error("counter write failed", name, err instanceof Error ? err.message : String(err));
-    throw new CounterError();
+  const first = Math.floor(Math.random() * SHARDS);
+  // One retry on another shard: a write refused for being too close to the previous one usually works on a different key.
+  for (const shard of [first, (first + 1) % SHARDS]) {
+    try {
+      const key = shardKey(d, name, shard);
+      await d.kv.put(key, String(asCount(await d.kv.get(key)) + by), { expirationTtl: 2 * 24 * 3600 });
+      return;
+    } catch (err) {
+      console.error("counter write failed", name, err instanceof Error ? err.message : String(err));
+    }
   }
+  throw new CounterError();
 }
 
 export async function capsOf(d: Deps): Promise<Caps> {
@@ -131,7 +146,7 @@ export async function capsOf(d: Deps): Promise<Caps> {
 
 /** Reserves `n` live Qloo calls against the shared cap. False when the cap is spent or when the counters cannot be trusted (then `d.countersDown` is set). */
 async function reserveQloo(d: Deps, n: number, trace?: TraceStep[]): Promise<boolean> {
-  if (d.mode === "synthetic") return true;
+  if (d.mode === "synthetic" || d.prepaid) return true;
   try {
     if ((await counter(d, "qloo")) + n > d.qlooDailyCap) return false;
     await bump(d, "qloo", n);
@@ -846,12 +861,22 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
     const pairOf = (p: (typeof libraryProposals)[number]): string => `${label(p.fromThemeId)}>${label(p.toThemeId)}`;
     // The wording depends only on the town and the two theme names, so each pair's validated model text is saved on its own for that town. Only genuine, validated model text is ever saved: never template text, and never a failure.
     const byPair: Record<string, string> = {};
-    const pairKey = async (pair: string): Promise<string> => `ai:why:v3:${await sha256Hex(`${city}|${pair}`)}`;
+    // One saved key per town holds every pair's wording (one read, at most one write per request: KV's free plan allows 1,000 writes a day).
+    const whyKey = `ai:why:v4:${await sha256Hex(city)}`;
     const wanted = [...new Set(libraryProposals.map(pairOf))];
+    let savedPairs: Record<string, string> = {};
+    try {
+      const raw = await safeGet(d.kv, whyKey);
+      const parsed = raw === null ? null : (JSON.parse(raw) as unknown);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) savedPairs = parsed as Record<string, string>;
+    } catch {
+      /* unreadable: start the town's saved wording again */
+    }
     for (const pair of wanted) {
-      const saved = await safeGet(d.kv, await pairKey(pair));
+      const saved = savedPairs[pair];
       if (typeof saved === "string" && saved.length > 0) byPair[pair] = saved;
     }
+    let newPairs = false;
     const missing = libraryProposals.filter((p, i, all) => byPair[pairOf(p)] === undefined && all.findIndex((q) => pairOf(q) === pairOf(p)) === i);
     const savedCount = wanted.length - new Set(missing.map(pairOf)).size;
     if (savedCount > 0) trace.push(step(iso(d), "model", `Writing the reasons for the swaps: used saved model wording for ${savedCount} of ${wanted.length}${missing.length > 0 ? `, so the model is asked only for the other ${missing.length}` : " (no model call)"}.`));
@@ -874,10 +899,12 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
           const text = item.why.trim();
           if (p && text.length > 0 && text.length <= 220 && numbersAreGrounded(text, []) && !claimsOutcome(text) && !OFF_FACTS.test(text) && whyShapeOk(text, label(p.fromThemeId), label(p.toThemeId), city)) {
             byPair[pairOf(p)] = text;
-            await safePut(d.kv, await pairKey(pairOf(p)), text, { expirationTtl: TTL });
+            savedPairs[pairOf(p)] = text;
+            newPairs = true;
           } else trace.push(step(iso(d), "model", `Dropped the model's reason for swap ${item.id}: it went beyond the taste comparison, so the template text is used.`));
         }
       }
+      if (newPairs) await safePut(d.kv, whyKey, JSON.stringify(savedPairs), { expirationTtl: TTL });
       const stillMissing = new Set(missing.filter((p) => byPair[pairOf(p)] === undefined).map(pairOf)).size;
       if (stillMissing > 0) trace.push(step(iso(d), "model", `Template text is used for ${stillMissing} swap${stillMissing === 1 ? "" : "s"}: the model gave no usable wording for ${stillMissing === 1 ? "it" : "them"}.`));
     }
@@ -891,6 +918,25 @@ export async function proposeSwaps(d: Deps, input: { market: MarketIn; nights: P
     proposals: res.proposals.map((p) => ({ ...p, why: whys.get(p.id) ?? p.why, whySource: whys.has(p.id) ? "model" : "template" })),
     discovery: discovery ? publicDiscovery(discovery) : discovery, ...(venue ? { acts: actsOut ?? null } : {}), angles: pickAngles(venue ? await supportActAngles(d, input.market, res.angles, nights, trace) : await tasteAngles(d, input.market, res.angles, nights, trace), new Set(res.proposals.map((p) => p.toThemeId))), unfixed: res.unfixed, trace, caps: await capsOf(d),
   };
+}
+
+// ---------- pre-warm ----------
+
+/**
+ * Saves a town's ratings and its family-title scores ahead of any visitor (the cron in warm.ts). The live Qloo calls are reserved with ONE
+ * counter write for both, so a new town costs three KV writes instead of four. "cached" when both were already saved.
+ */
+export async function warmMarket(d: Deps, m: MarketIn): Promise<"warmed" | "cached"> {
+  const trace: TraceStep[] = [];
+  const haveScores = (await safeGet(d.kv, cacheKey(d, m))) !== null;
+  const haveDisc = (await safeGet(d.kv, discoveryKey(d, m))) !== null;
+  if (haveScores && haveDisc) return "cached";
+  const need = (haveScores ? 0 : new Set(d.library.flatMap((t) => t.entities.map((e) => e.type))).size) + (haveDisc ? 0 : 2);
+  if (!(await reserveQloo(d, need, trace))) throw new CappedError(d.countersDown === true);
+  const paid = { ...d, prepaid: true };
+  if (!haveScores) await getScores(paid, m, trace);
+  if (!haveDisc) await discover(paid, m, trace);
+  return "warmed";
 }
 
 // ---------- re-check ----------

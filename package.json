@@ -19,6 +19,7 @@
     "e2e": "playwright test",
     "e2e:real": "playwright test -c playwright.real.config.ts",
     "e2e:live": "playwright test -c playwright.live.config.ts",
+    "warm:metros": "tsx scripts/warm-metros.ts",
     "qloo:resolve": "node --env-file=.dev.vars --import tsx scripts/qloo-resolve.ts",
     "qloo:coverage": "node --env-file=.dev.vars --import tsx scripts/qloo-coverage.ts",
     "qloo:reference": "node --env-file=.dev.vars --import tsx scripts/qloo-reference.ts",

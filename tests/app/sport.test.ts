@@ -246,7 +246,7 @@ describe("the API takes a sport", () => {
     for (const sport of ["baseball", "hockey"] as const) {
       const kv = memoryKv();
       await analyze(deps({ ai, kv, sport }), { market, rows: unknown });
-      keys.push([...kv.data.keys()].sort());
+      keys.push([...kv.data.keys()].filter((k) => !k.startsWith("cap:")).sort()); // a usage counter lands on a random shard
     }
     expect(prompts).toHaveLength(2);
     for (const p of prompts) expect(p).toMatch(/^You match sports-team promotion names to a fixed list/);

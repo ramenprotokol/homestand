@@ -1,5 +1,6 @@
 import type { ApiError, GeoHit, MarketIn, ProposeNightIn } from "../app/api-types";
 import { parseDate, type CalendarRow } from "../app/calendar/csv";
+import { QlooUnavailableError } from "../qloo/client";
 import { analyze, capsOf, CappedError, forKind, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
 import { isSport, kindOf } from "../app/kind";
 import { placeLabel } from "../app/geo";
@@ -92,8 +93,8 @@ function gateFor(deps: RouterDeps, req: Request, m: MarketIn): Gate {
 }
 
 const QUOTA_MESSAGES: Record<QuotaKind, string> = {
-  pull: "You've looked up as many new cities as are allowed today. The four sample clubs still work, and so do cities you've already checked.",
-  recheck: "You've used today's live re-checks. The saved results are still good, and the sample clubs still work.",
+  pull: "You've looked up as many new cities as are allowed today. The sample calendars still work, and so do cities you've already checked.",
+  recheck: "You've used today's live re-checks. The saved results are still good, and the sample calendars still work.",
   model: "",
   taste: "You've used today's live taste-graph lookups. The saved ideas are still good, and the sample calendars still work.",
 };
@@ -257,7 +258,12 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
       return fail(503, "counters", "Live lookups are paused because the usage counters are unavailable. Recorded results still work; try again shortly.", headers);
     }
     if (err instanceof CappedError) {
-      return fail(429, "capped", "Today's live Qloo allowance is used up, and this town has no saved result yet. The four sample clubs still work.", headers);
+      return fail(429, "capped", "Today's live Qloo allowance is used up, and this town has no saved result yet. The sample calendars still work, and so does any city already checked. Live lookups reset at midnight UTC.", headers);
+    }
+    if (err instanceof QlooUnavailableError) {
+      console.error("qloo unavailable", err.why, err.message);
+      if (err.why === "auth") return fail(503, "live-ended", "Live lookups for new cities have ended with the hackathon. The sample calendars still work, and so does any city already checked.", headers);
+      if (err.why === "busy") return fail(429, "qloo-busy", "Qloo is at its own limit right now, so this new city can't be looked up. Try again in a few minutes. The sample calendars and any city already checked still work.", headers);
     }
     // Qloo or upstream trouble: say so without leaking details.
     console.error("upstream failure", err instanceof Error ? err.message : String(err));

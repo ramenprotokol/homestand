@@ -8,6 +8,7 @@ import { syntheticDiscoveryReference } from "../app/discovery";
 import { memoryLimiter, ipBucket, type Limiter } from "./limits";
 import { route, type RouterDeps } from "./router";
 import { syntheticQlooFetch } from "./synthetic";
+import { runWarm, warmFetch } from "./warm";
 
 async function clientId(req: Request): Promise<string> {
   const ip = ipBucket(req.headers.get("cf-connecting-ip") ?? "local");
@@ -54,7 +55,7 @@ function depsFor(env: Env): RouterDeps {
     reference: synthetic ? SYNTHETIC_REFERENCE : REFERENCE,
     discoveryRef: synthetic ? syntheticDiscoveryReference() : DISCOVERY_REFERENCE,
     now: () => new Date(),
-    qlooDailyCap: num(env.QLOO_DAILY_CAP, 400),
+    qlooDailyCap: num(env.QLOO_DAILY_CAP, 1500),
     aiDailyCap: num(env.AI_DAILY_CAP, 400),
     qlooDelayMs: synthetic ? 0 : 260,
   };
@@ -70,5 +71,9 @@ function depsFor(env: Env): RouterDeps {
 }
 
 export default {
-  fetch: (request: Request, env: Env) => route(request, depsFor(env)),
+  fetch: (request: Request, env: Env) => (new URL(request.url).pathname === "/api/warm" ? warmFetch(request, env, depsFor(env).agent) : route(request, depsFor(env))),
+  // The pre-warm cron (wrangler.toml [triggers]).
+  scheduled: async (_event: ScheduledController, env: Env, ctx: ExecutionContext) => {
+    ctx.waitUntil(runWarm(depsFor(env).agent).then((s) => console.log("warm", JSON.stringify({ warmed: s.warmed, alreadySaved: s.alreadySaved, failed: s.failed, stoppedBecause: s.stoppedBecause }))));
+  },
 } satisfies ExportedHandler<Env>;

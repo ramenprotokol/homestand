@@ -9,6 +9,11 @@ command = "node scripts/prepare-data.mjs"
 [ai]
 binding = "AI"
 
+# Pre-warm (src/worker/warm.ts): every 3 hours, up to 8 new towns from the list of the largest US and Canadian metros, within the free-plan
+# KV write budget and 40% of the day's Qloo allowance. Towns already saved cost nothing. Not inherited by [env.check] (no cron locally).
+[triggers]
+crons = ["17 */3 * * *"]
+
 # KV cache for Qloo results, daily counters and rate limits. The id is a placeholder: the ship step creates the
 # namespace (through ~/RamenProtocol/_ops/infra/ramen-deploy.sh) and replaces it. Never run a bare `wrangler deploy`.
 [[kv_namespaces]]
@@ -42,7 +47,7 @@ simple = { limit = 6, period = 60 }
 [vars]
 ALLOWED_ORIGINS = "https://homestand-6az.pages.dev"
 QLOO_API_URL = "https://hackathon.api.qloo.com"
-QLOO_DAILY_CAP = "400"
+QLOO_DAILY_CAP = "1500"
 AI_DAILY_CAP = "400"
 
 # Local runs and e2e: `npm run worker:dev`. No AI binding (the agent writes template text) and synthetic Qloo

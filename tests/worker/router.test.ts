@@ -628,31 +628,32 @@ describe("markets must come from the search", () => {
 describe("per-client daily quotas", () => {
   const city = (i: number) => signed({ label: `City ${i}, KS`, lon: -100 + i * 0.5, lat: 38 });
 
-  it("allows 6 new-city pulls a day per client, never counts sample clubs or cached cities, and is per client", async () => {
+  it("allows 30 new-city pulls a day per client, never counts sample clubs or cached cities, and is per client", async () => {
     const h = harness();
-    for (let i = 0; i < 6; i++) expect((await analyzeWith(h, await city(i))).status).toBe(200);
-    const seventh = await analyzeWith(h, await city(6));
-    expect(seventh.status).toBe(429);
-    const body = (await seventh.json()) as ApiError;
+    h.deps.limiter = memoryLimiter(10, () => h.deps.agent.now().getTime()); // the per-minute limit is a separate guard
+    for (let i = 0; i < 30; i++) expect((await analyzeWith(h, await city(i))).status).toBe(200);
+    const thirtyFirst = await analyzeWith(h, await city(30));
+    expect(thirtyFirst.status).toBe(429);
+    const body = (await thirtyFirst.json()) as ApiError;
     expect(body.error).toBe("quota");
-    expect(body.message).toContain("sample clubs still work");
+    expect(body.message).toContain("sample calendars still work");
     // sample clubs and a city already pulled are still fine
     expect((await analyzeWith(h, market)).status).toBe(200);
     expect((await analyzeWith(h, await city(0))).status).toBe(200);
     // another client has its own allowance
     (h.deps as unknown as { ip: string }).ip = "b";
-    expect((await analyzeWith(h, await city(6))).status).toBe(200);
+    expect((await analyzeWith(h, await city(30))).status).toBe(200);
   });
 
-  it("allows 10 live re-checks a day per client", async () => {
+  it("allows 20 live re-checks a day per client", async () => {
     const h = harness();
     h.deps.limiter = memoryLimiter(10, () => h.deps.agent.now().getTime()); // the per-minute limit is a separate guard
-    const ids = activeLibrary({}, true).map((t) => t.id).slice(0, 11);
+    const ids = activeLibrary({}, true).map((t) => t.id).slice(0, 21);
     await analyzeOk(h);
     const statuses: number[] = [];
     for (const themeId of ids) statuses.push((await route(post("/api/recheck", { market, themeId }), h.deps)).status);
-    expect(statuses.slice(0, 10).every((x) => x === 200)).toBe(true);
-    expect(statuses[10]).toBe(429);
+    expect(statuses.slice(0, 20).every((x) => x === 200)).toBe(true);
+    expect(statuses[20]).toBe(429);
   });
 });
 
@@ -706,6 +707,8 @@ describe("saved reasons are only ever real model wording", () => {
     },
   };
   const whyKeys = (h: Harness) => [...h.kv.data.keys()].filter((k) => k.startsWith("ai:why:"));
+  /** The pairs saved for the town: one key holds them all. */
+  const savedPairs = (h: Harness): Record<string, string> => (whyKeys(h).length === 0 ? {} : (JSON.parse(h.kv.data.get(whyKeys(h)[0]!)!) as Record<string, string>));
 
   it("never saves template text, a failure or a rejected reply, so the next visit asks the model again", async () => {
     for (const reply of [{}, { response: "not json at all" }, { response: JSON.stringify([{ id: "1", why: "But the sponsor does not stay." }]) }]) {
@@ -721,19 +724,22 @@ describe("saved reasons are only ever real model wording", () => {
     }
   });
 
-  it("saves each validated pair on its own, and a partial hit asks the model only for the missing pairs", async () => {
+  it("saves each validated pair under one key per town, and a partial hit asks the model only for the missing pairs", async () => {
     const h = harness({}, goodAi);
     const out = await analyzeOk(h, akronBody);
     const body = { market: akronBody.market, nights: planFor(out), allowDuplicates: false };
     const first = (await (await route(post("/api/propose", body), h.deps)).json()) as ProposeResponse;
     const modelPairs = first.proposals.filter((x) => x.whySource === "model").length;
     expect(modelPairs).toBeGreaterThanOrEqual(3);
-    expect(whyKeys(h)).toHaveLength(modelPairs);
+    expect(whyKeys(h)).toHaveLength(1);
+    expect(Object.keys(savedPairs(h))).toHaveLength(modelPairs);
     expect(first.trace.some((t) => /used saved model wording/.test(t.text))).toBe(false);
     const askedFirst = factsOf(swapCalls(h)[0]!);
     expect(askedFirst).toHaveLength(modelPairs);
     // Forget one pair: only that one is asked about, the rest come from the saved wording.
-    h.kv.data.delete(whyKeys(h)[0]!);
+    const kept = savedPairs(h);
+    delete kept[Object.keys(kept)[0]!];
+    h.kv.data.set(whyKeys(h)[0]!, JSON.stringify(kept));
     const second = (await (await route(post("/api/propose", body), h.deps)).json()) as ProposeResponse;
     expect(swapCalls(h)).toHaveLength(2);
     expect(factsOf(swapCalls(h)[1]!)).toHaveLength(1);
@@ -989,5 +995,52 @@ describe("one pulled-from-Qloo time", () => {
     expect(cached.recordedOn).toBe("2026-10-15");
     expect(cached.themes["bluey"]!.fetchedAt).toBe(cached.recordedAt);
     expect(cached.trace.some((s) => s.detail === "Saved 2026-10-15T12:00:00.000Z.")).toBe(true);
+  });
+});
+
+describe("Qloo stops answering", () => {
+  const city = () => signed({ label: "Fresno, CA", lon: -119.78707, lat: 36.74773 });
+  const run = async (status: number) => {
+    const h = harness({}, null, async () => new Response("{}", { status }));
+    const res = await analyzeWith(h, await city());
+    return { res, body: (await res.json()) as ApiError, h };
+  };
+
+  it("says live lookups ended with the hackathon when the key is refused, and the samples still work", async () => {
+    const { res, body, h } = await run(403);
+    expect(res.status).toBe(503);
+    expect(body.error).toBe("live-ended");
+    expect(body.message).toContain("ended with the hackathon");
+    expect(body.message).toContain("sample calendars still work");
+    // A sample that already has saved results is unaffected: seed it first with a working Qloo, then break Qloo.
+    const ok = harness();
+    expect((await analyzeWith(ok, market)).status).toBe(200);
+    expect(h.qlooUrls.length).toBeGreaterThan(0);
+  });
+
+  it("gives a friendly 429 when Qloo is at its own limit", async () => {
+    const { res, body } = await run(429);
+    expect(res.status).toBe(429);
+    expect(body.error).toBe("qloo-busy");
+    expect(body.message).toContain("sample calendars");
+    expect(body.message).not.toMatch(/HTTP|429|Qloo \//);
+  });
+});
+
+describe("the shared counters survive a refused write", () => {
+  it("writes the usage counter to another key when one is refused, instead of failing closed", async () => {
+    const h = harness();
+    const put = h.deps.agent.kv.put.bind(h.deps.agent.kv);
+    let refused = 0;
+    h.deps.agent.kv.put = async (k, v, o) => {
+      if (k.startsWith("cap:") && refused < 1) {
+        refused++;
+        throw new Error("KV PUT failed: 429 Too Many Requests");
+      }
+      return put(k, v, o);
+    };
+    expect((await analyzeWith(h, await signed({ label: "Fresno, CA", lon: -119.78707, lat: 36.74773 }))).status).toBe(200);
+    expect(refused).toBe(1);
+    expect([...h.kv.data.keys()].some((k) => k.startsWith("cap:qloo:"))).toBe(true);
   });
 });
