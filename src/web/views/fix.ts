@@ -215,7 +215,7 @@ function actsPanel(d: ActsOut | null | undefined, marketLabel: string): HTMLElem
 function unfixedBlock(list: ProposeResponse["unfixed"]): HTMLElement {
   const young = list.filter((u) => u.reason.startsWith("No family theme")).length;
   const city = cityOfLabel(state.analysis!.market.label);
-  const these = `these ${list.length === 1 ? copy().night : `${list.length} ${copy().nights}`}`;
+  const these = list.length === 1 ? `this ${copy().night}` : `these ${list.length} ${copy().nights}`;
   const c = list.find((u) => u.counts)?.counts;
   const what = young === list.length ? "a kids' night" : `this ${copy().night}`;
   const why = c
