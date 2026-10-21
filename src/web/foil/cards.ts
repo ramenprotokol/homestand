@@ -93,6 +93,13 @@ function parts(iso: string): { month: string; day: number } {
   return { month: MON[m - 1]!, day: d };
 }
 
+/** The card's spoken name. It starts with the words printed on the card, in the order they are printed (date, rating, name, sponsor), so it always contains the visible text; the extras come after. */
+function cardLabel(month: string, day: number, rating: string, title: string, sponsor: string, extras: string[]): string {
+  const [a, b] = nameParts(title);
+  const printed = a === title ? `${title} ${b}`.trim() : title; // "Bluey Day" as written; a name with no suffix also reads the printed "THEME NIGHT"
+  return `${month} ${day} ${rating} ${printed}${sponsor ? ` ${sponsor}` : ""}, ${extras.join(", ")}`;
+}
+
 /** What one night looks like as a card right now: the director's pick and any approved swap applied. */
 export function specOf(v: NightView): CardSpec {
   const n = v.night;
@@ -111,22 +118,24 @@ export function specOf(v: NightView): CardSpec {
     sponsor: n.sponsor,
     locked: n.locked,
     index: n.index,
-    label: `${n.weekday} ${month} ${day}, ${title}${n.sponsor ? `, sponsor ${n.sponsor}` : ""}${n.locked ? ", locked" : ""}, ${words}${v.swappedFrom ? ", swapped" : ""}`,
+    label: cardLabel(month, day, words, title, n.sponsor, [n.weekday, ...(n.locked ? ["locked"] : []), ...(v.swappedFrom ? ["swapped"] : [])]),
   };
 }
 
 /** A card for a theme the agent proposes: the night's date and sponsor, the new theme's art and fit. */
 export function specForSwap(base: CardSpec, themeId: string, themeLabel: string, fit: FitLabel, genre?: string | null): CardSpec {
   const category = themeId === "music" ? "music" : (themeById(themeId)?.category ?? null);
-  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: `${base.weekday} ${base.month} ${base.day}, ${themeLabel}, ${fitWord(fit)}` };
+  return { ...base, title: themeLabel, fit, emblem: emblemFor(themeId, category, themeLabel, false, genre ?? themeById(themeId)?.genre), label: cardLabel(base.month, base.day, fitWord(fit), themeLabel, base.sponsor, [base.weekday]) };
 }
 
 function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
   const [script, slab] = nameParts(s.title);
-  const fs = Math.min(12.4, 205 / script.length).toFixed(1);
+  // Short names are one big line that shrinks a little as it grows; long names drop to a smaller size on up to two lines with an ellipsis, never squashed.
+  const long = script.length > 18;
+  const fs = long ? "6.8" : Math.min(12.4, 205 / script.length).toFixed(1);
   const panel = h("div", { class: "panel" }, h("div", { class: "rays" }));
   panel.append(raw(`<svg class="emb" viewBox="0 0 100 100" aria-hidden="true">${s.emblem}</svg>`));
-  const penn = h("div", { class: "penn" }, h("b", null, s.month), h("i", null, String(s.day)));
+  const penn = h("div", { class: "penn" }, h("b", null, s.month), " ", h("i", null, String(s.day)));
   if (s.locked) penn.append(raw(LOCK));
   return h(
     "div",
@@ -135,9 +144,12 @@ function frontFace(s: CardSpec, extra: Node[], cls: string): HTMLElement {
     panel,
     h("div", { class: "fine" }),
     raw(gemSVG(s.fit)),
+    // The plain spaces between pieces are for assistive tech and audits that read the card's text: "APR 23 STRONG FIT Star Wars NIGHT", not "APR23STRONG FITStar WarsNIGHT".
     penn,
+    " ",
     h("span", { class: "fitword" }, fitName(s.fit)),
-    h("div", { class: "plate" }, h("span", { class: "nm-s", style: `--fs:${fs}cqw` }, script), slab ? h("span", { class: "nm-b" }, slab) : null, s.sponsor ? h("span", { class: "spons" }, s.sponsor) : null),
+    " ",
+    h("div", { class: "plate" }, h("span", { class: `nm-s${long ? " long" : ""}`, style: `--fs:${fs}cqw`, title: s.title }, script), " ", slab ? h("span", { class: "nm-b" }, slab) : null, " ", s.sponsor ? h("span", { class: "spons" }, s.sponsor) : null),
     h("div", { class: "foil" }),
     ...extra,
   );
@@ -190,10 +202,11 @@ export interface CardOptions {
 
 /** One card. The card is a button the keyboard and a tap can use; its front is the night, its back is the Why or the new theme. */
 export function makeCard(s: CardSpec, opts: CardOptions = {}): HTMLElement {
-  const flipper = h("div", { class: "flipper" }, frontFace(s, opts.extra ?? [], "front"));
+  const flipper = h("div", { class: "flipper", "data-side": "front" }, frontFace(s, opts.extra ?? [], "front"));
+  flippers.add(flipper);
   if (opts.alt) flipper.append(frontFace(opts.alt, [], "alt"));
   else if (opts.back) flipper.append(backFace(opts.back));
-  const el = h("div", { class: `card tile ${labClass(s.fit)}${s.fit === "pick" ? " pick" : ""}`, "data-index": s.index, "data-fit": s.fit }, h("div", { class: "tilt" }, flipper));
+  const el = h("div", { class: `card tile ${labClass(s.fit)}${s.fit === "pick" ? " pick" : ""}${opts.alt || opts.back ? " flips" : ""}`, "data-index": s.index, "data-fit": s.fit }, h("div", { class: "tilt" }, flipper));
   if (opts.inert) {
     el.setAttribute("role", "group");
   } else {
@@ -208,15 +221,34 @@ export function makeCard(s: CardSpec, opts: CardOptions = {}): HTMLElement {
 export function repaintCard(el: HTMLElement, s: CardSpec, opts: CardOptions = {}): void {
   const fl = el.querySelector<HTMLElement>(".flipper")!;
   fl.replaceChildren(frontFace(s, opts.extra ?? [], "front"), ...(opts.alt ? [frontFace(opts.alt, [], "alt")] : opts.back ? [backFace(opts.back)] : []));
-  el.className = `card tile ${labClass(s.fit)}`;
+  el.className = `card tile ${labClass(s.fit)}${opts.alt || opts.back ? " flips" : ""}`;
   el.setAttribute("aria-label", s.label);
 }
 
 export const flipper = (card: Element): HTMLElement => card.querySelector<HTMLElement>(".flipper")!;
 
+/*
+ * Which face points at the viewer. CSS backface-visibility alone is not trusted: some WebKit builds paint a face that points
+ * away (mirrored text over the front). So the face that points away is also hidden with visibility, switched at 90 degrees
+ * when the card is edge-on and nothing shows. One ticker callback keeps every live card's flipper in step with GSAP.
+ */
+const flippers = new Set<HTMLElement>();
+function syncSide(fl: HTMLElement): void {
+  const a = (((Number(gsap.getProperty(fl, "rotationY")) || 0) % 360) + 360) % 360;
+  const side = a > 90 && a < 270 ? "back" : "front";
+  if (fl.dataset.side !== side) fl.dataset.side = side;
+}
+gsap.ticker.add(() => {
+  for (const f of flippers) {
+    if (!f.isConnected) flippers.delete(f);
+    else syncSide(f);
+  }
+});
+
 /** Set a card's flip angle without animating. */
 export function setFlip(card: Element, deg: number): void {
   gsap.set(flipper(card), { rotationY: deg });
+  syncSide(flipper(card));
 }
 
 /** Hold a card's pointer tilt and the foil sheen following the cursor. Mouse only; touch and reduced motion skip it. Returns a remover. */
