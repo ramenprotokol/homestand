@@ -3,7 +3,7 @@ import { seasonSpan, shortDate } from "../../app/dates";
 import { cleanTitle } from "../../app/text";
 import { fitWord, pullBand, type FitLabel } from "../../app/score";
 import { themeById } from "../../app/themes/artists";
-import { openDrawer, syntheticBanner } from "../components";
+import { openDrawer, savedCopyBanner, syntheticBanner } from "../components";
 import { h, localizeDates, type Child } from "../dom";
 import { ensureProposals, navigate } from "../flow";
 import { makeCard, setFlip, specForSwap, specOf, flipper, type CardSpec } from "../foil/cards";
@@ -125,6 +125,7 @@ export function fixView(): HTMLElement {
       { class: "wrap" },
       h("div", { class: "fix-head" }, h("div", null, h("div", { class: "eyebrow" }, "Step 2 of 3 · Fix"), h("h1", { class: "h2", tabindex: "-1" }, "Fix: ", h("em", null, `the weak ${copy().nights}`)), h("p", { class: "small season-line", "data-testid": "season-span" }, seasonSpan(state.analysis!.nights.map((n) => n.date))), h("p", { class: "lede" }, lead))),
       synth,
+      savedCopyBanner(),
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
       state.kind === "venue" ? actsPanel(p.acts, a.market.label) : ideasPanel(p.discovery, a.market.label),

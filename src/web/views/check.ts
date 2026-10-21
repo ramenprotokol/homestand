@@ -5,7 +5,7 @@ import { themeById } from "../../app/themes/artists";
 import { dateWithYear, passedCount, seasonSpan } from "../../app/dates";
 import { checkResultLine, cleanTitle, fitSummary, localDay, lockedLine } from "../../app/text";
 import { ApiFailure } from "../api";
-import { fitChip, syntheticBanner } from "../components";
+import { fitChip, savedCopyBanner, syntheticBanner } from "../components";
 import { formatDate, formatDateTime, h, type Child } from "../dom";
 import { recheckTheme, navigate } from "../flow";
 import { bindTilt, gemChip, makeCard, repaintCard, specOf, type BackSpec, type CardFit } from "../foil/cards";
@@ -86,6 +86,8 @@ export function checkView(): HTMLElement {
   const notices: HTMLElement[] = [];
   const synth = syntheticBanner();
   if (synth) notices.push(synth);
+  const saved = savedCopyBanner();
+  if (saved) notices.push(saved);
   if (state.kind === "club" && state.sport !== "baseball" && state.sampleId) notices.push(h("div", { class: "notice", role: "note", "data-testid": "sport-note" }, icon("info"), h("span", null, h("strong", null, "A made-up sample. "), `This ${copy().sport} calendar is one we wrote for a sample team. The dates, theme nights and sponsors are invented, and it is not any real team's schedule.`)));
   if (state.kind === "venue") notices.push(h("div", { class: "notice", role: "note", "data-testid": "venue-note" }, icon("info"), h("span", null, h("strong", null, "A made-up sample. "), "This summer concert calendar is one we wrote for a sample amphitheatre. The acts, dates and sponsors are invented, and it is not any real venue's schedule.")));
   if (state.parseErrors.length > 0) {

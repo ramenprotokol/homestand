@@ -3,7 +3,7 @@ import { exportCsv } from "../../app/export/csv";
 import { exportIcs } from "../../app/export/ics";
 import { buildMemoHtml, memoDocument, type MemoData } from "../../app/export/memo";
 import { themeById } from "../../app/themes/artists";
-import { syntheticBanner } from "../components";
+import { savedCopyBanner, syntheticBanner } from "../components";
 import { makeCard, specOf } from "../foil/cards";
 import { actIdeas, clubAngleParts, ideaTitles, openerLine } from "./fix";
 import { cityOfLabel } from "../../app/kind";
@@ -125,6 +125,7 @@ export function sendView(): HTMLElement {
           h("p", { class: "small season-line", "data-testid": "season-span" }, seasonSpan(a.nights.map((n) => n.date))),
           h("p", { class: "sum", "data-testid": "send-summary" }, summary),
           syntheticBanner(),
+          savedCopyBanner(),
           h(
             "div",
             { class: "exp" },

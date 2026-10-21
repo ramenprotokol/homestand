@@ -192,4 +192,4 @@ export function approvedSwaps(): ShownProposal[] {
 }
 
 /** Transient screen status. */
-export const ui = { pickNote: false, loading: false, error: null as string | null, proposing: false, proposeError: null as string | null, dupesBefore: null as string | null, dupesNote: null as string | null };
+export const ui = { savedCopy: false, pickNote: false, loading: false, error: null as string | null, proposing: false, proposeError: null as string | null, dupesBefore: null as string | null, dupesNote: null as string | null };
