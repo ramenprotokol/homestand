@@ -531,7 +531,8 @@ describe("geocode", () => {
     const r = (name: string, admin1: string, cc: string, lat: number) => ({ name, admin1, country_code: cc, latitude: lat, longitude: -90, feature_code: "PPL" });
     h.deps.geocodeFetch = async () => new Response(JSON.stringify({ results: [r("Tulsa", "Oklahoma", "US", 36.1), r("Tulsa", "Gujarat", "IN", 21.5), r("Tulsa", "Oklahoma", "US", 36.2), r("Calgary", "Alberta", "CA", 51), r("Tulsa", "Punjab", "PK", 33)] }));
     const res = await geo(h);
-    expect(((await res.json()) as { results: Array<{ label: string }> }).results.map((x) => x.label)).toEqual(["Tulsa, OK", "Calgary, AB"]);
+    // Calgary came back too, but it is not what "Tulsa" asked for.
+    expect(((await res.json()) as { results: Array<{ label: string }> }).results.map((x) => x.label)).toEqual(["Tulsa, OK"]);
   });
 
   it("calls geocodeFetch without the deps object as this (Workers throw Illegal invocation otherwise)", async () => {
@@ -573,6 +574,187 @@ describe("geocode", () => {
     };
     expect((await geo(h3)).status).toBe(502);
     expect(calls3).toBe(1);
+  });
+});
+
+/** A small stand-in for Open-Meteo: matches the start of a name (accents ignored) or of an alternate name, like the real one. */
+const PLACES: Array<RawPlaceFixture> = ([
+  p("Chicago", "Illinois", "US", 2720546, ["Chicago"]),
+  p("Willard", "Ohio", "US", 6000, ["Chicago Junction"]),
+  p("Craigmont", "Idaho", "US", 500, ["Chicago"]),
+  p("New Chicago", "California", "US", 80),
+  p("Brooklyn", "New York", "US", 2600000, ["Brooklyn"]),
+  p("Salem", "Wisconsin", "US", 2700, ["Brooklyn"]),
+  p("Brooklyn", "Ohio", "US", 11000),
+  p("Fargo", "North Dakota", "US", 125990),
+  p("Fargo", "Georgia", "US", 300),
+  p("Tulsa", "Oklahoma", "US", 413066),
+  p("Cincinnati", "Ohio", "US", 311097),
+  p("Cincinnati", "Iowa", "US", 345),
+  p("Cincinnatus", "New York", "US", 1056),
+  p("Québec", "Quebec", "CA", 531902),
+  p("Quebec", "Texas", "US", 0),
+  p("San Juan", "San Juan", "PR", 418140, [], "Puerto Rico"),
+  p("San Juan", "Texas", "US", 36556),
+  p("San Juan", "San Juan", "AR", 109123, [], "Argentina"),
+  p("Mexico City", "Mexico City", "MX", 12294193, [], "Mexico"),
+  p("Paris", "Ile-de-France", "FR", 2138551, [], "France"),
+  p("Paris", "Texas", "US", 24171),
+  p("Montréal", "Quebec", "CA", 1762949),
+  p("Saint Paul", "Minnesota", "US", 311527),
+  p("Winston-Salem", "North Carolina", "US", 249545),
+  p("Kansas City", "Missouri", "US", 508090),
+  p("Washington D.C.", "District of Columbia", "US", 689545),
+  p("Washington", "Pennsylvania", "US", 13497),
+  p("Toronto", "Ontario", "CA", 2731571),
+  p("Toronto", "Ohio", "US", 5000),
+  p("Albuquerque", "New Mexico", "US", 560326),
+  p("Alba", "Piedmont", "IT", 31000, [], "Italy"),
+  p("Springfield", "Illinois", "US", 114230),
+  p("Springfield", "Missouri", "US", 169176),
+  p("Springfeld", "Saskatchewan", "CA", 40),
+  p("Tulia", "Texas", "US", 4500),
+]).map((x, i) => ({ ...x, latitude: 40 + i / 100 }));
+interface RawPlaceFixture { name: string; admin1: string; country_code: string; country: string; population: number; latitude: number; longitude: number; feature_code: string; alt: string[] }
+function p(name: string, admin1: string, cc: string, population: number, alt: string[] = [], country = cc === "US" ? "United States" : cc === "CA" ? "Canada" : cc): RawPlaceFixture {
+  return { name, admin1, country_code: cc, country, population, latitude: 40, longitude: -90, feature_code: "PPL", alt };
+}
+const fold = (s: string): string => s.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+
+describe("geocode: what directors actually type", () => {
+  interface Out { results: Array<{ label: string }>; message?: string }
+  async function find(q: string): Promise<{ out: Out; calls: string[] }> {
+    const h = harness();
+    const calls: string[] = [];
+    h.deps.geocodeFetch = async (u) => {
+      const name = fold(new URL(String(u)).searchParams.get("name") ?? "");
+      calls.push(name);
+      const hit = PLACES.filter((x) => [x.name, ...x.alt].some((n) => fold(n).startsWith(name)));
+      return new Response(JSON.stringify({ results: hit }));
+    };
+    const res = await route(new Request(`https://api.test/api/geocode?q=${encodeURIComponent(q)}`, { headers: { origin: ORIGIN } }), h.deps);
+    expect(res.status).toBe(200);
+    return { out: (await res.json()) as Out, calls };
+  }
+  const labels = async (q: string): Promise<string[]> => (await find(q)).out.results.map((x) => x.label);
+
+  it("reads a state or province with or without a comma, by code or by name", async () => {
+    expect(await labels("Fargo ND")).toEqual(["Fargo, ND"]);
+    expect(await labels("Tulsa OK")).toEqual(["Tulsa, OK"]);
+    expect(await labels("tulsa, oklahoma")).toEqual(["Tulsa, OK"]);
+    expect(await labels("Fargo North Dakota")).toEqual(["Fargo, ND"]);
+    expect(await labels("Toronto, ON")).toEqual(["Toronto, ON"]);
+    expect(await labels("Toronto Ontario")).toEqual(["Toronto, ON"]);
+    expect(await labels("Washington DC")).toEqual(["Washington D.C., DC"]);
+    expect(await labels("Tulsa, OK, USA")).toEqual(["Tulsa, OK"]);
+    expect(await labels("Toronto, Canada")).toEqual(["Toronto, ON"]);
+  });
+
+  it("finds a city typed without its accent, and a name with a trailing City", async () => {
+    expect(await labels("Quebec City")).toEqual(["Québec, QC", "Quebec, TX"]);
+    expect(await labels("Québec City")).toEqual(["Québec, QC", "Quebec, TX"]);
+    expect(await labels("Montreal")).toEqual(["Montréal, QC"]);
+    expect(await labels("St Paul")).toEqual(["Saint Paul, MN"]);
+    expect(await labels("Quebec City, QC")).toEqual(["Québec, QC"]);
+  });
+
+  it("forgives a typo or two", async () => {
+    expect((await labels("Cincinatti"))[0]).toBe("Cincinnati, OH");
+    expect(await labels("Chicgo")).toEqual(["Chicago, IL"]);
+    expect((await labels("Tulsaa"))[0]).toBe("Tulsa, OK");
+    // A typo in the first letters needs the three-letter start, which still finds it.
+    expect(await labels("Albequerque")).toEqual(["Albuquerque, NM"]);
+    expect((await labels("Springfeld IL"))[0]).toBe("Springfield, IL");
+  });
+
+  it("explains when the state typed has no such town, and still offers the town as typed", async () => {
+    const { out } = await find("Tulsa, TX");
+    expect(out.message).toContain("No Tulsa in Texas");
+    // Tulia is a real town in Texas, one letter away. It comes first because the state was typed, but Tulsa is still offered.
+    expect(out.results.map((x) => x.label)).toEqual(["Tulia, TX", "Tulsa, OK"]);
+    expect((await find("Fargo, GA")).out.message).toBeUndefined();
+  });
+
+  it("the start of a name is fine, a four-letter name takes no typo", async () => {
+    expect(await labels("Albu")).toEqual(["Albuquerque, NM"]); // the Italian Alba is not offered
+    expect((await find("Tulx")).out.results).toEqual([]);
+  });
+
+  it("does not guess when the name is short: three letters take no typos", async () => {
+    expect(await labels("Tuls")).toEqual(["Tulsa, OK"]); // a start of a name is fine
+    expect(await labels("Fargx")).toEqual(["Fargo, ND", "Fargo, GA"]);
+  });
+
+  it("drops results that matched only through an alternate name, and ranks by name then population", async () => {
+    expect(await labels("Chicago")).toEqual(["Chicago, IL"]);
+    expect(await labels("Brooklyn")).toEqual(["Brooklyn, NY", "Brooklyn, OH"]);
+    expect(await labels("Fargo")).toEqual(["Fargo, ND", "Fargo, GA"]);
+  });
+
+  it("puts the larger town first for a plain name, with the exact name ahead of longer ones", async () => {
+    expect((await labels("Toronto"))).toEqual(["Toronto, ON", "Toronto, OH"]);
+    expect((await labels("Winston"))[0]).toBe("Winston-Salem, NC");
+  });
+
+  it("says plainly that Puerto Rico and the other territories are not covered, and does not call the geocoder for them", async () => {
+    const { out, calls } = await find("San Juan, PR");
+    expect(out.results).toEqual([]);
+    expect(out.message).toContain("Puerto Rico");
+    expect(out.message).toContain("not covered");
+    expect(calls).toEqual([]);
+    expect((await find("San Juan Puerto Rico")).out.message).toContain("not covered");
+    expect((await find("Hagatna, Guam")).out.message).toContain("not covered");
+  });
+
+  it("shows the US town for a bare San Juan, and says the bigger San Juan is in Puerto Rico and not covered", async () => {
+    const { out } = await find("San Juan");
+    expect(out.results.map((x) => x.label)).toEqual(["San Juan, TX"]);
+    expect(out.message).toMatch(/Puerto Rico.*not covered/);
+  });
+
+  it("says Homestand covers the US and Canada for a place elsewhere", async () => {
+    const mx = (await find("Mexico City")).out;
+    expect(mx.results).toEqual([]);
+    expect(mx.message).toContain("Homestand covers towns in the US and Canada");
+    const fr = (await find("Paris, France")).out;
+    expect(fr.results).toEqual([]);
+    expect(fr.message).toContain("Homestand covers towns in the US and Canada");
+    // Without a country, Paris is the Texas one.
+    expect(await labels("Paris")).toEqual(["Paris, TX"]);
+  });
+
+
+  it("returns nothing, and no message, for a made-up name; it asks the geocoder only a few times", async () => {
+    const { out, calls } = await find("Zzyzzyx");
+    expect(out).toEqual({ results: [] });
+    expect(calls.length).toBeLessThanOrEqual(5);
+  });
+
+  it("stops after the first lookup that finds the city", async () => {
+    expect((await find("Tulsa")).calls).toHaveLength(1);
+  });
+
+  it("refuses a 3,000-character search with a length message, not 'type at least two letters'", async () => {
+    const h = harness();
+    const res = await route(new Request(`https://api.test/api/geocode?q=${"a".repeat(3000)}`, { headers: { origin: ORIGIN } }), h.deps);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as ApiError;
+    expect(body.message).toContain("too long");
+    expect(body.message).not.toContain("at least two");
+    const short = await route(new Request("https://api.test/api/geocode?q=a", { headers: { origin: ORIGIN } }), h.deps);
+    expect(((await short.json()) as ApiError).message).toContain("at least two");
+  });
+
+  it("a failing later lookup keeps what the first found; a failing first lookup is a 502", async () => {
+    const h = harness();
+    let n = 0;
+    h.deps.geocodeFetch = async () => {
+      n++;
+      throw new TypeError("network");
+    };
+    const res = await route(new Request("https://api.test/api/geocode?q=Cincinatti", { headers: { origin: ORIGIN } }), h.deps);
+    expect(res.status).toBe(502);
+    expect(n).toBe(2); // the first lookup and its one retry
   });
 });
 

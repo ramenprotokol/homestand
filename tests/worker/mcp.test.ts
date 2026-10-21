@@ -13,7 +13,15 @@ import { syntheticQlooFetch } from "../../src/worker/synthetic";
 const SIGNING_KEY = "test-signing-key-0123456789abcdef";
 const ORIGIN = "http://127.0.0.1:5173";
 const NOW = new Date("2026-10-15T12:00:00.000Z");
-const FARGO = { results: [{ name: "Fargo", admin1: "North Dakota", country_code: "US", latitude: 46.87719, longitude: -96.7898, feature_code: "PPLA2" }] };
+const PLACES = [
+  { name: "Fargo", admin1: "North Dakota", country_code: "US", latitude: 46.87719, longitude: -96.7898, feature_code: "PPLA2" },
+  { name: "Fresno", admin1: "California", country_code: "US", latitude: 36.74773, longitude: -119.78707, feature_code: "PPLA2" },
+];
+/** Answers like the geocoder: places whose name starts with what was asked for. */
+const geocodeStub: typeof fetch = async (u) => {
+  const q = (new URL(String(u)).searchParams.get("name") ?? "").toLowerCase();
+  return new Response(JSON.stringify({ results: PLACES.filter((p) => p.name.toLowerCase().startsWith(q)) }));
+};
 
 function harness(over: Partial<RouterDeps> = {}, agentOver: Partial<Deps> = {}) {
   const kv = memoryKv();
@@ -23,7 +31,7 @@ function harness(over: Partial<RouterDeps> = {}, agentOver: Partial<Deps> = {}) 
     now: () => NOW, qlooDailyCap: 400, aiDailyCap: 150, qlooDelayMs: 0, discoveryRef: syntheticDiscoveryReference(), ...agentOver,
   };
   const deps: RouterDeps = {
-    agent, allowedOrigins: [ORIGIN], geocodeFetch: async () => new Response(JSON.stringify(FARGO)), clientId: async () => "a",
+    agent, allowedOrigins: [ORIGIN], geocodeFetch: geocodeStub, clientId: async () => "a",
     limiter: memoryLimiter(1, () => NOW.getTime()), signingKey: SIGNING_KEY, ...over,
   };
   return { deps, kv };

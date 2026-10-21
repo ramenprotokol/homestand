@@ -2,6 +2,7 @@ import { CSV_HEADER, csvField } from "./calendar/csv";
 import { SPORT_WORDS, type Sport } from "./kind";
 import { localDay } from "./text";
 
+
 // Four calendars we wrote for the demo: fictional sponsors, no MLB data. April to September 2027 (each date moved forward 52 weeks, so every night keeps its weekday).
 // Each has a few locked nights, 3 to 4 classic nights, one ambiguous theme (a name that fits two themes) and one unknown.
 type N = [date: string, theme: string, sponsor?: string, locked?: boolean, notes?: string];

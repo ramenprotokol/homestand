@@ -5,6 +5,7 @@ import { themeById } from "../../app/themes/artists";
 import { dateWithYear, passedCount, seasonEyebrow } from "../../app/dates";
 import { checkHeadline, cleanTitle, fitSummary, localDay, lockedLine } from "../../app/text";
 import { ApiFailure } from "../api";
+import { errorView } from "./errors";
 import { fitChip, savedCopyBanner, syntheticBanner } from "../components";
 import { formatDateTime, h, type Child } from "../dom";
 import { recheckTheme, navigate } from "../flow";
@@ -72,7 +73,7 @@ function slotNote(v: NightView): HTMLElement | null {
 export function checkView(): HTMLElement {
   if (ui.loading) return loadingView();
   if (ui.error) {
-    return h("section", { class: "scene" }, h("div", { class: "wrap narrow" }, h("h1", { class: "h2", tabindex: "-1" }, "That did not work"), h("p", { class: "error", role: "alert" }, ui.error), h("div", { class: "actions" }, h("a", { class: "btn pri", href: "#/" }, "Start again"))));
+    return errorView();
   }
   const a = state.analysis;
   if (!a) {

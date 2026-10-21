@@ -8,7 +8,7 @@
  * The tools only wrap analyze() and proposeSwaps() from agent.ts. Every call goes through the same per-minute limits,
  * daily quotas, caps and market checks as the web API: the router hands this file its limiter and its per-client deps.
  */
-import type { AnalyzeResponse, GeoHit, MarketIn, NightOut, ProposeNightIn, ProposeResponse } from "../app/api-types";
+import type { AnalyzeResponse, GeoResponse, MarketIn, NightOut, ProposeNightIn, ProposeResponse } from "../app/api-types";
 import { parseCalendar, parseDate, type CalendarRow } from "../app/calendar/csv";
 import { cityOfLabel, isSport, type Kind, type Sport, SPORTS } from "../app/kind";
 import { SAMPLE_MARKETS, sampleById, type SampleMarket } from "../app/markets";
@@ -20,7 +20,7 @@ import { marketAllowed } from "./sign";
 /** What the router gives this file. Nothing here bypasses the web API's checks. */
 export interface McpHost {
   respond(body: unknown | null, status: number, extra?: Record<string, string>): Response;
-  geocode(q: string): Promise<GeoHit[]>;
+  geocode(q: string): Promise<GeoResponse>;
   /** The deps for this caller: the kind and sport asked for, plus their daily allowance. */
   agentFor(m: MarketIn, kind: Kind, sport?: Sport): Deps;
   /** One count against the per-minute limit of a web route ("geocode", "analyze", "propose"). False when over. */
@@ -273,11 +273,11 @@ async function targetOf(args: Record<string, unknown>, host: McpHost): Promise<T
   }
   if (city === undefined) throw new InputError('Give a US or Canadian "city" (such as "Fargo, ND"), or a "sample" id from sample_teams.');
   if (!(await host.limit("geocode"))) throw new InputError("Too many requests from here. Wait a minute and try again.");
-  // "Fargo, ND": search the town name, then prefer the hit whose state or province matches.
-  const [name = city, region = ""] = city.split(",").map((s) => s.trim());
-  const hits = await host.geocode(name.length >= 2 ? name : city);
-  const wanted = region.toLowerCase();
-  const hit = (wanted ? hits.find((h) => h.label.toLowerCase().split(",").pop()?.trim() === wanted) : undefined) ?? hits[0];
+  // The same search as the web page: "Fargo, ND", "Fargo ND" and "Fargo North Dakota" all read, with accents and small typos forgiven.
+  const { results: hits, message } = await host.geocode(city);
+  const hit = hits[0];
+  // A note that starts "No ..." means the state typed has no such town: do not quietly check a different one.
+  if (message && (hit === undefined || message.startsWith("No "))) throw new InputError(message);
   if (!hit) throw new InputError(`I could not find a US or Canadian city called "${city}". Try the city and state, like "Fargo, ND".`);
   const market: MarketIn = { label: hit.label, lon: hit.lon, lat: hit.lat, sig: hit.sig };
   if (!(await marketAllowed(market, host.signingKey))) throw new InputError("Search for your city and pick it from the list, or use a sample club.");

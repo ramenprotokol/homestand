@@ -151,6 +151,12 @@ export interface RecheckResponse {
   withinDay?: boolean;
 }
 
+/** The city search answer. `message` is a plain-words note for the director: a place outside the US and Canada, a territory, no match in the state they typed. */
+export interface GeoResponse {
+  results: GeoHit[];
+  message?: string;
+}
+
 export interface GeoHit {
   label: string;
   lon: number;

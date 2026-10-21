@@ -1,9 +1,9 @@
-import type { ApiError, GeoHit, MarketIn, ProposeNightIn } from "../app/api-types";
+import type { ApiError, GeoResponse, MarketIn, ProposeNightIn } from "../app/api-types";
 import { parseDate, type CalendarRow } from "../app/calendar/csv";
 import { QlooUnavailableError } from "../qloo/client";
 import { analyze, capsOf, CappedError, forKind, proposeSwaps, QuotaError, recheck, type Deps, type Gate } from "./agent";
 import { isSport, kindOf, type Kind, type Sport } from "../app/kind";
-import { placeLabel } from "../app/geo";
+import { exactTries, MAX_CITY, parsePlaceQuery, prefixTries, rankPlaces, TERRITORY_MESSAGE, type PlaceHit, type RawPlace } from "../app/geo";
 import { DAILY_QUOTA, type Limiter, type QuotaKind } from "./limits";
 import { isSampleMarket, marketAllowed, signMarket } from "./sign";
 import { handleMcp, type McpHost } from "./mcp";
@@ -150,12 +150,13 @@ function nightsOf(v: unknown): ProposeNightIn[] | null {
   return out;
 }
 
-const STUB_PLACES: Array<Omit<GeoHit, "sig">> = [
-  { label: "Fresno, CA", lon: -119.78707, lat: 36.74773 },
-  { label: "Tulsa, OK", lon: -95.99278, lat: 36.15398 },
-  { label: "Boise, ID", lon: -116.20345, lat: 43.6135 },
-  { label: "Columbus, OH", lon: -83.00207, lat: 39.96118 },
-  { label: "Vancouver, BC", lon: -123.11934, lat: 49.24966 },
+/** Stand-ins for the geocoder in synthetic mode (local runs and the e2e suite), in the shape Open-Meteo answers. */
+const STUB_PLACES: RawPlace[] = [
+  { name: "Fresno", admin1: "California", country_code: "US", latitude: 36.74773, longitude: -119.78707, population: 542107, feature_code: "PPLA2" },
+  { name: "Tulsa", admin1: "Oklahoma", country_code: "US", latitude: 36.15398, longitude: -95.99278, population: 413066, feature_code: "PPLA2" },
+  { name: "Boise", admin1: "Idaho", country_code: "US", latitude: 43.6135, longitude: -116.20345, population: 235684, feature_code: "PPLA2" },
+  { name: "Columbus", admin1: "Ohio", country_code: "US", latitude: 39.96118, longitude: -83.00207, population: 905748, feature_code: "PPLA2" },
+  { name: "Vancouver", admin1: "British Columbia", country_code: "CA", latitude: 49.24966, longitude: -123.11934, population: 675218, feature_code: "PPL" },
 ];
 
 /**
@@ -173,30 +174,45 @@ async function fetchOnceMore(f: typeof fetch, url: string): Promise<Response> {
   return call(url);
 }
 
-export async function geocode(deps: RouterDeps, q: string): Promise<GeoHit[]> {
-  const hits = await searchPlaces(deps, q);
+export async function geocode(deps: RouterDeps, q: string): Promise<GeoResponse> {
+  const { hits, message } = await searchPlaces(deps, q);
   // Signed here, so the other endpoints only accept places this search returned.
-  return Promise.all(hits.map(async (h) => ({ ...h, sig: deps.signingKey ? await signMarket(deps.signingKey, h) : "" })));
+  const results = await Promise.all(hits.map(async (h) => ({ ...h, sig: deps.signingKey ? await signMarket(deps.signingKey, h) : "" })));
+  return message ? { results, message } : { results };
 }
 
-async function searchPlaces(deps: RouterDeps, q: string): Promise<Array<Omit<GeoHit, "sig">>> {
-  if (deps.agent.mode === "synthetic") return STUB_PLACES.filter((p) => p.label.toLowerCase().includes(q.toLowerCase()));
-  // Open-Meteo geocoding: public, no key (https://open-meteo.com/en/docs/geocoding-api). Ask for plenty, keep the US and Canada.
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=30&language=en&format=json`;
-  const res = await fetchOnceMore(deps.geocodeFetch, url);
-  if (!res.ok) throw new Error(`geocoding HTTP ${res.status}`);
-  const body = (await res.json()) as { results?: Array<{ name: string; admin1?: string; country_code?: string; latitude: number; longitude: number; feature_code?: string }> };
-  const seen = new Set<string>();
-  const out: Array<Omit<GeoHit, "sig">> = [];
-  for (const r of body.results ?? []) {
-    if (r.feature_code && !r.feature_code.startsWith("PPL") && !r.feature_code.startsWith("ADM")) continue;
-    const label = placeLabel(r.name, r.admin1, r.country_code);
-    if (!label || seen.has(label)) continue;
-    seen.add(label);
-    out.push({ label, lon: r.longitude, lat: r.latitude });
-    if (out.length === 6) break;
+/** How many times one search may call the geocoder: the name as typed, a spelling or two, then shorter starts for a typo. */
+const MAX_LOOKUPS = 5;
+
+async function searchPlaces(deps: RouterDeps, q: string): Promise<{ hits: PlaceHit[]; message?: string }> {
+  const parsed = parsePlaceQuery(q);
+  if (parsed.name.length < 2) return { hits: [] };
+  // A US territory is understood, and said plainly not to be covered, before any lookup.
+  if (parsed.region?.cc === "TERRITORY") return { hits: [], message: TERRITORY_MESSAGE };
+  if (deps.agent.mode === "synthetic") return rankPlaces(STUB_PLACES, parsed);
+  // Open-Meteo geocoding: public, no key (https://open-meteo.com/en/docs/geocoding-api). It matches the start of a name and also
+  // alternate names, so we ask for plenty and keep only the places whose own name matches what was typed.
+  const tries = [...exactTries(parsed), ...prefixTries(parsed)].slice(0, MAX_LOOKUPS);
+  const raw: RawPlace[] = [];
+  let best: { hits: PlaceHit[]; message?: string; miss?: boolean } = { hits: [] };
+  for (const [i, name] of tries.entries()) {
+    try {
+      const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(name)}&count=100&language=en&format=json`;
+      const res = await fetchOnceMore(deps.geocodeFetch, url);
+      if (!res.ok) throw new Error(`geocoding HTTP ${res.status}`);
+      const body = (await res.json()) as { results?: RawPlace[] };
+      raw.push(...(body.results ?? []));
+    } catch (err) {
+      // The first lookup failing is the search failing; a later one failing leaves what was already found.
+      if (i === 0) throw err;
+      break;
+    }
+    best = rankPlaces(raw, parsed);
+    // Good enough to stop: places found (even with a note), or "outside the US and Canada". A name found only in another state
+    // keeps looking, because the typed name may have a typo ("Springfeld, IL").
+    if (!best.miss && (best.hits.length > 0 || best.message)) break;
   }
-  return out;
+  return best.miss ? { hits: best.hits, ...(best.message ? { message: best.message } : {}) } : best;
 }
 
 export async function route(req: Request, deps: RouterDeps): Promise<Response> {
@@ -212,9 +228,10 @@ export async function route(req: Request, deps: RouterDeps): Promise<Response> {
     }
     if (req.method === "GET" && url.pathname === "/api/geocode") {
       const q = (url.searchParams.get("q") ?? "").trim();
-      if (q.length < 2 || q.length > 60) return fail(400, "bad-request", "Type at least two letters of a city name.", headers);
+      if (q.length > MAX_CITY) return fail(400, "too-long", `That is too long for a city name. Use ${MAX_CITY} characters or fewer, for example "Tulsa, OK".`, headers);
+      if (q.length < 2) return fail(400, "bad-request", "Type at least two letters of a city name.", headers);
       if (!(await deps.limiter("geocode", await deps.clientId(req)))) return fail(429, "rate-limit", "Too many searches. Wait a minute and try again.", headers);
-      return json({ results: await geocode(deps, q) }, 200, headers);
+      return json(await geocode(deps, q), 200, headers);
     }
     if (url.pathname === "/mcp") {
       if (req.method !== "POST") {

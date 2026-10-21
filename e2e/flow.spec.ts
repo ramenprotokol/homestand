@@ -2,7 +2,8 @@ import { expect, test, type Page, type TestInfo } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { createServer, request as httpRequest } from "node:http";
 
-const BASE = "http://127.0.0.1:5199";
+const PROXY_PORT = Number(process.env.E2E_PROXY_PORT ?? 5199);
+const BASE = `http://127.0.0.1:${PROXY_PORT}`;
 
 // Screenshots for each step land in test-results/screens/ (gitignored): <project>-<step>.png
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -433,16 +434,16 @@ test("the production CSP and security headers break nothing on any screen", asyn
   // local Worker. (Rewriting the document inside the browser makes Chrome treat it as a public page and block the local API.)
   const headersFile = await readFile("public/_headers", "utf8");
   const policy: Record<string, string> = {};
-  for (const m of headersFile.matchAll(/^ {2}([A-Za-z-]+): (.+)$/gm)) policy[m[1]!.toLowerCase()] = m[2]!.replace("https://homestand-api.ramenprotokol.workers.dev", "http://127.0.0.1:8788");
+  for (const m of headersFile.matchAll(/^ {2}([A-Za-z-]+): (.+)$/gm)) policy[m[1]!.toLowerCase()] = m[2]!.replace("https://homestand-api.ramenprotokol.workers.dev", `http://127.0.0.1:${process.env.E2E_API_PORT ?? 8788}`);
   expect(Object.keys(policy)).toEqual(expect.arrayContaining(["content-security-policy", "x-frame-options", "x-content-type-options", "referrer-policy", "permissions-policy", "cross-origin-opener-policy"]));
   const proxy = createServer((req, res) => {
-    const up = httpRequest({ host: "127.0.0.1", port: 5173, path: req.url, method: req.method, headers: req.headers }, (r) => {
+    const up = httpRequest({ host: "127.0.0.1", port: Number(process.env.E2E_WEB_PORT ?? 5173), path: req.url, method: req.method, headers: req.headers }, (r) => {
       res.writeHead(r.statusCode ?? 502, { ...r.headers, ...policy });
       r.pipe(res);
     });
     req.pipe(up);
   });
-  await new Promise<void>((resolve) => proxy.listen(5199, "127.0.0.1", resolve));
+  await new Promise<void>((resolve) => proxy.listen(PROXY_PORT, "127.0.0.1", resolve));
   try {
     await cspTour(page);
   } finally {

@@ -52,9 +52,21 @@ async function analyzeClub(c: SavedClub): Promise<void> {
     addTrace("Check: match names, rate, flag weak nights", a.trace);
   } catch (err) {
     ui.error = err instanceof ApiFailure ? err.message : "Something went wrong. Try again.";
+    ui.errorCode = err instanceof ApiFailure ? err.code : "error";
   }
   ui.loading = false;
   window.dispatchEvent(new HashChangeEvent("hashchange"));
+}
+
+/** Retry on the error page: the same Check request again, from the calendar already in memory. Nothing typed is lost. */
+export function retryCheck(): void {
+  if (!state.market || state.rows.length === 0 || ui.loading) return;
+  const c: SavedClub = { market: state.market, rows: state.rows, parseErrors: state.parseErrors, sampleId: state.sampleId, kind: state.kind, sport: state.sport };
+  ui.loading = true;
+  ui.error = null;
+  ui.errorCode = null;
+  window.dispatchEvent(new HashChangeEvent("hashchange"));
+  void analyzeClub(c);
 }
 
 /** Start of a visit on Check, Fix or Send with nothing in memory (a reload): pick the saved club up again and re-check it, staying on the same screen. */
@@ -66,6 +78,7 @@ export function resumeClub(): void {
   loadWork();
   ui.loading = true;
   ui.error = null;
+  ui.errorCode = null;
   void analyzeClub(c);
 }
 
@@ -77,6 +90,7 @@ export async function startCheck(market: MarketIn, rowsIn: CalendarRow[], parseE
   saveClub({ market, rows, parseErrors, sampleId, kind, sport });
   ui.loading = true;
   ui.error = null;
+  ui.errorCode = null;
   ui.dupesNote = null;
   ui.dupesBefore = null;
   // A sample club has a link of its own: #/check/biloxi opens it from a cold start.
