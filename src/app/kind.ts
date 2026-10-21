@@ -83,7 +83,7 @@ export const SPORT_WORDS: Record<Sport, SportWords> = {
 export const COPY: Record<Kind, Copy> = {
   club: { place: "town", markets: "towns", season: "season", night: "night", nights: "nights", themeNight: "theme night", themeNights: "theme nights", sample: "sample club", memoTitle: "Theme-night rationale", slab: "THEME NIGHT",
     team: SPORT_WORDS.baseball.team, venueWord: SPORT_WORDS.baseball.venue, sport: "baseball", months: SPORT_WORDS.baseball.months, provenExamples: SPORT_WORDS.baseball.provenExamples, firstMoment: SPORT_WORDS.baseball.firstMoment, touches: SPORT_WORDS.baseball.touches },
-  venue: { place: "city", markets: "towns", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "",
+  venue: { place: "city", markets: "cities", season: "summer series", night: "date", nights: "dates", themeNight: "date", themeNights: "dates", sample: "sample venue", memoTitle: "Summer-series rationale", slab: "",
     team: "venue", venueWord: "amphitheatre", sport: "", months: "May to September", provenExamples: "fireworks, symphony nights, local showcases", firstMoment: "a pre-show video", touches: "a stage-side read, a pre-show video or a giveaway" },
 };
 

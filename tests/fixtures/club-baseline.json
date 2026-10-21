@@ -1,6 +1,6 @@
 {
  "biloxi": {
-  "hash": "61a1eabe858c1e15a2bc4966320d0523d90aae8b2e4d8e61bf79024a3194f1a1",
+  "hash": "a65d4897db33b4edf535123d5535246d0a581d920f05b0830097bcf732bddad6",
   "summary": {
    "bands": [
     "2027-04-09 Margaritaville Night: leans-away",
@@ -46,7 +46,7 @@
   }
  },
  "albuquerque": {
-  "hash": "630d7d8b7e912b2763fb8b6144301e7320b6b2a08741e78514af17c4827b79bf",
+  "hash": "e469f68c519c9b4faf9a55334a08543d63f86bcdd6465e2bc36139322b9a3928",
   "summary": {
    "bands": [
     "2027-04-10 Taylor Swift Night: leans-in",
@@ -87,7 +87,7 @@
   }
  },
  "akron": {
-  "hash": "198121240419103e95d639b6789511945abe6bc3b5d1959f91e01901b913848a",
+  "hash": "b62eae81216655da319c82b29628947e82148489a2f25c67af1fb344cdd532af",
   "summary": {
    "bands": [
     "2027-04-10 Bluey Day: leans-in",
@@ -129,7 +129,7 @@
   }
  },
  "portland-me": {
-  "hash": "07916b277da3c93e8c8842b6452ccce04d7a37f6a3008933e1a16cfa88dfc0f4",
+  "hash": "efea7fb880faa2d15bdeedbe6b02678cd2611efd1229ea71c0828d21b7e5d2f6",
   "summary": {
    "bands": [
     "2027-04-17 Bluey Day: leans-in",
@@ -168,7 +168,7 @@
   }
  },
  "example@biloxi": {
-  "hash": "cf38eb874b547510b110a21e84d5f9c8ce8925f61b45ff8164844d42fde59671",
+  "hash": "882a22d3db6fe6ceaed4d98f3de75948e53fdcc123c1022f721090a7cf252a24",
   "summary": {
    "bands": [
     "2027-04-09 Fireworks Friday: classic",
@@ -207,7 +207,7 @@
   }
  },
  "example@akron": {
-  "hash": "a249e5122aa4eafad78a4567bd9d6bb27f1ae22798851827192ef2197eb5fb82",
+  "hash": "c3fd03c5df8e2767c736ebcea61554c077483443c1aa19d465ae04f488be53dd",
   "summary": {
    "bands": [
     "2027-04-09 Fireworks Friday: classic",

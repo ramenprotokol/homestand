@@ -301,6 +301,10 @@ function rowsOf(args: Record<string, unknown>): CalendarRow[] {
 
 const FIT_NAME: Record<FitLabel, string> = { "leans-in": "strong", average: "average", "leans-away": "weak", "not-scored": "not scored", classic: "classic", found: "local favorite" };
 
+/** A Strong or Weak rating that rests on a raw gap under 0.01 is reported as "leans strong" / "leans weak", never as a verdict. */
+const fitNameOf = (label: FitLabel, slight?: boolean): string => (slight && label === "leans-in" ? "leans strong" : slight && label === "leans-away" ? "leans weak" : FIT_NAME[label]);
+const SLIGHT_REASON = " This is only a slight lean: the raw gap behind it is under 0.01, so treat it as a lean, not a verdict.";
+
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 interface NightLine {
@@ -333,7 +337,7 @@ function lineOf(n: NightOut, d: Deps, a: AnalyzeResponse): NightLine {
   const themeLabel = label(n.themeId);
   const sc = a.themes[n.themeId];
   if (!sc || n.label === "not-scored") return { ...base, matchedTheme: themeLabel, fit: "not scored", reason: `We have no local data for ${themeLabel} in ${city}, so it stays as planned.` };
-  return { ...base, matchedTheme: themeLabel, fit: FIT_NAME[n.label], reason: fitLine(themeLabel, city, sc.index, a.kind) || comparisonSentence(themeLabel, n.label, city, a.kind) };
+  return { ...base, matchedTheme: themeLabel, fit: fitNameOf(n.label, n.slight), reason: (fitLine(themeLabel, city, sc.index, a.kind) || comparisonSentence(themeLabel, n.label, city, a.kind)) + (n.slight ? SLIGHT_REASON : "") };
 }
 
 const demoNote = (mode: string): string => (mode === "synthetic" ? " (Demo data: these ratings are made up, not real Qloo results.)" : "");
@@ -355,7 +359,7 @@ async function checkCalendar(args: Record<string, unknown>, host: McpHost): Prom
   const count = (f: string): number => nights.filter((n) => n.fit === f).length;
   const city = cityOfLabel(a.market.label);
   const summary =
-    `${plural(nights.length, "night", "nights")} checked for ${a.market.label}: ${count("strong")} strong, ${count("average")} average, ${count("weak")} weak, ${count("classic")} proven promo${count("classic") === 1 ? "" : "s"} (not graded), ` +
+    `${plural(nights.length, "night", "nights")} checked for ${a.market.label}: ${count("strong")} strong, ${count("average")} average, ${count("weak")} weak${count("leans strong") + count("leans weak") > 0 ? ` (plus ${count("leans strong")} leaning strong and ${count("leans weak")} leaning weak, only slightly)` : ""}, ${count("classic")} proven promo${count("classic") === 1 ? "" : "s"} (not graded), ` +
     `${count("not scored")} not scored${count("ambiguous") ? `, ${count("ambiguous")} to choose` : ""}.${demoNote(a.mode)}`;
   const weak = nights.filter((n) => n.fit === "weak").length;
   const body = nights.map((n) => `${n.date} ${n.weekday.slice(0, 3)}  ${n.theme}${n.locked ? " [locked]" : ""}: ${n.fit}. ${n.reason}`).join("\n");
@@ -373,6 +377,8 @@ interface SwapLine {
   proposed: string;
   plannedFit: string;
   proposedFit: string;
+  /** The planned night is only a slight lean: the swap is optional. */
+  optional?: boolean;
   reason: string;
   alternatives: string[];
 }
@@ -393,8 +399,9 @@ async function proposeTool(args: Record<string, unknown>, host: McpHost): Promis
     ...(p.sponsor ? { sponsor: p.sponsor } : {}),
     planned: label(p.fromThemeId),
     proposed: p.discovered ? p.discovered.name : label(p.toThemeId),
-    plannedFit: FIT_NAME[p.from.label],
-    proposedFit: p.kind === "best-option" ? "average (the best option here)" : FIT_NAME[p.to.label],
+    plannedFit: fitNameOf(p.from.label, p.from.slight),
+    proposedFit: p.kind === "best-option" ? "average (the best option here)" : fitNameOf(p.to.label, p.to.slight),
+    ...(p.optional ? { optional: true } : {}),
     reason: p.why,
     alternatives: p.alternates.map((x) => label(x.toThemeId)),
   }));
@@ -403,7 +410,7 @@ async function proposeTool(args: Record<string, unknown>, host: McpHost): Promis
   const city = cityOfLabel(a.market.label);
   const summary = swaps.length === 0 && notFixed.length === 0 ? `No weak nights to fix for ${city}.${demoNote(a.mode)}` : `${plural(swaps.length, "swap", "swaps")} suggested for ${a.market.label}${notFixed.length ? `, ${plural(notFixed.length, "night", "nights")} could not be fixed` : ""}.${demoNote(a.mode)}`;
   const lines = [
-    ...swaps.map((s) => `${s.date} ${s.weekday.slice(0, 3)}: ${s.planned} (${s.plannedFit}) -> ${s.proposed} (${s.proposedFit}). ${s.reason}${s.alternatives.length ? ` Other options: ${s.alternatives.join(", ")}.` : ""}`),
+    ...swaps.map((s) => `${s.date} ${s.weekday.slice(0, 3)}${s.optional ? " [optional: only a slight lean]" : ""}: ${s.planned} (${s.plannedFit}) -> ${s.proposed} (${s.proposedFit}). ${s.reason}${s.alternatives.length ? ` Other options: ${s.alternatives.join(", ")}.` : ""}`),
     ...notFixed.map((u) => `${u.date}: not fixed. ${u.reason}`),
     ...(ideas.length ? ["", "Ideas for locked nights:", ...ideas.map((i) => `${i.date}: ${i.text}`)] : []),
   ];

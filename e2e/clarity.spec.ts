@@ -47,9 +47,9 @@ test("a pick stays as one line with a way back, the CSV has a fit column, and th
   await page.goto("/#/check/biloxi");
   await expect(page.getByTestId("summary")).toBeVisible();
   const ask = page.getByRole("group", { name: /Dinosaurs/ });
-  await expect(ask).toContainText(/Jun 5: score it as Marvel or Dinosaur\?/);
+  await expect(ask).toContainText(/Jun 5, 2027: score it as Marvel or Dinosaur\?/);
   await ask.getByRole("button", { name: "Dinosaur" }).click();
-  await expect(page.getByTestId("picked-line")).toContainText(/Jun 5 scored as Dinosaur: (strong|average|weak) fit\./);
+  await expect(page.getByTestId("picked-line")).toContainText(/Jun 5, 2027 scored as Dinosaur: (strong|average|weak) fit\./);
   await page.getByTestId("picked-line").getByRole("button", { name: "Change" }).click();
   await expect(page.getByRole("group", { name: /Dinosaurs/ })).toBeVisible();
   await page.getByRole("group", { name: /Dinosaurs/ }).getByRole("button", { name: "Marvel" }).click();
@@ -64,14 +64,15 @@ test("a pick stays as one line with a way back, the CSV has a fit column, and th
   await page.keyboard.press("Escape");
   await page.getByTestId("to-send").click();
   await expect(page.getByTestId("memo")).toContainText("Rejected");
-  await expect(page.getByTestId("memo")).toContainText("Still weak, no swap");
+  await expect(page.getByTestId("memo")).toContainText("No swap available");
+  await expect(page.getByTestId("memo")).toContainText("Swap offered, not approved");
   const [csv] = await Promise.all([page.waitForEvent("download"), page.getByTestId("dl-csv").click()]);
   const text = await readFile((await csv.path())!, "utf8");
   expect(text.split("\r\n")[0]).toBe("date,theme,sponsor,locked,notes,fit");
   expect(text).toMatch(/,(Strong fit|Average fit|Weak fit|No data|Proven promo \(not graded\))\r\n/);
 });
 
-test("a venue run says offers, opener ideas and acts, never themes or holds", async ({ page }) => {
+test("a venue run says offers, support act ideas and acts, never themes or holds", async ({ page }) => {
   await page.goto("/#/check/raleigh");
   await expect(page.getByTestId("summary")).toBeVisible();
   await page.getByTestId("to-fix").click();

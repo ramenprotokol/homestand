@@ -46,6 +46,8 @@ function savedClub(): SavedClub | null {
 async function analyzeClub(c: SavedClub): Promise<void> {
   try {
     const a = await api.analyze(c.market, c.rows, c.kind ?? "club", sportOf(c.sport));
+    // An answer without its parts (an empty object, say) would blank every screen: treat it as a failed check, which shows the error page.
+    if (!a || !Array.isArray(a.nights) || a.nights.length === 0 || typeof a.themes !== "object" || a.themes === null || !a.market) throw new ApiFailure("incomplete", "The server's answer was incomplete, so the check could not be shown. Please try again in a moment.");
     state.analysis = a;
     addTrace("Check: match names, rate, flag weak nights", a.trace);
   } catch (err) {
@@ -103,6 +105,7 @@ export async function ensureProposals(): Promise<void> {
       return { index: n.index, date: n.date, themeId: n.resolution.kind === "classic" || v.needsChoice ? null : v.themeId, sponsor: n.sponsor, locked: n.locked, notes: n.notes };
     });
     const res = await api.propose(state.market, nights, state.allowDuplicates, state.kind, state.sport);
+    if (!res || !Array.isArray(res.proposals) || !Array.isArray(res.unfixed) || !Array.isArray(res.angles)) throw new ApiFailure("incomplete", "The server's answer was incomplete, so the swaps could not be shown. Please try again in a moment.");
     state.propose = res;
     // Allowing repeats re-runs the proposals. Say so when that changed nothing.
     if (ui.dupesBefore !== null) {

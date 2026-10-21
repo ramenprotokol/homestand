@@ -93,7 +93,7 @@ test("sample club: Check, Why, Fix, Send, The Study", async ({ page }, info) => 
   await expect(why.getByText("Fit number = z")).toHaveCount(0);
   await expect(why.getByText(/standard step/)).toHaveCount(0);
   await why.getByRole("button", { name: "Show the numbers" }).click();
-  await expect(why.getByText(/Raw scores sit near 0.99 everywhere/)).toBeVisible();
+  await expect(why.getByText(/Raw scores (for this (theme|act) sit near [\d.]+ everywhere|differ only a little between towns), so we compare the (small )?gaps/)).toBeVisible();
   await expect(why.getByText("Normal gap between towns")).toBeVisible();
   await expect(why.getByText("Akron's usual", { exact: true })).toBeVisible();
   await expect(why.getByTestId("vs-others")).toContainText(/Bluey here: (well )?(below|above|about typical for) (most )?towns\./);

@@ -40,3 +40,8 @@ export function seasonEyebrow(dates: string[], word = "season"): string {
   const season = y1 === y2 ? y1 : `${y1}\u2013${y2.slice(2)}`;
   return `${season} ${word} \u00b7 ${first === last ? noYear(first) : `${noYear(first)} \u2013 ${noYear(last)}`}`;
 }
+
+/** "Fri Jun 19, 2027": the short form with the year, for places a date appears on its own. */
+export function shortDateYear(iso: string): string {
+  return `${weekdayName(iso).slice(0, 3)} ${dateWithYear(iso)}`;
+}

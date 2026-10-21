@@ -1,4 +1,4 @@
-import { fitWord, type FitLabel } from "../app/score";
+import { fitWordFor, type FitLabel } from "../app/score";
 import { h, type Child } from "./dom";
 import { icon, type IconName } from "./icons";
 import { state, ui } from "./store";
@@ -13,8 +13,8 @@ const FIT_ICON: Record<FitLabel, IconName> = {
 };
 
 /** The fit in words, with an icon: colour is never the only signal. */
-export function fitChip(fit: FitLabel | "pick"): HTMLElement {
-  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWord(fit));
+export function fitChip(fit: FitLabel | "pick", slight?: boolean): HTMLElement {
+  return fit === "pick" ? h("span", { class: "fitchip fitchip--not-scored" }, icon("question"), "Needs your pick") : h("span", { class: `fitchip fitchip--${fit}` }, icon(FIT_ICON[fit]), fitWordFor(fit, slight));
 }
 
 export function syntheticBanner(): HTMLElement | null {

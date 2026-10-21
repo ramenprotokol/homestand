@@ -71,7 +71,7 @@ describe("the Study's personal line", () => {
 describe("real night names for swaps", () => {
   it("keeps the original ending: Barbie Day becomes LEGO Movie Day, Star Wars Night becomes Pro Wrestling Night", () => {
     expect(swapName("Barbie Day", "LEGO Movie")).toBe("LEGO Movie Day");
-    expect(swapName("Star Wars Night", "Pro wrestling")).toBe("Pro wrestling Night");
+    expect(swapName("Star Wars Night", "Pro wrestling")).toBe("Pro Wrestling Night");
     expect(swapName("Fireworks Friday", "Batman")).toBe("Batman Friday");
     expect(swapName("Hot Sauce Showdown", "Garth Brooks")).toBe("Garth Brooks Showdown");
     expect(swapName("Dinosaurs & Superheroes", "Marvel")).toBe("Marvel Night");

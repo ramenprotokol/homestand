@@ -19,6 +19,8 @@ export interface PlanNight {
 
 export interface ThemeFit {
   label: FitLabel;
+  /** A Strong or Weak label on a raw gap under 0.01: a lean, not a verdict. */
+  slight?: boolean;
   z: number | null;
   score: number | null;
 }
@@ -67,9 +69,15 @@ export interface Proposal {
   why: string;
   /** Set when the replacement is a title Qloo found, not a library theme. `to` then has label "found" and no number. */
   discovered?: Discovered;
+  /** Set when the planned night is only a slight Weak lean: the swap is offered but is not pre-selected, and is not counted as a night to fix. */
+  optional?: boolean;
   /** "best-option": nothing in this night's audience is a strong fit here, so this is the strongest of its audience, an average fit. */
   kind?: "best-option";
 }
+
+/** Assignment cost of offering a slight-lean Strong theme (a clear Strong is preferred) and of giving a candidate to a slight-lean Weak night (a clear Weak night wins a contested theme). */
+const SLIGHT_CANDIDATE_COST = 40;
+const SLIGHT_NIGHT_COST = 5000;
 
 /** A best-option swap must beat the planned night by at least a full band (the Leans in and Leans away cut-offs are 1.0 apart). */
 export const BEST_OPTION_GAIN = 1.0;
@@ -288,14 +296,18 @@ export function propose(input: ProposeInput): ProposeResult {
   const actPool: Discovered[] = venue ? [...(input.acts ?? [])].sort((x, y) => (y.z ?? 0) - (x.z ?? 0) || x.name.localeCompare(y.name)) : [];
 
   const away = nights.filter((n) => n.themeId && fits[n.themeId]?.label === "leans-away");
-  trace.push(step(now, "propose", `${away.length} ${away.length === 1 ? `${W.night} is` : `${W.nights} are`} a weak fit for this ${W.place}.`));
+  const slightAway = away.filter((n) => fits[n.themeId!]!.slight === true).length;
+  const clearAway = away.length - slightAway;
+  trace.push(step(now, "propose", `${clearAway} ${clearAway === 1 ? `${W.night} is` : `${W.nights} are`} a clear weak fit for this ${W.place}${slightAway > 0 ? `, and ${slightAway} more ${slightAway === 1 ? "is" : "are"} only a slight lean (a swap is offered as optional)` : ""}.`));
   const used = new Set(nights.map((n) => n.themeId).filter((x): x is string => x !== null));
   const leaning = library
     .filter((t) => fits[t.id]?.label === "leans-in")
-    .sort((a, b) => (fits[b.id]!.z ?? 0) - (fits[a.id]!.z ?? 0) || a.id.localeCompare(b.id));
+    // A clear Strong comes before a slight one, then the strongest first.
+    .sort((a, b) => Number(fits[a.id]!.slight === true) - Number(fits[b.id]!.slight === true) || (fits[b.id]!.z ?? 0) - (fits[a.id]!.z ?? 0) || a.id.localeCompare(b.id));
   trace.push(step(now, "propose", `${leaning.length} ${venue ? "act" : "theme"}${leaning.length === 1 ? "" : "s"} from our list ${leaning.length === 1 ? "is" : "are"} a strong fit here and can be offered.`));
 
   // Worst first, so the weakest nights are handled first (the order the trace and the pack read in).
+  const isSlightNight = (n: PlanNight): boolean => fits[n.themeId!]?.slight === true;
   const ordered = [...away].sort((a, b) => (fits[a.themeId!]!.z ?? 0) - (fits[b.themeId!]!.z ?? 0) || a.index - b.index);
 
   /** Rank of a candidate for a night: lower is better. A music night (club or venue) prefers the same genre, then a related one. */
@@ -348,8 +360,8 @@ export function propose(input: ProposeInput): ProposeResult {
     const entries = unlocked.map((n) => {
       const original = byId.get(n.themeId!)!;
       const g = gathered.get(n.index)!;
-      const list: Array<{ col: number; cost: number; pick: Pick }> = g.passing.map((x) => ({ col: colOf(`t:${x.theme.id}`), cost: rankOf(original, x.theme) * 100 - (fits[x.theme.id]!.z ?? 0) * 10, pick: { kind: "theme", theme: x.theme, detail: x.detail } }));
-      if (venue) actPool.forEach((a, i) => { const t = genreTier(original.genre, a.genre); if (t <= 1 && withinOneTier(original.tier, a.tier)) list.push({ col: colOf(`a:${i}`), cost: t * 200 + 50 - (a.z ?? 0) * 10, pick: { kind: "act", idx: i, tier: t } }); });
+      const list: Array<{ col: number; cost: number; pick: Pick }> = g.passing.map((x) => ({ col: colOf(`t:${x.theme.id}`), cost: rankOf(original, x.theme) * 100 - (fits[x.theme.id]!.z ?? 0) * 10 + (fits[x.theme.id]!.slight ? SLIGHT_CANDIDATE_COST : 0) + (isSlightNight(n) ? SLIGHT_NIGHT_COST : 0), pick: { kind: "theme", theme: x.theme, detail: x.detail } }));
+      if (venue) actPool.forEach((a, i) => { const t = genreTier(original.genre, a.genre); if (t <= 1 && withinOneTier(original.tier, a.tier)) list.push({ col: colOf(`a:${i}`), cost: t * 200 + 50 - (a.z ?? 0) * 10 + (isSlightNight(n) ? SLIGHT_NIGHT_COST : 0), pick: { kind: "act", idx: i, tier: t } }); });
       return list;
     });
     const rows = entries.length;
@@ -466,7 +478,7 @@ export function propose(input: ProposeInput): ProposeResult {
     }
     if (!chosen) {
       const young = isYoung(original.audience);
-      unfixed.push({ index: night.index, date: night.date, reason: venue ? `No ${original.genre ? `${GENRE_WORDS[original.genre]} ` : ""}act, or act in a related genre, is a strong fit here for this date.` : young ? "No family theme is a strong fit here for this date." : "No strong-fit theme passes the date, audience and no-repeat checks.", counts: g.counts });
+      if (!isSlightNight(night)) unfixed.push({ index: night.index, date: night.date, reason: venue ? `No ${original.genre ? `${GENRE_WORDS[original.genre]} ` : ""}act, or act in a related genre, is a strong fit here for this date.` : young ? "No family theme is a strong fit here for this date." : "No strong-fit theme passes the date, audience and no-repeat checks.", counts: g.counts });
       trace.push(step(now, "constraint", `${night.date} ${original.label}: ${noSwapLine(g.counts, city, venue)}`));
       continue;
     }
@@ -516,6 +528,7 @@ export function propose(input: ProposeInput): ProposeResult {
       .slice(0, MAX_ALTERNATES)
       .map((id) => ({ toThemeId: id, to: fits[id]! }));
   }
+  for (const p of proposals) if (fits[p.fromThemeId]?.slight === true) p.optional = true;
   proposals.sort((a, b) => a.date.localeCompare(b.date) || a.index - b.index);
   return { proposals, angles, unfixed, trace };
 }

@@ -29,11 +29,17 @@ A promotions director plans dozens of theme nights a season, and most of them ar
 
 ## How Homestand uses Qloo
 
+For each night, Homestand asks Qloo's Insights API how much people within 80 km like the theme's declared entities (`signal.location` with a fixed `filter.results.entities` list), and compares that reading with the identical request at 40 reference towns, changing only the location. That is the place-to-place comparison Qloo's docs describe ("how well a restaurant appeals to diners in one neighborhood versus another"), and we tested that it holds for our request shape: the same entity at the same place returned the identical value whether asked alone, in lists of 6, 10 or 12, in a tag-filtered query two days later, or on a repeat call.
+
+A theme's index is how far the town sits from the other towns, in units of their spread, minus the town's own average across all themes, so a town that scores high on everything doesn't light up every card. Qloo's affinity for very popular entities sits near 1 everywhere, and Qloo says a gap like 0.91 versus 0.92 usually means similar relevance. So when the raw gap behind a label is under 0.01, we mark it as a slight lean ("Leans strong" or "Leans weak") and don't push a swap: its swap is offered as optional, never pre-selected, and left out of the count of nights to fix.
+
+We didn't use Heatmap Insights, Qloo's tool for comparing places: it isn't among the hackathon's listed types, and because it ranks places against each other it wouldn't remove the small-gap issue. Our pre-registered study found the score didn't predict which theme night drew the bigger crowd, so Homestand describes local taste and never forecasts ticket sales.
+
 One new city, end to end:
 
-1. **Request.** The browser sends the picked city (name, longitude, latitude, signed by the Worker's search) and the calendar rows to `POST /api/analyze`. For each theme in the library, the Worker asks Qloo `GET /v2/insights` with `filter.type` (one call per entity type), `filter.results.entities` (the theme's declared entities), `signal.location=POINT(lon lat)` and `signal.location.radius=80000`. That is five batched calls for the library, then two more for a pool of family titles.
-2. **Result.** Qloo returns, per entity, how strongly that place likes it. Homestand averages each theme's entities and compares the result with 40 reference towns, so the answer is relative: "Bluey's local affinity sits in the bottom fifth of the 40 reference towns", and so Bluey is a Weak fit here. It also subtracts the town's own average, so a town that rates everything high does not call everything a Strong fit.
-3. **What you see.** Each night gets Strong, Average or Weak fit, with the plain reason and, under "Show the numbers", what Qloo looked at. Weak nights get swap proposals; the same call also surfaces family titles the town likes more than most towns do. Nothing in the result is a sales forecast.
+1. **Request.** The browser sends the picked city (name, longitude, latitude, signed by the Worker's search) and the calendar rows to `POST /api/analyze`. For each theme in the library, the Worker calls `GET /v2/insights` with `filter.type` (one call per entity type), `filter.results.entities`, `signal.location=POINT(lon lat)` and `signal.location.radius=80000`. That is five batched calls for the library, then two more for a pool of family titles.
+2. **Result.** Qloo returns, per entity, how strongly that place likes it. In words: "Bluey's local affinity sits in the bottom fifth of the 40 reference towns", so Bluey is a Weak fit here, unless the raw gap is tiny, in which case it reads "Leans weak".
+3. **What you see.** Each night gets Strong, Average or Weak fit (or a lean), with the plain reason and, under "Show the numbers", what Qloo looked at and the raw gap. Clear Weak nights get swap proposals. Nothing in the result is a sales forecast.
 
 The answers are saved server-side for 120 days, so the next visit for that town makes no Qloo call.
 

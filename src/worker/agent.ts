@@ -10,7 +10,7 @@ import { marketKey } from "../app/markets";
 import { angleText, categoryGroup, pickAngles, propose, type AngleOption, type Discovered, type PlanNight, type SponsorAngle, type ThemeFit } from "../app/propose/propose";
 import { audienceBand, audienceFit, inWindow } from "../app/propose/rules";
 import { shortDate } from "../app/dates";
-import { bundleScore, centre, fitFor, labelForZ, type FitLabel, type ReferenceStats } from "../app/score";
+import { bundleScore, centre, fitFor, labelForZ, rawGap, RAW_FLOOR, strengthOf, type FitLabel, type ReferenceStats } from "../app/score";
 import { idsOfType, type LiveTheme } from "../app/themes/ids";
 import { THEME_LIBRARY } from "../app/themes/library";
 import { VENUE_CLASSIC_PHRASES, VENUE_LIBRARY } from "../app/themes/artists";
@@ -272,6 +272,8 @@ function allOut(d: Deps, s: Scores): Record<string, ThemeScoreOut> {
         o.reason = "Too few themes had data in this town to compare one theme with its other themes.";
       } else o.label = labelForZ(o.index);
     }
+    o.gap = rawGap(o.index, o.ref?.sd);
+    if (o.label !== "not-scored" && strengthOf(o.index, o.ref?.sd) === "slight") o.slight = true;
   });
   return Object.fromEntries(list.map((o) => [o.themeId, o]));
 }
@@ -812,11 +814,11 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
     const label: FitLabel = res.kind === "classic" ? "classic" : themeId ? (sc?.label ?? "not-scored") : "not-scored";
     return {
       index: i, line: r.line, date: r.date, weekday: weekdayName(r.date), theme: r.theme, sponsor: r.sponsor, locked: r.locked, notes: r.notes,
-      resolution: res, candidates: res.kind === "ambiguous" ? res.candidates : [], themeId, label, z: sc?.index ?? null, recognisedAs: recognised[i] ?? null,
+      resolution: res, candidates: res.kind === "ambiguous" ? res.candidates : [], themeId, label, ...(sc?.slight ? { slight: true } : {}), z: sc?.index ?? null, recognisedAs: recognised[i] ?? null,
     };
   });
   const count = (l: FitLabel): number => nights.filter((n) => n.label === l).length;
-  trace.push(step(iso(d), "score", `Rated: ${count("leans-in")} strong fit, ${count("average")} average fit, ${count("leans-away")} weak fit, ${count("not-scored")} no data, ${count("classic")} proven promo.`));
+  trace.push(step(iso(d), "score", `Rated: ${count("leans-in")} strong fit, ${count("average")} average fit, ${count("leans-away")} weak fit, ${count("not-scored")} no data, ${count("classic")} proven promo.${nights.some((n) => n.slight) ? ` ${nights.filter((n) => n.slight).length} of the strong or weak ratings are only a slight lean (the raw gap is under ${RAW_FLOOR}).` : ""}`));
 
   return {
     market: input.market, ...(venue ? { kind: "venue" as const } : {}), mode: d.mode, recordedOn: scores.source === "cache" ? scores.stored.fetchedAt.slice(0, 10) : null, recordedAt: scores.stored.fetchedAt, themes, nights,
@@ -827,7 +829,7 @@ export async function analyze(d: Deps, input: AnalyzeInput): Promise<AnalyzeResp
 // ---------- propose ----------
 
 function fitsOf(themes: Record<string, ThemeScoreOut>): Record<string, ThemeFit> {
-  return Object.fromEntries(Object.entries(themes).map(([id, t]) => [id, { label: t.label, z: t.index, score: t.score }]));
+  return Object.fromEntries(Object.entries(themes).map(([id, t]) => [id, { label: t.label, z: t.index, score: t.score, ...(t.slight ? { slight: true } : {}) }]));
 }
 
 /**
