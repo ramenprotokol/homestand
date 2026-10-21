@@ -154,7 +154,7 @@ export const strengthOf = (index: number | null, sd: number | null | undefined):
 export const fitWordFor = (fit: FitLabel, slight?: boolean): string => (slight && fit === "leans-in" ? "Leans strong" : slight && fit === "leans-away" ? "Leans weak" : fitWord(fit));
 
 /** The Why-panel line for a slight lean, with the real gap. */
-export const slightNote = (gap: number, kind?: Kind): string => `Slight: only ${Math.abs(gap).toFixed(3)} from this ${copyFor(kind).place}'s usual. Qloo says gaps this small usually mean similar relevance, so treat it as a lean, not a verdict.`;
+export const slightNote = (gap: number, kind?: Kind): string => `Slight: only ${Math.abs(gap).toFixed(4)} from this ${copyFor(kind).place}'s usual. Qloo says gaps this small usually mean similar relevance, so treat it as a lean, not a verdict.`;
 
 /** How the method works, in plain words. Shown only under "Show the numbers". */
 export const methodWords = (kind?: Kind): string => {

@@ -137,11 +137,11 @@ export function fixView(): HTMLElement {
       savedCopyBanner(),
       swaps.length > 0 ? h("div", { class: "fix-grid" }, stageEl, agent) : null,
       doneBar,
+      p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
+      (p.slight ?? []).length > 0 ? slightBlock(p.slight) : null,
       state.kind === "venue" ? actsPanel(p.acts, a.market.label) : ideasPanel(p.discovery, a.market.label),
       settings,
       shownAngles().length > 0 ? anglesSection() : null,
-      p.unfixed.length > 0 ? unfixedBlock(p.unfixed) : null,
-      (p.slight ?? []).length > 0 ? slightBlock(p.slight) : null,
     ),
   );
 

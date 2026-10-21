@@ -24,7 +24,7 @@ describe("slight lean", () => {
     expect(fitWordFor("leans-in", true)).toBe("Leans strong");
     expect(fitWordFor("leans-away", false)).toBe("Weak fit");
     expect(fitWordFor("average", true)).toBe("Average fit");
-    expect(slightNote(-0.0042)).toBe("Slight: only 0.004 from this town's usual. Qloo says gaps this small usually mean similar relevance, so treat it as a lean, not a verdict.");
+    expect(slightNote(-0.0042)).toBe("Slight: only 0.0042 from this town's usual. Qloo says gaps this small usually mean similar relevance, so treat it as a lean, not a verdict.");
   });
 });
 
